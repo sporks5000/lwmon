@@ -1,0 +1,205 @@
+2.3.6 (2016-11-09) -
+    - Added the following sed command to remove non-printing characters that billing is sometimes apparently throwing in: sed 's/[\xef\xbb\xbf]//g'
+
+2.3.5 (2016-03-30) -
+    - Replaced any math using bc with awk instead.
+
+2.3.4 (2016-03-23) -
+    - Newer version of the function that handles how command line arguments are processed.
+    - Any instance where the script exits now has an exit code of "0" or "1"
+
+2.3.3 (2016-03-18) -
+    - Fixed a mistake where ssh-load jobs couldn't use the "--check-timeout" or "--ctps" flags.
+
+2.3.2 (2016-02-19) -
+    - The amount of time the checks have been running is now reported in hh:mm:ss rather than seconds.
+    - DNS jobs now have a minimum of five seconds rather than two seconds between checks.
+    - The "--testing" flag now rebuilds the child script for every new job.
+    - Fixed an error where the recreation of the command line output was wrong for "load-ps" and "load-fail"
+
+2.3.1 (2016-01-06) -
+    - Re-worded the warnings that certain components need to be installed in order to make the message more clear.
+    - Not having the mail binary installed no longer stops the script from running, it just stops mail from being sent.
+    - Added the "CURL_VERBOSE" and "LOG_HTTP_CODE" directives per a request from dev team.
+
+2.3.0 (2016-01-06) -
+    - Added the "--testing" flag to indicate that the mini script should be rebuilt.
+    - Added the "--record-type" and "--check-result" flags for DNS jobs.
+    - "--string" now relies on fgrep rather than egrep. This changes some functionality, but makes a lot more sense.
+
+2.2.2 (2016-01-04) -
+    - Added the "--job-name" flag, because it seemed weird that you couldn't specify a job name.
+    - Help output now word wraps with line breaks on spaces.
+
+2.2.1 (2015-12-28) -
+    - No longer relies on "ps aux" to check if processes are running.
+    - The master process only spawns one child process per loop rather than potentially spawning several all at once. Staggering them makes for less chance of taxing the processor.
+
+2.2.0 (2015-12-24) -
+    - Master process now checks for killed jobs every five minutes rather than every two seconds.
+    - The master process doesn't need to announce that the verbosity has changed.
+    - Fixed a bug where the script was never deleting old jobs.
+    - Fixed a bug where the menu option for old jobs was not exiting when there were no old jobs.
+    - Added a menu item for currently running jobs to output the "more verbose" information once.
+    - Added menu options for html files.
+    - Allowed command line options "--user-agent" and "--wget" to optionally be followed by "true" or "false" (as there was no way to unset either of these if it was already set in the conf).
+    - Added the following flags "--ldd", "--ndr", "--nsns", "--nds". These mostly exist for the purposes of putputting the command to reproduce the job.
+
+2.1.0 (2015-12-23) -
+    - The master process now checks for a newer version of lwmon and lets the user know if one is available.
+    - ssh-load jobs can now be started with just the "--load" flag, in addition to the "--ssh-load" flag
+    - Added menu options for old jobs.
+
+2.0.2 (2015-12-19) -
+    - The script now has the ability to use wget instead of curl. Added the "--wget" flag to force this.
+
+2.0.1 (2015-12-18) -
+    - Re-added a menu item for changing the job name, as it's not as intuative as I would like just from editing the conf.
+    - Added the "--ident" flag, so that you can pre-include a ticket number or account number as part of a job's name.
+    - When determining a domain's IP address, the script first checks /etc/hosts before determining if it needs to do a dig.
+    - ssh-load jobs can now be run against localhost. A user is not required.
+
+2.0.0 (2015-12-17) -
+    - Moved to version 2.0 - Pretty much all of the original script has been rewritten at this point, and Nothing from earlier versions is compatible.
+    - "CURL_TIMEOUT" is now "CHECK_TIMEOUT".
+    - "NUM_CHECKS_RECENT" is now "NUM_DURATIONS_RECENT"
+    - "DNS_DOMAIN" is now "DNS_CHECK_DOMAIN"
+    - Consolidated the status reporting functions into one function (and saved a few KB as a result).
+    - Revised the process of checking command line arguments. It is slightly less CPU efficient now, but it's significantly more uniform.
+    - Revised fn_parse_server to make its output more accurate and (hopefully) compensate for IPv6
+    - Revised the functions that organize data from the command line and put them into the parameters files.
+    - Removed the majority of the menus; restructured the remaining ones.
+    - Menu items to view log files.
+    - In the child directory, there is a file named "cl" that has the command line flags for the job. You can output this from the menus.
+    - Implimented ssh-load job types. Made sure that there was an explanation for how to start them.
+
+1.4.1 (2015-12-10) -
+    - Improved checking for the output file
+    - Fixed an error where the WAIT_SECONDS variable was being assigned to the wrong variable under some circumstances at the command line.
+    - Fixed an issue where child processes were outputting data after the parent was killed.
+    - Added the --port flag so that you can specify a port at the command line (this can still be achieved by specifying the port within the URL as well).
+    - Replaced all variables named "CURL_PORT" to "SERVER_PORT".
+    - Fixed a bug where "--modify" would occasionally show the incorrect information.
+    - Fixed a bug where "--kill" wasn't telling the child processes to die.
+    - Fixed a bug where log files from re-started jobs weren't getting copied over to their new job.
+
+1.4.0 (2015-12-09) -
+    - Instances of the child pid have the same variable name (With a few exceptions), whether or not they're being referenced by the child process.
+    - fn_read_conf and fn_test_variable are no longer run in subshells.
+    - The reload file is no longer used to test whether the parameters have changed - rather, the script checks if the mtime stamp has been updated.
+    - The params file and the conf file are now read and kept in memory as a variable, and only re-read if their timestamp changes.
+    - More than one curl string can be declared at the command line. All of them present must match the curl'd result in order for it to be counted as a success.
+    - Replaced the phrase "server string" with "job name".
+    - "Hits" and "misses" are now referred to as "successes" and "failures".
+    - LWmon now gathers data on how long it takes for each check to run, and the user has the option to log this data (on by default).
+    - Checks how long it takes for the busy-work portion of checks and subtracts that from WAIT_SECONDS.
+    - Added "more verbose" mode.
+    - email messages now include data on how long the checks took.
+    - Implimented partial successes for URL based checks.
+    - The master process now creates a mini script with just the functions that the child proces needs (reduces memory footprint).
+    - Set the minimum wait seconds to 5 for URLs and 2 for ping and DNS.
+    - All potential parameters are output to the params file; the unpopulated ones are commented out.
+    - Added an option for the script to send an email if X out of the last Y checks were not successes.
+    - Condensed the email functions by reworking them to combine common verbiage.
+
+1.3.1 (2015-12-02) -
+    - Changed the project's name from "xmonitor" to "lwmon".
+
+1.3.0 (2015-12-01) -
+    - A custom message can now be added to email messages using the "CUSTOM_MESSAGE" directive in the params file.
+    - When the master process recieves a "ctrl -c", the prompt now times out after 15 seconds.
+    - Replaced the old control files with a conf file.
+    - Re-designed the params file as a conf-style file.
+    - The job type no longer has to be on the first line - it just has to be preceeded with "JOB_TYPE = ".
+    - Created functions to read from and write to conf files.
+    - More robust checks to make sure that the values pulled from the params files make sense.
+    - No more "none2" verbosity during the period where xmonitor is shutting down; handling this by touching a file instead.
+    - You can now set the number of html files that are kept.
+    - The email now only specifies the original server string if the server string has changed.
+    - The colors of output text can be modified using values within the configuration file.
+    - Revised the interpretation of command line arguments so that they can be used both "=" or a space. I'll pretend that this makes things a little more posix compliant.
+    - Renamed all internal variables so that they start with "v_"
+
+1.2.2 (2015-11-25) -
+    - When a child process begins outputting to a different location, that information is now logged.
+    - Added the "--outfile" flag so that the output file can be assigned on job declaration. Can be assigned through menus as well.
+    - The remote die list can also include the $IP_ADDRESS or $DOMAIN associated with the job. In these cases, it will kill the individual jobs rather than the master process.
+    - The remote die list can also contain in-line comments.
+    - When a process kill is triggered by the remote die list, the full line, including comments, is logged.
+    - "Xmonitor" is now included in the user agent, whether or not the chrome user agent is being used. Tested to verify that this works on my one test case (http://www.celebdirtylaundry.com/).
+    - If the user agent field is set to something that is neither "true" nor "false", what ever is in the field will be used.
+    - All instances of "$v_LOG" are now in quotes, just in case the designated log file contains spaces.
+    - re-worked the sections of the master process that find dead children, and remove disabled children.
+
+1.2.1 (2015-11-23) -
+    - The script checks against a remote list of IP addresses to see if it should exit. The benefit behind this is that if the activity from xmonitor is having a negative impact on a customer's server, we can disable the script without having to unplug an employee's workstation.
+    - The new flag "--help-params-file" explains what the directives in the parameters file do.
+    - Curl timeout can now have a default value set.
+    - The default config files were originally only being made when a master process was being run. I didn't see any reason not to always check whether or not these were present.
+    - No longer using "--resolve" to pull sites from a specific IP address.
+    - Fixed where the script was doing a terrible job of determining the port number.
+    - Verbose mode was showing the wrong time since last check on the first fail or success this is either fixed, or broken in a new and interesting way.
+    - Email subject now includes the word "Xmonitor".
+    - The presence of the file [child pid]/status causes the child process to print the full stats from verbose mode once, then return to the previous verbosity.
+    - The variables in the params file are no longer recognized by the line number they're on.
+    - "--modify" includes an option to directly edit a child process's params file.
+    - Child processes have their own verbosity file. This can be changed in the "--modify" menu.
+    - Now has the option for child processes to output in places other than /dec/stdout. This is accessable through the "--modify" menu.
+
+1.2.0 (2015-11-16) -
+    - Script does its best to check if there are newer versions of curl installed elsewhere.
+    - The "--curl-timeout" flag allows the user to set how long to wait for the curl transaction to complete.
+    - The menu options for URLs now include curl timeout and user agent.
+    - Fixed a mistake where the "save" file never got deleted.
+    - Child loops now collect timestamps all at once.
+    - The Parameters file is now descriptive, and therefore easier to edit.
+    - The child directories have a #reload and #die file by default (easier for manual editing)
+    - There is an option in the --modify menu for a command to take you to the child process's working directory.
+    - Now keeps copies of the downloaded site:
+          - The current copy
+          - The previous copy
+          - Any instance where the site has succeeded immediately before failing
+          - Any instance where the site has failed immediately after succeeding
+    - Automatically cleans up these copies when there are more than 100 of them in total.
+    - When a process is found dead and restarted, the log file is kept.
+    - If anything that is not a job or a log ends up in the new/ directory, it is removed.
+    - Added a command line flag for an explanation on master, control, and child processes.
+    - The e-mail functions now use the child logs rather than pulling from the master log file.
+
+1.1.5 (2015-04-18) -
+    - Added the "--user-agent" flag.
+    - Curl is now run with the "-k" flag 
+
+1.1.4 (2014-03-26) -
+    - E-mail messages should contain the original server string as well as the modified server string in order to prevent ambiguity.
+
+1.1.3 (2013-12-01) -
+    - The line that was determining whether or not a folder represented a child process was working just fine on my workstation, but not my laptop. Changed it to work on both.
+    - The same string as above was in two other places. I modified it there as well.
+
+1.1.2 (2013-09-29) -
+    - The default now is to restart a child process if it's found dead, no matter when it's found.
+    - When a child process is stopped, its folder is backed up for seven days. This may or may not be a reference to the movie "The Ring"
+    - Child processes log to their own directories as well.
+
+1.1.1 (2013-09-20) -
+    - If it finds a dead child process on startup, it restarts that process.
+
+1.1.0 (2013-07-15) -
+    - Added far more robust command line arguments
+    - Added the ability to parse those command line arguments
+    - Added a function that parses out any URL into a URL, IP address, domain, and port.
+    - Better descriptions of the verbosity settings in the menu
+    - Updated the help information and added a help option specifically for flags.
+    - Allowed for setting default e-mail address, wait_seconds, and mail_delay through "--default"
+    - E-mail messages are sent as a background process so that the script won't hang if mail isn't configured.
+
+1.0.0 (2013-07-09) -
+    - Implimented master, child, and control functionality
+    - URL, ping, and DNS monitoring
+    - Basic functionality for "--modify"
+    - "--help" text is concise and informative
+    - E-mail messages can be sent after a certain number of hits or a certain number of misses.
+    - When running without any arguents, prompt intelligently for what needs to be done.
+    - "--modify" allows you to kill the master process
+    - Option to backup current child processes so that they will run next time xmonitor is started, then kill the master process.
