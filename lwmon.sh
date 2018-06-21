@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.2.2"
+v_VERSION="2.3.0"
 
 ##################################
 ### Functions that create jobs ###
@@ -76,7 +76,7 @@ function fn_url_cl {
    if [[ -z "$v_CURL_URL" || -z "${a_CURL_STRING[0]}" ]]; then
       echo "For url jobs, both the \"--url\" and \"--string\" flags require arguments."
       exit
-   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
+   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
       echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
@@ -106,7 +106,7 @@ function fn_url_cl {
    echo "CURL_URL = $v_CURL_URL" >> "$v_WORKINGDIR""$v_NEW_JOB"
    i=0; while [[ $i -le $(( ${#a_CURL_STRING[@]} -1 )) ]]; do
       ### The sed at the end of this line should make the string egrep safe (which is good, because egrepping with it is exactly what we're going to do).
-      echo "CURL_STRING = $( echo ${a_CURL_STRING[$i]} | sed 's/[]\.|$(){}?+*^]/\\&/g' )" >> "$v_WORKINGDIR""$v_NEW_JOB"
+      echo "CURL_STRING = ${a_CURL_STRING[$i]}" >> "$v_WORKINGDIR""$v_NEW_JOB"
       i=$(( $i + 1 ))
    done
    if [[ -z $v_USER_AGENT ]]; then
@@ -127,7 +127,7 @@ function fn_ping_cl {
    if [[ -z "$v_DOMAIN" ]]; then
       echo "For ping jobs, the \"--ping\" flag requires an argument."
       exit
-   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
+   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with ping jobs are the following:"
       echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
@@ -152,7 +152,7 @@ function fn_dns_cl {
       exit
    elif [[ $( echo -n "$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with dns jobs are the following:"
-      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
+      echo "--dns, --domain, --check-result, --record-type, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    ### Make sure that the domain resolves and is properly formatted
@@ -169,6 +169,16 @@ function fn_dns_cl {
    v_NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "JOB_TYPE = dns" > "$v_WORKINGDIR""$v_NEW_JOB"
    echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   if [[ -n $v_DNS_CHECK_RESULT ]]; then
+      echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   else
+      echo "#DNS_CHECK_RESULT = " >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
+   if [[ -n $v_DNS_RECORD_TYPE ]]; then
+      echo "DNS_RECORD_TYPE = $v_DNS_RECORD_TYPE" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   else
+      echo "#DNS_RECORD_TYPE = " >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
 
    fn_mutual_cl
 }
@@ -179,7 +189,7 @@ function fn_load_cl {
    if [[ -z "$v_DOMAIN" ]]; then
       echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
       exit
-   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS" | wc -c ) -gt 0 ]]; then
+   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
       echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
@@ -211,7 +221,7 @@ function fn_load_cl {
       echo
       echo "ssh -o ControlMaster=auto -o ControlPath=\"$v_SSH_CONTROL_PATH\" -p $v_SERVER_PORT $v_SSH_USER@$v_DOMAIN"
       echo
-      echo "Be sure to exit out of the master ssh process when you're done."
+      echo "Be sure to exit out of the master ssh process when you're done monitoring the remote server."
       echo
       exit
    fi
@@ -276,7 +286,7 @@ function fn_mutual_cl {
    fi
    echo "#CUSTOM_MESSAGE = " >> "$v_WORKINGDIR""$v_NEW_JOB"
    if [[ -z $v_LOG_DURATION_DATA ]]; then
-      echo "LOG_DURATION_DATA = false" >> "$v_WORKINGDIR""$v_NEW_JOB"
+      echo "#LOG_DURATION_DATA = " >> "$v_WORKINGDIR""$v_NEW_JOB"
    else
       echo "LOG_DURATION_DATA = $v_LOG_DURATION_DATA" >> "$v_WORKINGDIR""$v_NEW_JOB"
    fi
@@ -494,7 +504,15 @@ function fn_child_vars {
    if [[ $v_JOB_TYPE == "dns" ]]; then
       fn_read_conf DNS_CHECK_DOMAIN child; v_DNS_CHECK_DOMAIN="$v_RESULT"
       fn_parse_server "$v_DNS_CHECK_DOMAIN"; v_DNS_CHECK_DOMAIN="$v_DOMAINa"
+      fn_read_conf DNS_CHECK_RESULT child; v_DNS_CHECK_RESULT="$v_RESULT"
+      fn_read_conf DNS_RECORD_TYPE child; v_DNS_RECORD_TYPE="$v_RESULT"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --check-domain $v_DNS_CHECK_DOMAIN"
+      if [[ -n $v_DNS_CHECK_RESULT ]]; then
+         v_JOB_CL_STRING="$v_JOB_CL_STRING --check-result \"$v_DNS_CHECK_RESULT\""
+      fi
+      if [[ -n $v_DNS_RECORD_TYPE ]]; then
+         v_JOB_CL_STRING="$v_JOB_CL_STRING --record-type $v_DNS_RECORD_TYPE"
+      fi
    fi
    v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY --verbosity \"$v_VERBOSITY\" --outfile \"$v_OUTPUT_FILE\" --seconds $v_WAIT_SECONDS --ldd $v_LOG_DURATION_DATA --ndr $v_NUM_DURATIONS_RECENT --nsns $v_NUM_STATUSES_NOT_SUCCESS --nsr $v_NUM_STATUSES_RECENT --job-name \"$v_JOB_NAME\""
    echo "$v_JOB_CL_STRING" > "$v_WORKINGDIR""$v_CHILD_PID"/cl
@@ -555,7 +573,7 @@ function fn_url_child {
       ### I like the line below, but I had to scrap it 1) on the off chance the multiple strings overlapped, and 2) Because it didn't account for the possibility of one string appearing multiple times, while another string didn't appear at all.
       # if [[ $( egrep -o "$( IFS="|"; echo "${a_CURL_STRING[*]}"; IFS=$" \t\n" )" "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html | wc -l ) -ge "${#a_CURL_STRING[@]}" ]]; then
       i=0; j=0; while [[ $i -lt ${#a_CURL_STRING[@]} ]]; do
-         if [[ $( egrep -c "${a_CURL_STRING[$i]}" "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html ) -gt 0 ]]; then
+         if [[ $( fgrep -c "${a_CURL_STRING[$i]}" "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html ) -gt 0 ]]; then
             j=$(( $j + 1 ))
          fi
          i=$(( $i + 1 ))
@@ -635,7 +653,15 @@ function fn_dns_child {
    while [[ 1 == 1 ]]; do
       fn_child_dates
       v_CHECK_START=$( date +%s"."%N | head -c -6 )
-      v_QUERY_RESULT=$( dig +tries=1 $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | grep -c "ANSWER SECTION" )
+      if [[ -n $v_DNS_RECORD_TYPE && -n $v_DNS_CHECK_RESULT ]]; then
+         v_QUERY_RESULT=$( dig +tries=1 +short $v_DNS_RECORD_TYPE $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | fgrep -c "$v_DNS_CHECK_RESULT" )
+      elif [[ -n $v_DNS_RECORD_TYPE ]]; then
+         v_QUERY_RESULT=$( dig +tries=1 +short $v_DNS_RECORD_TYPE $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | wc -l )
+      elif [[ -n $v_DNS_CHECK_RESULT ]]; then
+         v_QUERY_RESULT=$( dig +tries=1 +short $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | fgrep -c "$v_DNS_CHECK_RESULT" )
+      else
+         v_QUERY_RESULT=$( dig +tries=1 $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | grep -c "ANSWER SECTION" )
+      fi
       v_CHECK_END=$( date +%s"."%N | head -c -6 )
       if [[ $v_QUERY_RESULT -ne 0 ]]; then
          fn_report_status success
@@ -1119,35 +1145,38 @@ function fn_compare_version {
 
 function fn_create_mini_script {
    v_MINI_SCRIPT="$v_WORKINGDIR""$v_PROGRAMNAME"
-   echo "#! /bin/bash" > "$v_MINI_SCRIPT"
-   echo "v_VERSION=\"$v_VERSION\"" >> "$v_MINI_SCRIPT"
+   v_MINI_VERSION="$( head -n 10 $v_MINI_SCRIPT 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+   if [[ $v_VERSION != $v_MINI_VERSION || $v_TESTING == true ]]; then
+      echo "#! /bin/bash" > "$v_MINI_SCRIPT"
+      echo "v_VERSION=\"$v_VERSION\"" >> "$v_MINI_SCRIPT"
 
-   type fn_child | tail -n +2  >> "$v_MINI_SCRIPT"
-   type fn_child_vars | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_read_conf | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_test_variable | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_test_file | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_child_dates | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_url_child | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_ping_child | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_dns_child | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_load_child | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_child_checks | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_child_exit | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_report_status | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_send_email | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_success_email | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_partial_success_email | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_intermittent_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_start_script | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_use_wget | tail -n +2 >> "$v_MINI_SCRIPT"
-   type fn_parse_server | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_child | tail -n +2  >> "$v_MINI_SCRIPT"
+      type fn_child_vars | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_read_conf | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_test_variable | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_test_file | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_child_dates | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_url_child | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_ping_child | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_dns_child | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_load_child | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_child_checks | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_child_exit | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_report_status | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_send_email | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_success_email | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_partial_success_email | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_intermittent_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_start_script | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_use_wget | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_parse_server | tail -n +2 >> "$v_MINI_SCRIPT"
 
-   echo "v_RUNNING_STATE=\"child\"" >> "$v_MINI_SCRIPT"
-   echo "fn_start_script" >> "$v_MINI_SCRIPT"
-   echo "fn_child" >> "$v_MINI_SCRIPT"
-   chmod +x "$v_MINI_SCRIPT"
+      echo "v_RUNNING_STATE=\"child\"" >> "$v_MINI_SCRIPT"
+      echo "fn_start_script" >> "$v_MINI_SCRIPT"
+      echo "fn_child" >> "$v_MINI_SCRIPT"
+      chmod +x "$v_MINI_SCRIPT"
+   fi
 }
 
 function fn_spawn_child_process {
@@ -1353,8 +1382,8 @@ if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
       less +G "$v_WORKINGDIR""$v_CHILD_PID/log"
    elif [[ "$v_OPTION_NUM" == "5" ]]; then
       echo
-      echo "wget http://lwmon.com/lwmon.sh"
-      echo "chmod +x lwmon.sh"
+      echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
+      echo "chmod +x ./lwmon.sh"
       echo "./lwmon.sh $( cat "$v_WORKINGDIR""$v_CHILD_PID/cl" )"
       echo
    elif [[ "$v_OPTION_NUM" == "6" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
@@ -1461,8 +1490,8 @@ function fn_modify {
       less +G "$v_WORKINGDIR""$v_CHILD_PID/log"
    elif [[ "$v_OPTION_NUM" == "5" ]]; then
       echo
-      echo "wget http://lwmon.com/lwmon.sh"
-      echo "chmod +x lwmon.sh"
+      echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
+      echo "chmod +x ./lwmon.sh"
       echo "./lwmon.sh $( cat "$v_WORKINGDIR""$v_CHILD_PID/cl" )"
       echo
    elif [[ "$v_OPTION_NUM" == "6" ]]; then
@@ -1644,7 +1673,6 @@ function fn_parse_cl_argument {
          exit
       fi
    fi
-
    if [[ $2 == "num" && $( echo "$v_RESULT" | egrep -c "^[0-9]+$" ) -eq 0 ]]; then
       echo "The flag \"$1\" needs to be followed by an integer. Exiting."
       exit
@@ -1832,7 +1860,7 @@ FLAGS FOR MONITORING JOB TYPES:
 
      This flag is used to start a new monitoring job for DNS services on a remote server. It requires the use of the "--domain" flag, and can also be used in conjunction with the following flags:
 
-     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds
+     --record-type, --check-result, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds
 
 --ping (host name or IP)
 
@@ -1855,6 +1883,10 @@ FLAGS FOR MONITORING JOB TYPES:
 
 
 FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
+
+--check-result (string)
+
+     This flag allows the user to specify a string of text that must be present in the "dig +short" result of a DNS check.
 
 --check-timeout (number (with or without decimal places))
 
@@ -1932,6 +1964,10 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 --port (port number)
 
      Specify a port number to connect to for ssh-load jobs.
+
+--record-type
+
+     This flag allows the user to specify the type of DNS record that is being requested in a DNS job.
 
 --seconds (number (with or without decimal places))
 
@@ -2052,10 +2088,9 @@ After changes are made to the params file, these changes will not be recognized 
 "CURL_STRING"
      For URL jobs, this is the string that's being checked against in the result of curl process. This directive can be used multiple times. The format for this check is...
 
-     egrep "$CURL_STRING" site_file.html
+     fgrep "$CURL_STRING" site_file.html
 
-     So anything that would be interpreted as a regular expression by egrep WILL be interpreted as such. The "CURL_STRING" directive can be assigned multiple times. All of them mush be matched in the curl result in order for the check to be considered a success.
-     For DNS and ping jobs, this directive is not being used.
+     so when declaring strings at the command line, be sure to escape any dollar sign ($) characters (when modifying a parameters file, escaping this character is not necessary).
 
 "CURL_URL"
      For URL jobs, this is the URL that's being curl'd.
@@ -2065,6 +2100,12 @@ After changes are made to the params file, these changes will not be recognized 
 
 "DNS_CHECK_DOMAIN"
      For a DNS job, when it sends a dig request to the remote server, this is the domain that it sends that request for.
+
+"DNS_CHECK_RESULT"
+     For a DNS job, this is some or all of the text that's expected in the result of the "dig +short" response. fgrep is used to check whether there's a match or not.
+
+"DNS_RECORD_TYPE"
+     For a dns job, this specifies the record type that should be checked for. 
 
 "DOMAIN" 
      For DNS jobs, this is the domain associated with the zone file on the server that we're checking against.
@@ -2135,6 +2176,11 @@ cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
+
+2.3.0 (2016-01-06) -
+     Added the "--testing" flag to indicate that the mini script should be rebuilt.
+     Added the "--record-type" and "--check-result" flags for DNS jobs.
+     "--string" now relies on fgrep rather than egrep. This changes some functionality, but makes a lot more sense.
 
 2.2.2 (2016-01-04) -
      Added the "--job-name" flag, because it seemed weird that you couldn't specify a job name.
@@ -2316,15 +2362,19 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       v_RUNNING_STATE="control"
    elif [[ $v_ARGUMENT == "--save" ]]; then
       v_SAVE_JOBS=true
+   elif [[ $v_ARGUMENT == "--testing" ]]; then
+      v_TESTING=true
+      v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS - 1 ))
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--user-agent($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--user-agent" "bool" "--user-agent" "true"; v_USER_AGENT="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ldd|log-duration-data)($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--ldd" "bool" "--log-duration-data" "true"; v_LOG_DURATION_DATA="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--wget($|=)" ) -eq 1 ]]; then
-      fn_parse_cl_argument "--wget" "bool" "--wget" "true"; v_USE_WGET="$v_RESULT"
+      fn_parse_cl_argument "--wget" "bool" "--wget" "false"; v_USE_WGET="$v_RESULT"
       if [[ $v_USE_WGET == "true" ]]; then
          fn_use_wget
       fi
+      v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS - 1 ))
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(e)*mail($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--mail" "string" "--email"; v_EMAIL_ADDRESS="$v_RESULT"
       if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | grep -c "^[^@][^@]*@[^.]*\..*$" ) -lt 1 ]]; then
@@ -2359,6 +2409,10 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fn_parse_cl_argument "--string" "string"; a_CURL_STRING[${#a_CURL_STRING[@]}]="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(check-)*domain($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--domain" "string" "--check-domain"; v_DNS_CHECK_DOMAIN="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--check-result($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--check-result" "string"; v_DNS_CHECK_RESULT="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--record-type($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--record-type" "string"; v_DNS_RECORD_TYPE="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ssh-)*user($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--user" "string" "--ssh-user"; v_SSH_USER="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--job-name($|=)" ) -eq 1 ]]; then
@@ -2435,7 +2489,7 @@ elif [[ $v_RUN_TYPE == "--kill" ]]; then
 elif [[ $v_RUN_TYPE == "--version" ]]; then
    fn_version
    exit
-elif [[ $v_RUN_TYPE == "--help" || $1 == "-h" ]]; then
+elif [[ $v_RUN_TYPE == "--help" || $v_RUN_TYPE == "-h" ]]; then
    fn_help
    exit
 elif [[ $v_RUN_TYPE == "--help-flags" ]]; then
@@ -2447,9 +2501,9 @@ elif [[ $v_RUN_TYPE == "--help-process-types" ]]; then
 elif [[ $v_RUN_TYPE == "--help-params-file" ]]; then
    fn_help_params_file
    exit
-elif [[ $v_RUN_TYPE == "--modify" || $1 == "-m" ]]; then
+elif [[ $v_RUN_TYPE == "--modify" || $v_RUN_TYPE == "-m" ]]; then
    fn_modify
-elif [[ $v_RUN_TYPE == "--list" || $1 == "-l" ]]; then
+elif [[ $v_RUN_TYPE == "--list" || $v_RUN_TYPE == "-l" ]]; then
    fn_list
    echo
    exit
