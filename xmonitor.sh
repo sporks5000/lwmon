@@ -1,6 +1,6 @@
 #! /bin/bash
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 
 #######################
 ### BEGIN FUNCTIONS ###
@@ -105,7 +105,7 @@ function fn_dns_vars {
 }
 
 function fn_email_address {
-   # When functions are run from the meno, the come here to gather the $WAIT_SECONDS $EMAIL_ADDRESS and $MAIL_DELAY variables.
+   # When functions are run from the menu, they come here to gather the $WAIT_SECONDS $EMAIL_ADDRESS and $MAIL_DELAY variables.
    echo
    echo "Enter the number of seconds the script should wait before performing each iterative check."
    read -p "(Or just press enter for the default of $( cat "$WORKINGDIR"wait_seconds ) seconds): " WAIT_SECONDS
@@ -133,7 +133,7 @@ function fn_email_address {
 }
 
 function fn_parse_server {
-   # given a URL, Domain name, or IP address, this parses those out into the variables $URL, $DOMAIN $IP_ADDRESS, and $IP_PORT.
+   # given a URL, Domain name, or IP address, this parses those out into the variables $URL, $DOMAIN, $IP_ADDRESS, and $IP_PORT.
    if [[ $( echo $SERVER | grep -ci "^HTTP" ) -eq 0 ]]; then
       DOMAINa=$SERVER
       URLa=$SERVER
@@ -674,6 +674,19 @@ function fn_master {
       echo "Master process already present. Exiting"
       exit
    fi
+   # Are there any directories from old child processes? Everything must have exited unexpectedly. Start them back up.
+   for i in $( find $WORKINGDIR -type d ); do
+      CHILD_PID=$( basename $i )
+      if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+         if [[ $( ps aux | grep "$CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+            echo "$( date ) - [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - CHILD process was found on startup. Restarting with new PID." >> $LOG
+            NEW_JOB="$( date +%s )""_$RANDOM"
+            mv -f "$WORKINGDIR""$CHILD_PID"/params "$WORKINGDIR""new/$NEW_JOB"
+            rm -rf "$WORKINGDIR""$CHILD_PID"
+         fi
+      fi
+   done
+   # try to prevent the master process from exiting unexpectedly.
    trap fn_master_exit SIGINT SIGTERM SIGKILL
    VERBOSITY=$( cat "$WORKINGDIR"verbosity )
    while [[ 1 == 1 ]]; do
@@ -1155,7 +1168,10 @@ cat << 'EOF' > /dev/stdout
 
 Version Notes:
 Future Versions -
-     no current plans
+     For URL's, save the results every time their different, so that they can be compared.
+
+1.1.1 -
+     If it finds a dead child process on startup, it restarts that process.
 
 1.1.0 -
      Added far more robust command line arguments
