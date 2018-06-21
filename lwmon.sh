@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.3.3"
+v_VERSION="2.3.4"
 
 ##################################
 ### Functions that create jobs ###
@@ -75,18 +75,18 @@ function fn_url_cl {
    ### Verify that the correct information was given at the command line
    if [[ -z "$v_CURL_URL" || -z "${a_CURL_STRING[0]}" ]]; then
       echo "For url jobs, both the \"--url\" and \"--string\" flags require arguments."
-      exit
+      exit 1
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
       echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
-      exit
+      exit 1
    fi
    ### If there is an IP address, check to make sure that it's really an IP address, or can be translated into one.
    if [[ -n "$v_IP_ADDRESS" ]]; then
       fn_parse_server "$v_IP_ADDRESS"
       if [[ "$v_IP_ADDRESSa" == false ]]; then
          echo "The IP address provided with the \"--ip\" flag is not a valid IP address. Exiting."
-         exit
+         exit 1
       fi
       v_IP_ADDRESS="$v_IP_ADDRESSa"
    fi
@@ -128,16 +128,16 @@ function fn_ping_cl {
    ### Verify that the correct information was given at the command line
    if [[ -z "$v_DOMAIN" ]]; then
       echo "For ping jobs, the \"--ping\" flag requires an argument."
-      exit
+      exit 1
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with ping jobs are the following:"
       echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
-      exit
+      exit 1
    fi
    fn_parse_server "$v_DOMAIN"
    if [[ "$v_IP_ADDRESSa" == false ]]; then
       echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
-      exit
+      exit 1
    fi
    v_ORIG_JOB_NAME="$v_DOMAINa"
    v_DOMAIN=$v_DOMAINa
@@ -151,17 +151,17 @@ function fn_dns_cl {
    ### Verify that the correct information was given at the command line
    if [[ -z "$v_DOMAIN" || -z "$v_DNS_CHECK_DOMAIN" ]]; then
       echo "For dns jobs, both the \"--dns\" and \"--domain\" flags require arguments."
-      exit
+      exit 1
    elif [[ $( echo -n "$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with dns jobs are the following:"
       echo "--dns, --domain, --check-result, --record-type, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
-      exit
+      exit 1
    fi
    ### Make sure that the domain resolves and is properly formatted
    fn_parse_server "$v_DOMAIN"
    if [[ "$v_IP_ADDRESSa" == false ]]; then
       echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
-      exit
+      exit 1
    fi
    v_DOMAIN="$v_DOMAINa"
    ### Make sure that the domain we're digging is properly formatted as well
@@ -190,20 +190,20 @@ function fn_load_cl {
    ### We're not going to check for the user here - we'll cover that below once we confirm that the job isn't for localhost
    if [[ -z "$v_DOMAIN" ]]; then
       echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
-      exit
+      exit 1
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_IP_ADDRESS" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with ssh-load jobs are the following:"
       echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
-      exit
+      exit 1
    fi
    fn_parse_server "$v_DOMAIN"
    if [[ "$v_IP_ADDRESSa" == false ]]; then
       echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
-      exit
+      exit 1
    elif [[ "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" && -z "$v_SSH_USER" ]]; then
    ### If it's not for localhost and there is no user, warn and exit.
       echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
-      exit
+      exit 1
    fi
    v_ORIG_JOB_NAME="$v_DOMAINa"
    v_DOMAIN="$v_DOMAINa"
@@ -225,7 +225,7 @@ function fn_load_cl {
       echo
       echo "Be sure to exit out of the master ssh process when you're done monitoring the remote server."
       echo
-      exit
+      exit 1
    fi
    v_NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "JOB_TYPE = ssh-load" > "$v_WORKINGDIR""$v_NEW_JOB"
@@ -316,7 +316,7 @@ function fn_mutual_cl {
       if [[ $v_TESTING == true ]]; then
          fn_create_mini_script
       fi
-      exit
+      exit 0
    fi
 }
 
@@ -334,7 +334,7 @@ function fn_child {
    v_CHILD_PID=$$
    if [[ ! -f "$v_WORKINGDIR"lwmon.pid ]]; then 
       echo ""$( date +%F":"%T" "%Z )" - [$v_CHILD_PID] - No Master Process present. Exiting." >> "$v_LOG"
-      exit
+      exit 1
    fi
    v_MASTER_PID=$( cat "$v_WORKINGDIR"lwmon.pid )
    v_START_TIME=$( date +%s )
@@ -364,11 +364,11 @@ function fn_child {
          fn_load_child
       else
          echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - Job type is unexpected. Exiting." >> "$v_LOG"
-         fn_child_exit
+         fn_child_exit 1
       fi
    else
       echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - No job type, or more than one job type present. Exiting." >> "$v_LOG"
-      fn_child_exit
+      fn_child_exit 1
    fi
 }
 
@@ -740,7 +740,7 @@ function fn_child_checks {
       touch "$v_WORKINGDIR""$v_CHILD_PID"/die
    fi
    if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/die ]]; then
-      fn_child_exit
+      fn_child_exit 0
    fi
    ### Generally all of the STUFF between the actual check and running sleep lasts 0.1 seconds-ish. No harm in calculating exactly how long it took and then subtracting that from the wait seconds.
    v_CHECK_END2=$( date +%s"."%N | head -c -6 )
@@ -751,7 +751,8 @@ function fn_child_checks {
 }
 
 function fn_child_exit {
-   ### When a child process exits, it needs to clean up after itself and log the fact that it has exited.
+   ### When a child process exits, it needs to clean up after itself and log the fact that it has exited. "$1" is the exit code that should be output.
+   v_EXIT_CODE="$1"
    if [[ $v_TOTAL_CHECKS -gt 0 ]]; then
       echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$v_LOG"
       echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$v_WORKINGDIR""$v_CHILD_PID"/log
@@ -761,7 +762,7 @@ function fn_child_exit {
       mv -f "$v_WORKINGDIR""$v_CHILD_PID"/die "$v_WORKINGDIR""$v_CHILD_PID"/#die
       mv "$v_WORKINGDIR""$v_CHILD_PID" "$v_WORKINGDIR""old_""$v_CHILD_PID""_""$v_DATE3"
    fi
-   exit
+   exit $v_EXIT_CODE
 }
 
 #####################################
@@ -825,7 +826,7 @@ function fn_report_status {
 
    ### Check to see if the parent is still in palce, and die if not.
    if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 ]]; then
-      fn_child_exit
+      fn_child_exit 0
    fi
    ### Figure out how long the script has run and what percent are successes, etc.
    v_RUN_TIME="$( fn_convert_seconds $(( $v_DATE3 - $v_START_TIME )) )"
@@ -1075,7 +1076,7 @@ function fn_master {
    ### This is the loop for the master function.
    if [[ $v_RUNNING_STATE != "master" ]]; then
       echo "Master process already present. Exiting."
-      exit
+      exit 1
    fi
    ### try to prevent the master process from exiting unexpectedly.
    trap fn_master_exit SIGINT SIGTERM SIGKILL
@@ -1093,7 +1094,7 @@ function fn_master {
       $v_WGET_BIN -q --timeout=10 -O "$v_WORKINGDIR"die_list http://lwmon.com/die_list.txt
       v_REMOTE_VERSION="$( $v_WGET_BIN -q --timeout=10 -O "/dev/stdout" http://lwmon.com/lwmon.sh | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
    fi
-   fn_compare_version
+   fn_compare_version "http://wlmon.com/lwmon.sh" "color"
    fn_create_mini_script
    fn_check_mail_binary
    if [[ $v_SEND_MAIL == false ]]; then
@@ -1141,7 +1142,7 @@ function fn_master {
             touch "$v_WORKINGDIR"die
             touch "$v_WORKINGDIR"save
             echo "$( date +%F" "%T" "%Z ) - [$$] - Local IP found on remote list. The line reads \"$( egrep "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\". Process ended." >> "$v_LOG"
-            fn_master_exit
+            fn_master_exit 1
          fi
          ### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
          for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "^[0-9][0-9]*$" ); do
@@ -1191,29 +1192,121 @@ function fn_master {
       fi
       ### Is there a file named "die" in the working directory? If so, end the master process.
       if [[ -f "$v_WORKINGDIR"die ]]; then
-         fn_master_exit
+         fn_master_exit 0
       fi
       sleep 2
    done
 }
 
 function fn_compare_version {
-   ### Check to see if a newer version of the script is available; report if that's the case
-   if [[ -n "$v_REMOTE_VERSION" ]]; then
-      if [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -gt $( echo "$v_VERSION" | cut -d "." -f1 ) ]]; then
-         v_UPDATE=true
-      elif [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -eq $( echo "$v_VERSION" | cut -d "." -f1 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f2 ) -gt $( echo "$v_VERSION" | cut -d "." -f2 ) ]]; then
-         v_UPDATE=true
-      elif [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -eq $( echo "$v_VERSION" | cut -d "." -f1 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f2 ) -eq $( echo "$v_VERSION" | cut -d "." -f2 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f3 ) -gt $( echo "$v_VERSION" | cut -d "." -f3 ) ]]; then
-         v_UPDATE=true
+### Function Version 1.1.1
+### "$1" is the remote URL of the script. "$2" is "run" if a newer version should be run automatically, "color" if we should alert the user in color, and "plain" if we should alert the user with plain text. "plain" is assumed if none of these values are set.
+### The "run" functionality assumes that "${a_CL_ARGUMENTS[@]}" is populated with the command line arguments of the current run. It also assumes that the string "End of Script" is within the last 10 lines of the script.
+### This function can optionally make use of the fn_timeout function.
+   ### Check to see if a newer version of the script is available; report if that's the case.
+   v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+   v_PROGRAMDIR="$( echo "$v_PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
+   v_PROGRAMNAME="$( basename "${BASH_SOURCE[0]}" )"
+   v_SCRIPT_URL="$1"
+   if [[ ! -f "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check" || $(( $(date +%s) - $( stat --format=%Y "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check" ) )) -gt 7200 ]]; then
+      if [[ "$2" == "run" && "$( type -t timeout )" == "file" ]]; then
+         timeout 5 wget -q --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL"
+         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+      elif [[ "$( type -t timeout )" == "file" ]]; then
+         v_REMOTE_VERSION="$( timeout 5 wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+      elif [[ "$2" == "run" && "$( type -t fn_timeout )" == "function" ]]; then
+         fn_timeout 5 wget -q --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL" 
+         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+      elif [[ "$( type -t fn_timeout )" == "function" ]]; then
+         v_REMOTE_VERSION="$( fn_timeout 5 wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+      elif [[ "$2" == "run" ]]; then
+         wget -q --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL" 
+         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+      else
+         v_REMOTE_VERSION="$( wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
       fi
-      if [[ $v_UPDATE == true ]]; then
-         echo
-         echo -e "\e[1;31mThere is a newer version of lwmon available at http://wlmon.com/lwmon.sh\e[00m"
-         echo
+      if [[ -n "$v_REMOTE_VERSION" ]]; then
+         if [[ ( "$2" == "run" && $( tail -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep -c "^### End of Script" ) -eq 1 ) || "$2" != "run" ]]; then
+         ### If the version number is present and the last line of the script is present...
+            if [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -gt $( echo "$v_VERSION" | cut -d "." -f1 ) ]]; then
+               v_UPDATE=true
+            elif [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -eq $( echo "$v_VERSION" | cut -d "." -f1 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f2 ) -gt $( echo "$v_VERSION" | cut -d "." -f2 ) ]]; then
+               v_UPDATE=true
+            elif [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -eq $( echo "$v_VERSION" | cut -d "." -f1 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f2 ) -eq $( echo "$v_VERSION" | cut -d "." -f2 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f3 ) -gt $( echo "$v_VERSION" | cut -d "." -f3 ) ]]; then
+               v_UPDATE=true
+            fi
+            if [[ $v_UPDATE == true && "$2" == "run" ]]; then
+               mv -f "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_PROGRAMDIR""$v_PROGRAMNAME"
+               chmod +x "$v_PROGRAMDIR""$v_PROGRAMNAME"
+               echo 
+               echo "Downloaded a newer version of $v_PROGRAMNAME."
+               echo
+               "$v_PROGRAMDIR""$v_PROGRAMNAME" "${a_CL_ARGUMENTS[@]}" --no-version-check
+               exit $?
+            elif [[ $v_UPDATE == true && "$2" = "color" ]]; then
+               echo
+               echo -e "\e[1;31mThere is a newer version of $v_PROGRAMNAME available at $1""\e[00m"
+               echo
+            elif [[ $v_UPDATE == true ]]; then
+               echo
+               echo "--------There is a newer version of $v_PROGRAMNAME available at $1""--------"
+               echo
+            else
+               rm -f "$v_PROGRAMDIR""$v_PROGRAMNAME"1
+            fi
+         fi
+         touch "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check"
       fi
    fi
 }
+
+
+### Version Information for fn_timeout
+### Version 1.0.0 - 
+###      Original version
+
+function fn_timeout { (
+### Function Version 1.0.0
+### This function expects $1 to be a number of seconds. Optionally $2 can be "--verbose" for verbose output.
+   v_VERBOSE=false
+   if [[ $( echo "$1" | egrep -c "^[0-9]+$" ) -eq 1 ]]; then
+      v_SECONDS="$1"
+      shift
+   else
+      v_SECONDS=10
+   fi
+   if [[ "$1" == "--verbose" ]]; then
+      v_VERBOSE=true
+      shift
+   fi
+   a_CL_ARGUMENTS=( "$@" )
+   a_CL_ARGUMENTS[0]="$( which ${a_CL_ARGUMENTS[0]} )"
+   if [[ -n ${a_CL_ARGUMENTS[0]} ]]; then
+      "${a_CL_ARGUMENTS[@]}" &
+      v_PID=$!
+      v_TIMESTAMP1=$( date +%s )
+      v_TIMESTAMP2=$( date +%N )
+      if [[ -n $v_PID ]]; then
+         while [[ -e /proc/$v_PID/cmdline && -z $( grep -v "^${a_CL_ARGUMENTS[0]}" /proc/$v_PID/cmdline > /dev/null 2>&1 ) ]]; do
+            if [[ "$(( $v_TIMESTAMP1 + $v_SECONDS ))$v_TIMESTAMP2" -lt "$( date +%s )$( date +%N )" ]]; then
+               if [[ $v_VERBOSE == true ]]; then
+                  echo "killing"
+               fi
+               kill $v_PID > /dev/null 2>&1
+               wait $v_PID 2> /dev/null
+               break
+            else
+               if [[ $v_VERBOSE == true ]]; then
+                  echo "sleeping"
+               fi
+               sleep 0.1
+            fi
+         done
+      fi
+   elif [[ $v_VERBOSE == true ]]; then
+      echo "Command is not a recognized"
+   fi
+) }
 
 function fn_create_mini_script {
    v_MINI_SCRIPT="$v_WORKINGDIR""$v_PROGRAMNAME"
@@ -1270,7 +1363,8 @@ function fn_spawn_child_process {
 }
 
 function fn_master_exit {
-   ### these steps are run after the master process has recieved a signal that it needs to die.
+   ### these steps are run after the master process has recieved a signal that it needs to die. "$1" is the exit code that should be passed.
+   v_EXIT_CODE="$1"
    echo "$( date +%F" "%T" "%Z ) - [$$] - Ending the Master Process" >> "$v_LOG"
    if [[ ! -f "$v_WORKINGDIR"die && $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -vc "[^0-9]" ) -gt 0 ]]; then
       ### If the "die" file is not present, it was CTRL-C'd from the command line. Check if there are child processes, then prompt if they should be saved.
@@ -1302,7 +1396,7 @@ function fn_master_exit {
       done
    fi
    rm -f "$v_WORKINGDIR"lwmon.pid "$v_WORKINGDIR"die
-   exit
+   exit $v_EXIT_CODE
 }
 
 ###############################
@@ -1313,7 +1407,7 @@ function fn_list {
    ### This just lists the lwmon master process and all child processes.
    if [[ $v_RUNNING_STATE == "master" ]]; then
       echo "No current lwmon processes. Exiting."
-      exit
+      exit 1
    fi
    echo "List of currently running lwmon processes:"
    echo
@@ -1360,7 +1454,7 @@ function fn_modify_master {
    else
       echo "Exiting."
    fi
-   exit
+   exit 0
 }
 
 function fn_modify_no_master {
@@ -1395,7 +1489,7 @@ function fn_modify_no_master {
    else
       echo "Exiting."
    fi
-   exit
+   exit 0
 }
 
 function fn_modify_old_jobs {
@@ -1417,13 +1511,13 @@ function fn_modify_old_jobs {
    if [[ ${#a_CHILD_PID[@]} -eq 0 ]]; then
       echo "There are no old jobs. Exiting."
       echo
-      exit
+      exit 1
    fi
    echo
    read -p "Which process do you want to modify? " v_CHILD_NUMBER
    if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
       echo "Invalid Option. Exiting."
-      exit
+      exit 1
    fi
    v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]}"
    fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
@@ -1468,7 +1562,7 @@ if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
    else
       echo "Exiting."
    fi
-   exit
+   exit 0
 }
 
 function fn_modify_html {
@@ -1488,12 +1582,12 @@ function fn_modify_html {
    echo
    if [[ ${#a_HTML_LIST[@]} -eq 0 ]]; then
       echo "There are no html files associated with this job. Exiting."
-      exit
+      exit 1
    fi
    read -p "Which html file do you want options on? " v_HTML_NUMBER
    if [[ "$v_HTML_NUMBER" == "0" || $( echo "$v_HTML_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_HTML_NUMBER" -ge $(( ${#a_HTML_LIST[@]} + 1 )) ]]; then
       echo "Invalid Option. Exiting."
-      exit
+      exit 1
    fi
    v_HTML_NAME="${a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]}"
    echo "$v_HTML_NAME:"
@@ -1513,7 +1607,7 @@ function fn_modify_html {
    else
       echo "Exiting."
    fi
-   exit
+   exit 0
 }
 
 function fn_modify {
@@ -1526,7 +1620,7 @@ function fn_modify {
    read -p "Which process do you want to modify? " v_CHILD_NUMBER
    if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
       echo "Invalid Option. Exiting."
-      exit
+      exit 1
    fi
    if [[ $v_CHILD_NUMBER -lt 2 ]]; then
       fn_modify_master
@@ -1579,7 +1673,7 @@ function fn_modify {
    else
       echo "Exiting."
    fi
-   exit
+   exit 0
 }
 
 ##############################################
@@ -1710,36 +1804,51 @@ function fn_test_file {
 }
 
 function fn_parse_cl_argument {
-   ### For this function, $1 is the flag that was passed (without trailing equal sign), $2 is "num" or "int" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, "date" if it's a date, "file" if it's a file, "directory" if it's a directory, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. IF $2 is bool, then $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error. If $2 is "file" or "directory", then $4 can be "create" if the file should be created, and "error" if the file needs to have existed previously.
+   ### Function Version 1.0.1
+   ### For this function, $1 is the flag that was passed (without trailing equal sign), $2 is "num" or "int" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, "date" if it's a date, "file" if it's a file, "directory" if it's a directory, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. If $2 is bool, then $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error. If $2 is "file" or "directory", then $4 can be "create" if the file should be created, and "error" if the file needs to have existed previously.
+   ### This script makes use of, but does not rely on the function "fn_fix_home".
+   ### Currently scrub.sh has the prettiest implimentation of passing data to this function.
    unset v_RESULT
    if [[ "$2" == "none" ]]; then
       v_RESULT="true"
-   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^$1$" ) -eq 1 && "$2" != "none" ]]; then
+   elif [[ "$v_ARGUMENT" =~ ^$1$ && "$2" != "none" ]]; then
    ### If there is no equal sign, the next argument is the modifier for the flag
-      if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ]]; then
-         c=$(( $c + 1 ))
-         v_RESULT="${a_CL_ARGUMENTS[$c]}"
+      if [[ ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
+      ### If the next argument doesn't begin with a dash.
+         if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
+         ### If it's not bool, or if it is bool, but the next argument is neither true nor false
+            c=$(( $c + 1 ))
+            v_RESULT="${a_CL_ARGUMENTS[$c]}"
+         fi
       elif [[ "$2" != "bool" ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
          exit 1
       fi
-   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^$1=" ) -eq 1 && "$2" != "none" ]]; then
+   elif [[ "$v_ARGUMENT" =~ ^$1[0-9]*$ && ( $2 == "int" || $2 == "num" ) ]]; then
+   ### If the argument has a number on the end, and it's type is "int" or "num", then the number is the modifier
+      v_RESULT="$( echo "$v_ARGUMENT" | sed "s/^$1//" )"
+   elif [[ "$v_ARGUMENT" =~ ^$1= && "$2" != "none" ]]; then
    ### If the argument has an equal sign, then the modifier for the flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
       if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
          exit 1
       fi
-   elif [[ -n "$3" && $( echo "$v_ARGUMENT" | egrep -c "^$3$" ) -eq 1 && "$2" != "none" ]]; then
+   elif [[ -n "$3" && "$v_ARGUMENT" =~ ^$3$ && "$2" != "none" ]]; then
    ### If there is no equal sign, the next argument is the modifier for the alternate flag
-      if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ]]; then
-         c=$(( $c + 1 ))
-         v_RESULT="${a_CL_ARGUMENTS[$c]}"
+      if [[ ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
+         if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
+            c=$(( $c + 1 ))
+            v_RESULT="${a_CL_ARGUMENTS[$c]}"
+         fi
       elif [[ "$2" != "bool" ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
          exit 1
       fi
-   elif [[ -n "$3" && $( echo "$v_ARGUMENT" | egrep -c "^$3=" ) -eq 1 && "$2" != "none" ]]; then
+   elif [[ "$v_ARGUMENT" =~ ^$3[0-9]*$ && ( $2 == "int" || $2 == "num" ) ]]; then
+   ### If the argument has a number on the end, and it's type is "int" or "num", then the number is the modifier
+      v_RESULT="$( echo "$v_ARGUMENT" | sed "s/^$3//" )"
+   elif [[ -n "$3" && "$v_ARGUMENT" =~ ^$3= && "$2" != "none" ]]; then
    ### If the argument has an equal sign, then the modifier for the alternate flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
       if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
@@ -1747,19 +1856,23 @@ function fn_parse_cl_argument {
          exit 1
       fi
    fi
-   if [[ ( $2 == "num" || $2 == "int" ) && $( echo "$v_RESULT" | egrep -c "^[0-9]+$" ) -eq 0 ]]; then
+   if [[ ( $2 == "num" || $2 == "int" ) && ! "$v_RESULT" =~ ^[0-9]+$ ]]; then
       echo "The flag \"$1\" needs to be followed by an integer. Exiting."
       exit 1
    elif [[ $2 == "date" ]]; then
+      ### Dates are validated by ensuring that they can be passed to the "date" command,so things like "yesterday" also work.
       date --date="$v_RESULT" > /dev/null 2>&1
       if [[ $? -ne 0 ]]; then
          echo "The flag \"$1\" needs to be followed by a date. Exiting."
          exit 1
       fi
-   elif [[ $2 == "float" && $( echo "$v_RESULT" | egrep -c "^[0-9.]+$" ) -eq 0 ]]; then
+   elif [[ $2 == "float" && ! "$v_RESULT" =~ ^[0-9.]+$ ]]; then
       echo "The flag \"$1\" needs to be followed by a number. Exiting."
       exit 1
    elif [[ $2 == "file" ]]; then
+      if [[ $( type -t fn_fix_home ) == "function" ]]; then
+         fn_fix_home "$v_RESULT"
+      fi
       if [[ $4 == "error" && ! -f "$v_RESULT" ]]; then
          echo "File \"$v_RESULT\" does not appear to exist. Exiting."
          exit 1
@@ -1772,6 +1885,9 @@ function fn_parse_cl_argument {
          fi
       fi
    elif [[ $2 == "directory" ]]; then
+      if [[ $( type -t fn_fix_home ) == "function" ]]; then
+         fn_fix_home "$v_RESULT" --directory
+      fi
       if [[ $4 == "error" && ! -d "$v_RESULT" ]]; then
          echo "Directory \"$v_RESULT\" does not appear to exist. Exiting."
          exit 1
@@ -1783,11 +1899,11 @@ function fn_parse_cl_argument {
             exit 1
          fi
       fi
-      if [[ $( echo "$v_RESULT" | grep -c "/$" ) -eq 0 ]]; then
+      if [[ "$v_RESULT" =~ /$ ]]; then
          v_RESULT="$v_RESULT/"
       fi
    elif [[ $2 == "bool" ]]; then
-      if [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^(t(rue)*|f(alse)*)$" ) -eq 0  ]]; then
+      if [[ $( echo "$v_RESULT" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 0 ]]; then
          if [[ -z "$4" || "$4" == "exit" ]]; then
             echo "The flag \"$1\" needs to be followed by \"true\" or \"false\". Exiting."
             exit 1
@@ -1796,9 +1912,9 @@ function fn_parse_cl_argument {
          else
             v_RESULT="true"
          fi
-      elif [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^t(rue)*$" ) -eq 1  ]]; then
+      elif [[ $( echo "$v_RESULT" | egrep -c "^[Tt]([Rr][Uu][Ee])*$" ) -eq 1 ]]; then
          v_RESULT="true"
-      elif [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^f(alse)*$" ) -eq 1  ]]; then
+      elif [[ $( echo "$v_RESULT" | egrep -c "^[Ff]([Aa][Ll][Ss][Ee])*$" ) -eq 1 ]]; then
          v_RESULT="false"
       fi
    fi
@@ -1896,7 +2012,7 @@ sleep 1
 ##################################
 
 function fn_help {
-cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
+cat << 'EOF' | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
 
 LWmon (Less Worry Monitor) - A script to organize and consolidate the monitoring of multiple servers. With LWmon you can run checks against multiple servers simultaneously, starting new jobs and stopping old ones as needed without interfering with any that are currently running. All output from the checks go by default to a single terminal window, allowing you to keep an eye on multiple things going on at once.
 
@@ -1960,11 +2076,11 @@ Note: Regarding text color!
 
 EOF
 #"'do
-exit
+exit 0
 }
 
 function fn_help_flags {
-cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
+cat << 'EOF' | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
 
 FLAGS FOR MONITORING JOB TYPES:
 
@@ -2153,11 +2269,11 @@ OTHER FLAGS:
 
 EOF
 #'"do
-exit
+exit 0
 }
 
 function fn_help_process_types {
-cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
+cat << 'EOF' | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
 
 MASTER, CONTROL, AND CHILD PROCESSES
 
@@ -2176,11 +2292,11 @@ CHILD PROCESSES -
 
 EOF
 #'do
-exit
+exit 0
 }
 
 function fn_help_params_file {
-cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
+cat << 'EOF' | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
 
 PARAMETERS FILE
 (located at ".lwmon/[CHILD PID]/params")
@@ -2284,19 +2400,23 @@ After changes are made to the params file, these changes will not be recognized 
 
 EOF
 #'do
-exit
+exit 0
 }
 
 function fn_version {
 echo "Current Version: $v_VERSION"
-cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
+cat << 'EOF' | fold -s -w $(( $(tput cols) - 1 )) > /dev/stdout
 
 Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
      Rather than have a job run indefinitely, have the user set a duration or a time for it to stop.
 
-3.3.3. (2016-03-18) -
+2.3.4 (2016-03-23) -
+     Newer version of the function that handles how command line arguments are processed.
+     Any instance where the script exits now has an exit code of "0" or "1"
+
+2.3.3 (2016-03-18) -
      Fixed a mistake where ssh-load jobs couldn't use the check-timeout or ctps flags.
 
 2.3.2 (2016-02-19) -
@@ -2332,7 +2452,7 @@ Future Versions -
 
 EOF
 #'do
-exit
+exit 0
 }
 
 ########################
@@ -2372,7 +2492,7 @@ function fn_use_wget {
    v_WGET_BIN="$( which wget 2> /dev/null )"
    if [[ -z "$v_WGET_BIN" ]]; then
       echo "curl or wget needs to be installed for lwmon to perform some of its functions. Exiting."
-      exit
+      exit 1
    fi
    v_WGET_BIN_VERSION="$( wget --version | head -n1 | awk '{print $3}' )"
    v_CURL_BIN="false"
@@ -2392,7 +2512,7 @@ rm -f "$v_WORKINGDIR"no_output
 for i in bc dig ping stat ssh; do
    if [[ -z $( which $i 2> /dev/null ) ]]; then
       echo "The \"$i\" binary needs to be installed for lwmon to perform some of its functions. Exiting."
-      exit
+      exit 1
    fi
 done
 
@@ -2434,7 +2554,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       if [[ -n $v_RUN_TYPE ]]; then
          ### If another of these actions has already been specified, end.
          echo "Cannot use \"$v_RUN_TYPE\" and \"$v_ARGUMENT\" simultaneously. Exiting."
-         exit
+         exit 1
       fi
       v_RUN_TYPE=$( echo "$v_ARGUMENT" | cut -d "=" -f1 )
       if [[ $( echo "$v_ARGUMENT" | egrep -c "^-(u|-url)($|=)" ) -eq 1 ]]; then
@@ -2476,7 +2596,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fn_parse_cl_argument "--mail" "string" "--email"; v_EMAIL_ADDRESS="$v_RESULT"
       if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | grep -c "^[^@][^@]*@[^.]*\..*$" ) -lt 1 ]]; then
          echo "The flag \"--mail\" needs to be followed by an e-mail address. Exiting."
-         exit
+         exit 1
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--seconds($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--seconds" "float"; v_WAIT_SECONDS="$v_RESULT"
@@ -2524,14 +2644,14 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fi
       if [[ $( echo "$v_VERBOSITY" | egrep -c "^(verbose|more verbose|standard|change|none)$" ) -eq 0 ]]; then
          echo "The flag \"--verbosity\" needs to be followed by either \"verbose\", \"more verbose\", \"standard\", \"change\", or \"none\". Exiting."
-         exit
+         exit 1
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--out(put-)*file($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--outfile" "string" "--output-file"; v_OUTPUT_FILE="$v_RESULT"
       fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
       if [[ -z "$v_OUTPUT_FILE" ]]; then
          echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
-         exit
+         exit 1
       fi
    else
       if [[ $( echo "$v_ARGUMENT "| grep -c "^-" ) -eq 1 ]]; then
@@ -2539,7 +2659,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       else
          echo "I don't understand what flag the argument \"$v_ARGUMENT\" is supposed to be associated with. Exiting."
       fi
-      exit
+      exit 1
    fi
    v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS + 1 ))
 done
@@ -2548,7 +2668,7 @@ done
 if [[ $v_RUN_TYPE == "--master" || $v_RUN_TYPE == "--version" || $v_RUN_TYPE == "--help-flags" || $v_RUN_TYPE == "--help-process-types" || $v_RUN_TYPE == "--help-params-file" || $v_RUN_TYPE == "--help" || $v_RUN_TYPE == "--modify" || $v_RUN_TYPE == "-h" || $v_RUN_TYPE == "-m" ]]; then
    if [[ $v_NUM_ARGUMENTS -gt 1 ]]; then
       echo "The flag \"$v_RUN_TYPE\" cannot be used with other flags. Exiting."
-      exit
+      exit 1
    fi
 fi
 ### Tells the script where to go with the type of job that was selected.
@@ -2564,46 +2684,46 @@ elif [[ $v_RUN_TYPE == "--kill" ]]; then
    if [[ -n $v_CHILD_PID ]]; then
       if [[ ! -f  "$v_WORKINGDIR"$v_CHILD_PID/params ]]; then
          echo "Child ID provided does not exist."
-         exit
+         exit 1
       fi
       touch "$v_WORKINGDIR"$v_CHILD_PID/die
       echo "The child process will exit shortly."
-      exit   
+      exit 0
    elif [[ $v_SAVE_JOBS == true ]]; then
       if [[ $v_NUM_ARGUMENTS -gt 2 ]]; then
          echo "The \"--kill\" flag can only used alone, with the \"--save\" flag, or in conjunction with the ID number of a child process. Exiting."
-         exit
+         exit 1
       fi
       touch "$v_WORKINGDIR"save
    else
       if [[ $v_NUM_ARGUMENTS -gt 1 ]]; then
          echo "The \"--kill\" flag can only used alone, with the \"--save\" flag, or in conjunction with the ID number of a child process. Exiting."
-         exit
+         exit 1
       fi
    fi
    touch "$v_WORKINGDIR"die
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--version" ]]; then
    fn_version
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--help" || $v_RUN_TYPE == "-h" ]]; then
    fn_help
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--help-flags" ]]; then
    fn_help_flags
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--help-process-types" ]]; then
    fn_help_process_types
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--help-params-file" ]]; then
    fn_help_params_file
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--modify" || $v_RUN_TYPE == "-m" ]]; then
    fn_modify
 elif [[ $v_RUN_TYPE == "--list" || $v_RUN_TYPE == "-l" ]]; then
    fn_list
    echo
-   exit
+   exit 0
 elif [[ $v_RUN_TYPE == "--master" ]]; then
    fn_master
 elif [[ -z $v_RUN_TYPE ]]; then
@@ -2614,9 +2734,9 @@ elif [[ -z $v_RUN_TYPE ]]; then
 fi
 
 echo "The script should not get to this point. Exiting"
-exit
+exit 1
 
 
 
 
-
+### End of Script
