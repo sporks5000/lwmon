@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.3.1"
+v_VERSION="2.3.2"
 
 ##################################
 ### Functions that create jobs ###
@@ -312,6 +312,10 @@ function fn_mutual_cl {
    if [[ "$v_RUNNING_STATE" == "master" ]]; then
       fn_master
    else
+      ### Rebuild the child script if necesasary
+      if [[ $v_TESTING == true ]]; then
+         fn_create_mini_script
+      fi
       exit
    fi
 }
@@ -434,9 +438,13 @@ function fn_child_vars {
       ### If there is no designated output file, and there was none previously, stdout will be fine.
       v_OUTPUT_FILE="/dev/stdout"
    fi
-   if [[ "$v_JOB_TYPE" == "dns" || "$v_JOB_TYPE" == "ping" ]]; then
+   if [[ "$v_JOB_TYPE" == "ping" ]]; then
       if [[ $( echo $v_WAIT_SECONDS | cut -d "." -f1 ) -lt 2 ]]; then
          v_WAIT_SECONDS=2
+      fi
+   else
+      if [[ $( echo $v_WAIT_SECONDS | cut -d "." -f1 ) -lt 5 ]]; then
+         v_WAIT_SECONDS=5
       fi
    fi
    if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
@@ -446,9 +454,6 @@ function fn_child_vars {
       fn_test_variable "$v_CHECK_TIME_PARTIAL_SUCCESS" true CHECK_TIME_PARTIAL_SUCCESS "7"; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --check-timeout $v_CHECK_TIMEOUT --ctps $v_CHECK_TIME_PARTIAL_SUCCESS"
       v_CHECK_TIME_PARTIAL_SUCCESS="$( echo "scale=4; $v_CHECK_TIME_PARTIAL_SUCCESS *100" | bc | cut -d "." -f1 )"
-      if [[ $( echo $v_WAIT_SECONDS | cut -d "." -f1 ) -lt 5 ]]; then
-         v_WAIT_SECONDS=5
-      fi
    fi
    if [[ $v_JOB_TYPE == "url" ]]; then
       fn_read_conf IP_ADDRESS child; v_IP_ADDRESS="$v_RESULT"
@@ -488,7 +493,7 @@ function fn_child_vars {
       fi
       if [[ $v_USER_AGENT == true ]]; then
          v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent"
-         v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36'
+         v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'
       elif [[ $v_USER_AGENT == false && $v_WGET_BIN == "false" ]]; then
          v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent false"
          v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
@@ -502,12 +507,12 @@ function fn_child_vars {
       fn_test_variable "$v_SERVER_PORT" true false "22"; v_SERVER_PORT="$v_RESULT"
       fn_read_conf MIN_LOAD_PARTIAL_SUCCESS child; v_MIN_LOAD_PARTIAL_SUCCESS="$v_RESULT"
       fn_test_variable "$v_MIN_LOAD_PARTIAL_SUCCESS" true false "4"; v_MIN_LOAD_PARTIAL_SUCCESS="$v_RESULT"
-      v_MIN_LOAD_PARTIAL_SUCCESS="$( echo "scale=4; $v_MIN_LOAD_PARTIAL_SUCCESS *100" | bc | cut -d "." -f1 )"
       fn_read_conf MIN_LOAD_FAILURE child; v_MIN_LOAD_FAILURE="$v_RESULT"
       fn_test_variable "$v_MIN_LOAD_FAILURE" true false "8"; v_MIN_LOAD_FAILURE="$v_RESULT"
-      v_MIN_LOAD_FAILURE="$( echo "scale=4; $v_MIN_LOAD_FAILURE *100" | bc | cut -d "." -f1 )"
       fn_read_conf SSH_USER child; v_SSH_USER="$v_RESULT"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --port $v_SERVER_PORT --load-ps $v_MIN_LOAD_PARTIAL_SUCCESS --load-fail $v_MIN_LOAD_FAILURE --user $v_SSH_USER"
+      v_MIN_LOAD_PARTIAL_SUCCESS="$( echo "scale=4; $v_MIN_LOAD_PARTIAL_SUCCESS *100" | bc | cut -d "." -f1 )"
+      v_MIN_LOAD_FAILURE="$( echo "scale=4; $v_MIN_LOAD_FAILURE *100" | bc | cut -d "." -f1 )"
       fn_read_conf SSH_CONTROL_PATH child; v_SSH_CONTROL_PATH="$v_RESULT"
       fn_test_variable "$v_SSH_CONTROL_PATH" false SSH_CONTROL_PATH "~/.ssh/control:%h:%p:%r"; v_SSH_CONTROL_PATH="$v_RESULT"
       fn_test_file "$v_SSH_CONTROL_PATH" false false; v_SSH_CONTROL_PATH="$v_RESULT"
@@ -823,7 +828,7 @@ function fn_report_status {
       fn_child_exit
    fi
    ### Figure out how long the script has run and what percent are successes, etc.
-   v_RUN_TIME=$(( $v_DATE3 - $v_START_TIME ))
+   v_RUN_TIME="$( fn_convert_seconds $(( $v_DATE3 - $v_START_TIME )) )"
    v_TOTAL_CHECKS=$(( $v_TOTAL_CHECKS + 1 ))
    v_PERCENT_SUCCESSES=$( echo "scale=2; $v_TOTAL_SUCCESSES * 100 / $v_TOTAL_CHECKS" | bc )
    v_PERCENT_PARTIAL_SUCCESSES=$( echo "scale=2; $v_TOTAL_PARTIAL_SUCCESSES * 100 / $v_TOTAL_CHECKS" | bc )
@@ -854,21 +859,21 @@ function fn_report_status {
       if [[ $v_LAST_SUCCESS == "never" || -z $v_LAST_SUCCESS ]]; then
          v_LAST_SUCCESS_STRING="never"
       else
-         v_LAST_SUCCESS_STRING="$(( $v_DATE3 - $v_LAST_SUCCESS )) seconds ago"
+         v_LAST_SUCCESS_STRING="$( fn_convert_seconds $(( $v_DATE3 - $v_LAST_SUCCESS )) ) ago"
       fi
    fi
    if [[ "$v_THIS_STATUS" != "partial success" ]]; then
       if [[ $v_LAST_PARTIAL_SUCCESS == "never" || -z $v_LAST_PARTIAL_SUCCESS ]]; then
          v_LAST_PARTIAL_SUCCESS_STRING="never"
       else
-         v_LAST_PARTIAL_SUCCESS_STRING="$(( $v_DATE3 - $v_LAST_PARTIAL_SUCCESS )) seconds ago"
+         v_LAST_PARTIAL_SUCCESS_STRING="$( fn_convert_seconds $(( $v_DATE3 - $v_LAST_PARTIAL_SUCCESS )) ) ago"
       fi
    fi
    if [[ "$v_THIS_STATUS" != "failure" ]]; then
       if [[ $v_LAST_FAILURE == "never" || -z $v_LAST_FAILURE ]]; then
          v_LAST_FAILURE_STRING="never"
       else
-         v_LAST_FAILURE_STRING="$(( $v_DATE3 - $v_LAST_FAILURE )) seconds ago"
+         v_LAST_FAILURE_STRING="$( fn_convert_seconds $(( $v_DATE3 - $v_LAST_FAILURE )) ) ago"
       fi
    fi
 
@@ -876,7 +881,7 @@ function fn_report_status {
 
    if [[ $v_VERBOSITY == "verbose" ]]; then
       ### verbose
-      v_REPORT="$v_DATE - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME: $v_DESCRIPTOR1 - Checking for $v_RUN_TIME seconds."
+      v_REPORT="$v_DATE - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME: $v_DESCRIPTOR1 - Checking for $v_RUN_TIME."
       if [[ $v_LAST_LAST_STATUS == "success" ]]; then
          v_REPORT="$v_REPORT Last success: $v_LAST_SUCCESS_STRING."
       elif [[ $v_LAST_LAST_STATUS == "partial success" ]]; then
@@ -887,7 +892,7 @@ function fn_report_status {
       v_REPORT="$v_REPORT $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate."
    elif [[ $v_VERBOSITY == "more verbose" || -f "$v_WORKINGDIR""$v_CHILD_PID"/status ]]; then
       ### more verbose
-      v_REPORT="$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME\n  Check Status:               $v_DESCRIPTOR1\n  Checking for:               $v_RUN_TIME seconds\n  "
+      v_REPORT="$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME\n  Check Status:               $v_DESCRIPTOR1\n  Checking for:               $v_RUN_TIME\n  "
       if [[ "$v_THIS_STATUS" != "success" ]]; then
          v_REPORT="$v_REPORT""Last successful check:      $v_LAST_SUCCESS_STRING\n  "
       fi
@@ -987,7 +992,7 @@ function fn_report_status {
 
 function fn_send_email {
    if [[ $v_SEND_MAIL == true ]]; then
-      v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n"
+      v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n"
       if [[ "$v_THIS_STATUS" == "intermittent failure" ]]; then
          fn_intermittent_failure_email
       elif [[ "$v_THIS_STATUS" == "success" ]]; then
@@ -1050,6 +1055,16 @@ function fn_check_mail_binary {
    else
       v_SEND_MAIL=true
    fi
+}
+
+function fn_convert_seconds {
+### I really haven't wrapped my head around how this function I stole works, but it converts a number of seconds to hours, minutes, and seconds.
+   ((h=${1}/3600))
+   ### This is the part where it does some stuff.
+   ((m=(${1}%3600)/60))
+   ((s=${1}%60))
+   ### I'm really excited about this part here that does the thing.
+   printf "%02d:%02d:%02d\n" $h $m $s
 }
 
 ########################
@@ -1229,6 +1244,7 @@ function fn_create_mini_script {
       type fn_use_wget | tail -n +2 >> "$v_MINI_SCRIPT"
       type fn_parse_server | tail -n +2 >> "$v_MINI_SCRIPT"
       type fn_check_mail_binary | tail -n +2 >> "$v_MINI_SCRIPT"
+      type fn_convert_seconds | tail -n +2 >> "$v_MINI_SCRIPT"
 
       echo "v_RUNNING_STATE=\"child\"" >> "$v_MINI_SCRIPT"
       echo "fn_start_script" >> "$v_MINI_SCRIPT"
@@ -2245,6 +2261,13 @@ cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
+     Rather than have a job run indefinitely, have the user set a duration or a time for it to stop.
+
+2.3.2 (2016-02-19) -
+     The amount of time the checks have been running is now reported in hh:mm:ss rather than seconds.
+     DNS jobs now have a minimum of five seconds rather than two seconds between checks.
+     The "--testing" flag now rebuilds the child script for every new job.
+     Fixed an error where the recreation of the command line output was wrong for "load-ps" and "load-fail"
 
 2.3.1 (2016-01-06) -
      Re-worded the warnings that certain components need to be installed in order to make the message more clear.
