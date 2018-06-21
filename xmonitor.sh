@@ -1,6 +1,6 @@
 #! /bin/bash
 
-VERSION="1.1.2"
+VERSION="1.1.3"
 
 #######################
 ### BEGIN FUNCTIONS ###
@@ -712,7 +712,9 @@ function fn_master {
       # go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
       for i in $( find $WORKINGDIR -type d ); do
          CHILD_PID=$( basename $i )
-         if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+         # I'm not sure why the following line works sometimes and not others. Replacing it.
+         # if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+         if [[ $( echo $CHILD_PID | sed "s/[[:digit:]]//g" | grep -c . ) -eq 0 ]]; then
             if [[ $( ps aux | grep "$CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
                # If it's been marked to die, back it up temporarily
                if [[ -f "$WORKINGDIR""$CHILD_PID/die" ]]; then
@@ -774,7 +776,8 @@ function fn_master_exit {
       if [[ $OPTION_NUM == "1" ]]; then
          for i in $( find $WORKINGDIR -type d ); do
             CHILD_PID=$( basename $i )
-            if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+            # if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+            if [[ $( echo $CHILD_PID | sed "s/[[:digit:]]//g" | grep -c . ) -eq 0 ]]; then
                if [[ $( ps aux | grep "$CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
                   touch "$WORKINGDIR""$CHILD_PID/die"
                fi
@@ -850,7 +853,8 @@ function fn_modify {
    # List the current xmonitor processes.
    for i in $( find $WORKINGDIR -type d ); do
       CHILD_PID=$( basename $i )
-      if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+      # if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+      if [[ $( echo $CHILD_PID | sed "s/[[:digit:]]//g" | grep -c . ) -eq 0 ]]; then
          CHILD_NUMBER=$(( $CHILD_NUMBER + 1 ))
          echo "  $CHILD_NUMBER) [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" )"
          aCHILD_PID[$CHILD_NUMBER]="$CHILD_PID"
@@ -1183,7 +1187,11 @@ cat << 'EOF' > /dev/stdout
 
 Version Notes:
 Future Versions -
-     For URL's, save the results every time their different, so that they can be compared.
+     For URL's, save the results every time they're different, so that they can be compared.
+
+1.1.3 - 
+     The line that was determining whether or not a folder represented a child process was working just fine on my workstation, but not my laptop. Changed it to work on both.
+     The same string as above was in two other places. I modified it there as well.
 
 1.1.2 -
      The default now is to restart a child process if it's found dead, no matter when it's found.
