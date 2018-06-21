@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.1.0"
+v_VERSION="2.2.0"
 
 ##################################
 ### Functions that create jobs ###
@@ -78,7 +78,7 @@ function fn_url_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
-      echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control"
+      echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    ### If there is an IP address, check to make sure that it's really an IP address, or can be translated into one.
@@ -115,8 +115,8 @@ function fn_url_cl {
       echo "USER_AGENT = $v_USER_AGENT" >> "$v_WORKINGDIR""$v_NEW_JOB"
    fi
    echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$v_WORKINGDIR""$v_NEW_JOB"
-   if [[ $v_USE_WGET == "true" ]]; then
-      echo "USE_WGET = true" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   if [[ -n $v_USE_WGET ]]; then
+      echo "USE_WGET = $v_USE_WGET" >> "$v_WORKINGDIR""$v_NEW_JOB"
    fi
 
    fn_mutual_cl
@@ -129,7 +129,7 @@ function fn_ping_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with ping jobs are the following:"
-      echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control"
+      echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    fn_parse_server "$v_DOMAIN"
@@ -152,7 +152,7 @@ function fn_dns_cl {
       exit
    elif [[ $( echo -n "$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with dns jobs are the following:"
-      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control"
+      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    ### Make sure that the domain resolves and is properly formatted
@@ -181,7 +181,7 @@ function fn_load_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
-      echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control"
+      echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    fn_parse_server "$v_DOMAIN"
@@ -269,10 +269,26 @@ function fn_mutual_cl {
       echo "OUTPUT_FILE = $v_OUTPUT_FILE" >> "$v_WORKINGDIR""$v_NEW_JOB"
    fi
    echo "#CUSTOM_MESSAGE = " >> "$v_WORKINGDIR""$v_NEW_JOB"
-   echo "#NUM_DURATIONS_RECENT = " >> "$v_WORKINGDIR""$v_NEW_JOB"
-   echo "#LOG_DURATION_DATA = " >> "$v_WORKINGDIR""$v_NEW_JOB"
-   echo "#NUM_STATUSES_RECENT = " >> "$v_WORKINGDIR""$v_NEW_JOB"
-   echo "#NUM_STATUSES_NOT_SUCCESS = " >> "$v_WORKINGDIR""$v_NEW_JOB"
+   if [[ -z $v_LOG_DURATION_DATA ]]; then
+      echo "LOG_DURATION_DATA = false" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   else
+      echo "LOG_DURATION_DATA = $v_LOG_DURATION_DATA" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
+   if [[ -z "$v_NUM_DURATIONS_RECENT" ]]; then
+      echo "#NUM_DURATIONS_RECENT = " >> "$v_WORKINGDIR""$v_NEW_JOB"
+   else
+      echo "NUM_DURATIONS_RECENT = $v_NUM_DURATIONS_RECENT" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
+   if [[ -z "$v_NUM_STATUSES_RECENT" ]]; then
+      echo "#NUM_STATUSES_RECENT = " >> "$v_WORKINGDIR""$v_NEW_JOB"
+   else
+      echo "NUM_STATUSES_RECENT = $v_NUM_STATUSES_RECENT" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
+   if [[ -z "$v_NUM_STATUSES_NOT_SUCCESS" ]]; then
+      echo "#NUM_STATUSES_NOT_SUCCESS = " >> "$v_WORKINGDIR""$v_NEW_JOB"
+   else
+      echo "NUM_STATUSES_NOT_SUCCESS = $v_NUM_STATUSES_NOT_SUCCESS" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
    mv -f "$v_WORKINGDIR""$v_NEW_JOB" "$v_WORKINGDIR""new/$v_NEW_JOB"
    ### If this instance is running as master, go on to begin spawning child processes, etc.
    if [[ "$v_RUNNING_STATE" == "master" ]]; then
@@ -380,7 +396,7 @@ function fn_child_vars {
    fn_read_conf LOG_DURATION_DATA child; v_LOG_DURATION_DATA="$v_RESULT"
    fn_test_variable "$v_LOG_DURATION_DATA" false LOG_DURATION_DATA "true"; v_LOG_DURATION_DATA="$v_RESULT"
    fn_read_conf NUM_STATUSES_RECENT child; v_NUM_STATUSES_RECENT="$v_RESULT"
-   fn_test_variable "$v_NUM_STATUSES_RECENT" true NUM_STATUSES_RECENT "10"; v_NUM_STATUSES_RECENT="$v_RESULT"
+   fn_test_variable "$v_NUM_STATUSES_RECENT" true NUM_STATUSES_RECENT "12"; v_NUM_STATUSES_RECENT="$v_RESULT"
    fn_read_conf NUM_STATUSES_NOT_SUCCESS child; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
    fn_test_variable "$v_NUM_STATUSES_NOT_SUCCESS" true NUM_STATUSES_NOT_SUCCESS "3"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
    ### IF there's no output file, set it as standard out, then test to see where the output file is. IF it's different than what it was previously, log it.
@@ -447,8 +463,10 @@ function fn_child_vars {
          v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent"
          v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36'
       elif [[ $v_USER_AGENT == false && $v_WGET_BIN == "false" ]]; then
+         v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent false"
          v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
       elif [[ $v_USER_AGENT == false && $v_WGET_BIN != "false" ]]; then
+         v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent false"
          v_USER_AGENT='LWmon/'"$v_VERSION"' wget/'"$v_WGET_BIN_VERSION"
       fi
    fi
@@ -472,7 +490,7 @@ function fn_child_vars {
       fn_parse_server "$v_DNS_CHECK_DOMAIN"; v_DNS_CHECK_DOMAIN="$v_DOMAINa"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --check-domain $v_DNS_CHECK_DOMAIN"
    fi
-   v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY --verbosity \"$v_VERBOSITY\" --outfile \"$v_OUTPUT_FILE\" --seconds $v_WAIT_SECONDS"
+   v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY --verbosity \"$v_VERBOSITY\" --outfile \"$v_OUTPUT_FILE\" --seconds $v_WAIT_SECONDS --ldd $v_LOG_DURATION_DATA --ndr $v_NUM_DURATIONS_RECENT --nsns $v_NUM_STATUSES_NOT_SUCCESS --nsr $v_NUM_STATUSES_RECENT"
    echo "$v_JOB_CL_STRING" > "$v_WORKINGDIR""$v_CHILD_PID"/cl
 }
 
@@ -968,8 +986,8 @@ function fn_master {
    if [[ -f "$v_WORKINGDIR"save ]]; then
       rm -f "$v_WORKINGDIR"save
    fi
-   v_TIMESTAMP_REMOTE_CHECK=0
-   v_TIMESTAMP_LOCAL_CHECK=0
+   v_TIMESTAMP_FIVE_MINUTES=0
+   v_TIMESTAMP_THIRTY_MINUTES=0
    if [[ "$v_WGET_BIN" == "false" ]]; then
       $v_CURL_BIN -Lsm 10 http://lwmon.com/die_list.txt > "$v_WORKINGDIR"die_list
       v_REMOTE_VERSION="$( $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.sh | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
@@ -981,9 +999,10 @@ function fn_master {
    fn_create_mini_script
    echo "$( date +%F" "%T" "%Z ) - [$$] - Starting the Master Process" >> "$v_LOG"
    while [[ 1 == 1 ]]; do
-      ### Check to see what the current IP address is (thanks to VPN, this can change, so we need to check every half hour.
-      if [[ $(( $( date +%s ) - 1800 )) -gt $v_TIMESTAMP_REMOTE_CHECK ]]; then
-         v_TIMESTAMP_REMOTE_CHECK="$( date +%s )"
+
+      ### Every thirty minutes check to see what the current IP address is (thanks to VPN, this can change).
+      if [[ $(( $( date +%s ) - 1800 )) -gt $v_TIMESTAMP_THIRTY_MINUTES ]]; then
+         v_TIMESTAMP_THIRTY_MINUTES="$( date +%s )"
          if [[ "$v_WGET_BIN" == "false" ]]; then
             v_LOCAL_IP="$( $v_CURL_BIN -Lsm 10 http://ip.liquidweb.com/ )"
          else
@@ -1005,9 +1024,10 @@ function fn_master {
             fi
          done
       fi
-      ### Check a remote list to see if lwmon should be stopped
-      if [[ $(( $( date +%s ) - 300 )) -gt $v_TIMESTAMP_REMOTE_CHECK ]]; then
-         v_TIMESTAMP_REMOTE_CHECK="$( date +%s )"
+
+      ### Every five minutes, check a remote list to see if lwmon should be stopped, and check to see if old processes need to be backed up.
+      if [[ $(( $( date +%s ) - 300 )) -gt $v_TIMESTAMP_FIVE_MINUTES ]]; then
+         v_TIMESTAMP_FIVE_MINUTES="$( date +%s )"
          if [[ "$v_WGET_BIN" == "false" ]]; then
             $v_CURL_BIN -Lsm 10 http://lwmon.com/die_list.txt > "$v_WORKINGDIR"die_list
          else
@@ -1019,8 +1039,29 @@ function fn_master {
             echo "$( date +%F" "%T" "%Z ) - [$$] - Local IP found on remote list. The line reads \"$( egrep "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\". Process ended." >> "$v_LOG"
             fn_master_exit
          fi
+         ### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
+         for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "^[0-9][0-9]*$" ); do
+            if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+               ### If it hasn't been marked to die, restart it.
+               if [[ ! -f "$v_WORKINGDIR""$v_CHILD_PID/die" ]]; then
+                  fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
+                  fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+                  echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME - Child process was found dead. Restarting with new PID." >> "$v_LOG"
+                  v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+                  cp -a "$v_WORKINGDIR""$v_CHILD_PID"/params "$v_WORKINGDIR""new/$v_NEW_JOB.job"
+                  if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/log ]]; then
+                     ### If there's a log file, let's keep that too.
+                     cp -a "$v_WORKINGDIR""$v_CHILD_PID"/log "$v_WORKINGDIR""new/$v_NEW_JOB".log
+                  fi
+               fi
+               ### Regardless of whether or not it's been marked to die, back it up.
+               v_TIMESTAMP="$( date +%s )"
+               mv "$v_WORKINGDIR""$v_CHILD_PID" "$v_WORKINGDIR""old_""$v_CHILD_PID""_""$v_TIMESTAMP"
+            fi
+         done
       fi
-      ### Check if there are any new files within the new/ directory. Assume that they're params files for new jobs
+
+      ### Every Two Seconds, check if there are any new files within the new/ directory. Assume that they're params files for new jobs
       if [[ $( ls -1 "$v_WORKINGDIR""new/" | wc -l ) -gt 0 ]]; then
          for v_LWMON_JOB in "$v_WORKINGDIR"new/*.job; do
             ### Find all files that are not marked as log files.
@@ -1043,40 +1084,6 @@ function fn_master {
          ### If there's anything else left in this directory, it is neither a job, nor a log file. Let's get rid of it.
          if [[ $( ls -1 "$v_WORKINGDIR""new/" | wc -l ) -gt 0 ]]; then
             rm -f "$v_WORKINGDIR"new/*
-         fi
-      fi
-      ### go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
-      ### go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
-      for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "^[0-9][0-9]*$" ); do
-         if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
-            ### If it's been marked to die, back it up temporarily
-            if [[ -f "$v_WORKINGDIR""$v_CHILD_PID/die" ]]; then
-               v_TIMESTAMP="$( date +%s )"
-               mv "$v_WORKINGDIR""$v_CHILD_PID" "$v_WORKINGDIR""old_""$v_CHILD_PID""_""$v_TIMESTAMP"
-            ### Otherwise, restart it, then backup the old data temporarily.
-            else
-               fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
-               fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
-               echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME - Child process was found dead. Restarting with new PID." >> "$v_LOG"
-               v_NEW_JOB="$( date +%s )""_$RANDOM.job"
-               cp -a "$v_WORKINGDIR""$v_CHILD_PID"/params "$v_WORKINGDIR""new/$v_NEW_JOB.job"
-               if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/log ]]; then
-                  ### If there's a log file, let's keep that too.
-                  cp -a "$v_WORKINGDIR""$v_CHILD_PID"/log "$v_WORKINGDIR""new/$v_NEW_JOB".log
-               fi
-               v_TIMESTAMP="$( date +%s )"
-               mv "$v_WORKINGDIR""$v_CHILD_PID" "$v_WORKINGDIR""old_""$v_CHILD_PID""_""$v_TIMESTAMP"
-            fi
-         fi
-      done
-      ### Has verbosity changed? If so, announce this fact!
-      fn_read_conf VERBOSITY master; v_VERBOSITY2="$v_RESULT"
-      if [[ "$v_VERBOSITY2" != "$v_VERBOSITY" ]]; then
-         if [[ $( echo "$v_VERBOSITY2" | egrep -c "^(standard|more verbose|verbose|change|none)$" ) -ne 1 ]]; then
-            fn_update_conf VERBOSITY "$v_VERBOSITY" "$v_WORKINGDIR"lwmon.conf
-         else
-            v_VERBOSITY="$v_VERBOSITY2"
-            echo "***Verbosity is now set as \"$v_VERBOSITY\"***"
          fi
       fi
       ### Is there a file named "die" in the working directory? If so, end the master process.
@@ -1195,17 +1202,17 @@ function fn_master_exit {
 ###############################
 
 function fn_list {
-   ### This is the menu front-end for modifying child processes.
+   ### This just lists the lwmon master process and all child processes.
    if [[ $v_RUNNING_STATE == "master" ]]; then
-      fn_modify_no_master
+      echo "No current lwmon processes. Exiting."
+      exit
    fi
    echo "List of currently running lwmon processes:"
    echo
    echo "  1) [$( cat "$v_WORKINGDIR"lwmon.pid )] - Master Process (and lwmon in general)" #"
    v_CHILD_NUMBER=2
    a_CHILD_PID=()
-   for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
-      v_CHILD_PID="$( basename $i )"
+   for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
       ### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
       fn_read_conf JOB_NAME "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_NAME="$v_RESULT"
       fn_read_conf JOB_TYPE "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_TYPE="$v_RESULT"
@@ -1216,6 +1223,7 @@ function fn_list {
 }
 
 function fn_modify_master {
+### Options for the master process
    echo -e "Options:\n"
    echo "  1) Exit out of the master process."
    echo "  2) First back-up the child processes so that they'll run immediately when lwmon is next started, then exit out of the master process."
@@ -1248,13 +1256,15 @@ function fn_modify_master {
 }
 
 function fn_modify_no_master {
+### Options if there is no master process
    echo -e "Options:\n"
    echo "  1) Output general help information (same as with \"--help\" flag)."
    echo "  2) Output help information specific to flags (same as with \"--help-flags\" flag)."
-   echo "  3) Launch a master process (same as with \"--master\" flag)."
+   echo "  3) Edit the configuration file."
    echo "  4) View the log file."
-   echo "  5) Old monotoring jobs."
-   echo "  6) Exit out of this menu."
+   echo "  5) Launch a master process (same as with \"--master\" flag)."
+   echo "  6) Old monotoring jobs."
+   echo "  7) Exit out of this menu."
    echo
    read -p "Choose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
@@ -1262,11 +1272,17 @@ function fn_modify_no_master {
    elif [[ $v_OPTION_NUM == "2" ]]; then
       fn_help_flags
    elif [[ $v_OPTION_NUM == "3" ]]; then
-      fn_master
+      if [[ -n $EDITOR ]]; then
+         $EDITOR "$v_WORKINGDIR""lwmon.conf"
+      else
+         vi "$v_WORKINGDIR""lwmon.conf"
+      fi
    elif [[ $v_OPTION_NUM == "4" ]]; then
       echo "Viewing the log at $v_LOG"
       less +G "$v_LOG"
    elif [[ $v_OPTION_NUM == "5" ]]; then
+      fn_master
+   elif [[ $v_OPTION_NUM == "6" ]]; then
       fn_modify_old_jobs
    else
       echo "Exiting."
@@ -1275,14 +1291,13 @@ function fn_modify_no_master {
 }
 
 function fn_modify_old_jobs {
-   ### This is the menu front-end for modifying child processes.
+   ### This is the menu front-end for modifying old child processes.
    echo "List of old lwmon jobs:"
    echo
    v_CHILD_NUMBER=1
    a_CHILD_PID=()
-   for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
-      v_CHILD_PID="$( basename $i )"
-      v_ENDED_DATE="$( basename $i | cut -d "_" -f3 )"
+   for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
+      v_ENDED_DATE="$( echo "$v_CHILD_PID" | cut -d "_" -f3 )"
       v_ENDED_DATE="$( date --date="@$v_ENDED_DATE" +%m"/"%d" "%H":"%M":"%S )"
       ### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
       fn_read_conf JOB_NAME "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_NAME="$v_RESULT"
@@ -1291,9 +1306,14 @@ function fn_modify_old_jobs {
       a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]="$v_CHILD_PID"
       v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
    done
+   if [[ ${#a_CHILD_PID[@]} -eq 0 ]]; then
+      echo "There are no old jobs. Exiting."
+      echo
+      exit
+   fi
    echo
    read -p "Which process do you want to modify? " v_CHILD_NUMBER
-   if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -gt $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
+   if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
       echo "Invalid Option. Exiting."
       exit
    fi
@@ -1307,7 +1327,8 @@ function fn_modify_old_jobs {
    echo "  4) View the log file associated with this monitoring job."
    echo "  5) Output the commands to reproduce this job."
    echo "  6) Change the end stamp on this job (stop it from being auto-deleted until 7 days from now)"
-   echo "  7) Exit out of this menu."
+   echo "  7) View associated html files (if any)."
+   echo "  8) Exit out of this menu."
    echo
    read -p "Chose an option from the above list: " v_OPTION_NUM
 if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
@@ -1331,9 +1352,56 @@ if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
       echo "chmod +x lwmon.sh"
       echo "./lwmon.sh $( cat "$v_WORKINGDIR""$v_CHILD_PID/cl" )"
       echo
-   elif [[ "$v_OPTION_NUM" == "6" ]]; then
+   elif [[ "$v_OPTION_NUM" == "6" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
       v_NEW_DIRECTORY="$( basename $i | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
       mv -f "$v_WORKINGDIR""$v_CHILD_PID" "$v_WORKINGDIR""$v_NEW_DIRECTORY"
+   elif [[ "$v_OPTION_NUM" == "7" ]]; then
+      fn_modify_html
+   else
+      echo "Exiting."
+   fi
+   exit
+}
+
+function fn_modify_html {
+### Lists html files associated with a process and then gives options for them.
+   echo "List of html files associated with $v_JOB_NAME"
+   echo
+   v_HTML_NUMBER=1
+   a_HTML_LIST=()
+   for v_HTML_NAME in $( find "$v_WORKINGDIR""$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | grep "[0-9]\.html$" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
+      v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | egrep -o "[0-9]*\.html" | cut -d "." -f1 )"
+      v_HTML_TIMESTAMP="$( date --date="@$v_HTML_TIMESTAMP" +%m"/"%d" "%H":"%M":"%S )"
+      ### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
+      echo "  $v_HTML_NUMBER) $v_HTML_TIMESTAMP - $v_HTML_NAME"
+      a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]="$v_HTML_NAME"
+      v_HTML_NUMBER=$(( $v_HTML_NUMBER + 1 ))
+   done
+   echo
+   if [[ ${#a_HTML_LIST[@]} -eq 0 ]]; then
+      echo "There are no html files associated with this job. Exiting."
+      exit
+   fi
+   read -p "Which html file do you want options on? " v_HTML_NUMBER
+   if [[ "$v_HTML_NUMBER" == "0" || $( echo "$v_HTML_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_HTML_NUMBER" -ge $(( ${#a_HTML_LIST[@]} + 1 )) ]]; then
+      echo "Invalid Option. Exiting."
+      exit
+   fi
+   v_HTML_NAME="${a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]}"
+   echo "$v_HTML_NAME:"
+   echo
+   echo "  1) Delete this file."
+   echo "  2) Output the full file name."
+   echo "  3) Exit out of this menu."
+   echo
+   read -p "Chose an option from the above list: " v_OPTION_NUM
+   if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" && "$v_HTML_NAME" ]]; then
+      rm -f "$v_WORKINGDIR""$v_CHILD_PID"/"$v_HTML_NAME"
+      echo "The file has been deleted."
+   elif [[ $v_OPTION_NUM == "2" ]]; then
+      echo
+      echo "$v_WORKINGDIR""$v_CHILD_PID"/"$v_HTML_NAME"
+      echo
    else
       echo "Exiting."
    fi
@@ -1341,10 +1409,14 @@ if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
 }
 
 function fn_modify {
+### lists the lwmon processes and then gives options for the currently running processes.
+   if [[ $v_RUNNING_STATE == "master" ]]; then
+      fn_modify_no_master
+   fi
    fn_list
    echo
    read -p "Which process do you want to modify? " v_CHILD_NUMBER
-   if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -gt $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
+   if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
       echo "Invalid Option. Exiting."
       exit
    fi
@@ -1361,7 +1433,9 @@ function fn_modify {
    echo "  4) View the log file associated with this process."
    echo "  5) Output the commands to reproduce this job."
    echo "  6) Change the title of the job as it's reported by the child process. (Currently \"$v_JOB_NAME\")."
-   echo "  7) Exit out of this menu."
+   echo "  7) Output the \"more verbose\" output once, then return to current verbosity."
+   echo "  8) View associated html files (if any)."
+   echo "  9) Exit out of this menu."
    echo
    read -p "Chose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
@@ -1390,6 +1464,10 @@ function fn_modify {
       read -p "Enter a new identifying string to associate with this check: " v_JOB_NAME
       fn_update_conf JOB_NAME "$v_JOB_NAME" "$v_WORKINGDIR""$v_CHILD_PID/params"
       echo "The job name has been updated."
+   elif [[ "$v_OPTION_NUM" == "7" ]]; then
+      touch "$v_WORKINGDIR""$v_CHILD_PID"/status
+   elif [[ "$v_OPTION_NUM" == "8" ]]; then
+      fn_modify_html
    else
       echo "Exiting."
    fi
@@ -1524,39 +1602,44 @@ function fn_test_file {
 }
 
 function fn_parse_cl_argument {
-   ### For this function, $1 is the flag that was passed (wthout trailing equal sign), $2 is "num" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality.
+   ### For this function, $1 is the flag that was passed (wthout trailing equal sign), $2 is "num" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error.
    unset v_RESULT
    if [[ "$2" == "none" ]]; then
       v_RESULT="true"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^$1$" ) -eq 1 && "$2" != "none" ]]; then
+   ### If there is no equal sign, the next argument is the modifier for the flag
       if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ]]; then
          c=$(( $c + 1 ))
          v_RESULT="${a_CL_ARGUMENTS[$c]}"
-      else
+      elif [[ "$2" != "bool" ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
          exit
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^$1=" ) -eq 1 && "$2" != "none" ]]; then
+   ### If the argument has an equal sign, then the modifier for the flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z "$v_RESULT" ]]; then
+      if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
          exit
       fi
    elif [[ -n "$3" && $( echo "$v_ARGUMENT" | egrep -c "^$3$" ) -eq 1 && "$2" != "none" ]]; then
+   ### If there is no equal sign, the next argument is the modifier for the alternate flag
       if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ]]; then
          c=$(( $c + 1 ))
          v_RESULT="${a_CL_ARGUMENTS[$c]}"
-      else
+      elif [[ "$2" != "bool" ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
          exit
       fi
    elif [[ -n "$3" && $( echo "$v_ARGUMENT" | egrep -c "^$3=" ) -eq 1 && "$2" != "none" ]]; then
+   ### If the argument has an equal sign, then the modifier for the alternate flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z "$v_RESULT" ]]; then
+      if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
          exit
       fi
    fi
+
    if [[ $2 == "num" && $( echo "$v_RESULT" | egrep -c "^[0-9]+$" ) -eq 0 ]]; then
       echo "The flag \"$1\" needs to be followed by an integer. Exiting."
       exit
@@ -1565,8 +1648,14 @@ function fn_parse_cl_argument {
       exit
    elif [[ $2 == "bool" ]]; then
       if [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^(t(rue)*|f(alse)*)$" ) -eq 0  ]]; then
-         echo "The flag \"$1\" needs to be followed by \"true\" or \"false\". Exiting."
-         exit
+         if [[ -z "$4" || "$4" == "exit" ]]; then
+            echo "The flag \"$1\" needs to be followed by \"true\" or \"false\". Exiting."
+            exit
+         elif [[ "$4" == "false" ]]; then
+            v_RESULT="false"
+         else
+            v_RESULT="true"
+         fi
       elif [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^t(rue)*$" ) -eq 1  ]]; then
          v_RESULT="true"
       elif [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^f(alse)*$" ) -eq 1  ]]; then
@@ -1623,16 +1712,16 @@ HTML_FILES_KEPT = 100
 NUM_DURATIONS_RECENT = 10
 
 # The "NUM_STATUSES_RECENT" and "NUM_STATUSES_NOT_SUCCESS" directives allow the user to configure the script to send email allerts when out of the X most recent statuses, Y of them are not a success. X being the value set for "NUM_STATUSES_RECENT" and Y being the value set for "NUM_STATUSES_NOT_SUCCESS".
-NUM_STATUSES_RECENT = 10
+NUM_STATUSES_RECENT = 12
 NUM_STATUSES_NOT_SUCCESS = 3
 
-# For URL based jobs, it's possible to set a time limit for the process to be considered a "partial success" - Even if the curl process finished before it reaches CHECK_TIMEOUT, the amount of time it look to complete took long enough that it should be brought to the user's attention.
+# For URL based jobs, it's possible to set a time limit for the process to be considered a "partial success" - Even if the curl process finished before it reaches "CHECK_TIMEOUT", the amount of time it look to complete took long enough that it should be brought to the user's attention.
 CHECK_TIME_PARTIAL_SUCCESS = 7
 
 # If the "LOG_DURATION_DATA" directive is set to "true", then the amount of time it takes for each check to complete will be output to the log file in the child directory.
 LOG_DURATION_DATA = true
 
-# Setting the "USE_WGET" directive to "true" forces the script to use wget rather than curl to pull files.
+# Setting the "USE_WGET" directive to "true" forces the script to use wget rather than curl to pull files. Curl is typically preferred as its behavior is slightly more predictable and its error output is slightly more specific.
 USE_WGET = false
 
 # The "SSH_CONTROL_PATH" directive allows the user to specify where the control path socket file for an ssh-load job is located.
@@ -1738,26 +1827,26 @@ FLAGS FOR MONITORING JOB TYPES:
 
      This flag is used to start a new monitoring job for DNS services on a remote server. It requires the use of the "--domain" flag, and can also be used in conjunction with the following flags:
 
-     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control
+     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds
 
 --ping (host name or IP)
 
      This flag is used to start a new monitoring job to watch whether or not a server is pinging. It can be used in conjunction with the following flags:
 
-     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control
+     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds
 
 --ssh-load (host name or IP)
 --load (host name or IP)
 
      This flag is used to start a new monitoring job to watch a remote server's load. It requires the "--user" flag, and also requires the presence of an SSH control socket. It can be used in conjunction with the following flags:
 
-     --load-ps, --load-fail, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control
+     --load-ps, --load-fail, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds
 
 --url (url)
 
      This flag is used to start a new monitoring job to confirm that a URL is loading as expected. It requires one or more uses of the "--string" flag, and can also be used in conjunction with the following flags:
 
-     --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control
+     --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control, --ldd, --ndr, --nsns, --nds
 
 
 FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
@@ -1789,6 +1878,11 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 
      Used with "--url". This flag is used to specify the IP address of the server that you're running the check against. Without this flag, a DNS query is used to determine what IP the site needs to be pulled from. "--ip" is perfect for situations where multiple load balanced servers need to be monitored at once, or where the customer's A record is pointing at cloudflare, and you're trying to determine whether connectivity issues are server specific, or cloudflare specific.
 
+--ldd (true|false)
+--log-duration-data (true|false)
+
+     Tells the job whether or not to add the time it takes for each check to complete to the child process's log file.
+
 --load-fail (number (with or without decimal places))
 
      For an ssh-load job, this is the flag used to specify the minimum load at which the check returns as a failure rather than as a success or partial success.
@@ -1805,6 +1899,21 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 --mail-delay (number)
 
      Specifies the number of failed or successful chacks that need to occur in a row before an e-mail message is sent. The default is to send a message two checks that have had a different result than the previous ones. Setting this to "0" prevents e-mail allerts from being sent.
+
+--ndr (number)
+--num-durations-recent (number)
+
+     The script keeps track of the average amount of time it takes to perform a check over X number of checks. This is 10 by default, but you can change this using the "--ndr" flag.
+
+--nsns (number)
+--num-statuses-not-success (number)
+
+     The "--nsns" and "--nsr" flags can be used together to determine if an email alert needs to be sent regarding a job that keeps fluctuating between success and failure, but has succeeded enough that an email would not otherwise be sent. If the ststus of a job is not successful X out of Y times, an email will be sent. "--nsns" allows the user to set X; "--nsr" allows the user to set Y.
+
+--nsr (number)
+--num-statuses-recent (number)
+
+     The "--nsns" and "--nsr" flags can be used together to determine if an email alert needs to be sent regarding a job that keeps fluctuating between success and failure, but has succeeded enough that an email would not otherwise be sent. If the ststus of a job is not successful X out of Y times, an email will be sent. "--nsns" allows the user to set X; "--nsr" allows the user to set Y.
 
 --outfile (file)
 --output-file (file)
@@ -1828,17 +1937,17 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 
      For an ssh-load job, this is flag is used to specify that user that we are connecting to the server with.
 
---user-agent
+--user-agent (true|false)
 
      When used with "--url", this will cause the curl command to be run in such a way that the chrome 45 user agent is imitated. This is useful in situations where a site is refusing connections from the standard user agent.
 
---verbosity
---verbose
+--verbosity (standard|verbose|more verbose|change|none)
+--verbose (standard|verbose|more verbose|change|none)
 
      Allows the user to specify the verbosity level of the output of a child processes. "standard": Outputs whether any specific check has succeeded or failed. "verbose": In addition to the information given from the standard output, also indicates how long checks for that job have been running, how many have been run, and the percentage of successful checks. "more verbose": Outputs multiple lines with the data from verbose, as well as data on how lnog the checks are taking. "change": Only outputs text on the first failure after any number of successes, or the first success after any number of failures. "none": output no text.
 
---wget
-     Forces the script to use wget rather than CURL.
+--wget (true|false)
+     Forces the script to use wget rather than curl. Curl is typically preferred as its behavior is slightly more predictable and its error output is slightly more specific.
 
 OTHER FLAGS:
 
@@ -2018,6 +2127,16 @@ Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
 
+2.2.0 (2015-12-24) -
+     Master process now checks for killed jobs every five minutes rather than every two seconds.
+     The master process doesn't need to announce that the verbosity has changed.
+     Fixed a bug where the script was never deleting old jobs.
+     Fixed a bug where the menu option for old jobs was not exiting when there were no old jobs.
+     Added a menu item for currently running jobs to output the "more verbose" information once.
+     Added menu options for html files.
+     Allowed "--user-agent" and "--wget" to optionally be followed by "true" or "false" (as there was no way to unset either of these if it was already set in the conf).
+     Added the following flags "--ldd", "--ndr", "--nsns", "--nds". These mostly exist for the purposes of putputting the command to reproduce the job.
+
 2.1.0 (2015-12-23) -
      The master process now checks for a newer version of lwmon and lets the user know if one is available.
      ssh-load jobs can now be started with just the "--load" flag, in addition to the "--ssh-load" flag
@@ -2160,10 +2279,13 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       v_RUN_TYPE=$( echo "$v_ARGUMENT" | cut -d "=" -f1 )
       if [[ $( echo "$v_ARGUMENT" | egrep -c "^-(u|-url)($|=)" ) -eq 1 ]]; then
          fn_parse_cl_argument "--url" "string" "-u"; v_CURL_URL="$v_RESULT"
+         v_RUN_TYPE="--url"
       elif [[ $( echo "$v_ARGUMENT" | egrep -c "^-(d|-dns)($|=)" ) -eq 1 ]]; then
          fn_parse_cl_argument "--dns" "string" "-d"; v_DOMAIN="$v_RESULT"
+         v_RUN_TYPE="--dns"
       elif [[ $( echo "$v_ARGUMENT" | egrep -c "^-(p|-ping)($|=)" ) -eq 1 ]]; then
          fn_parse_cl_argument "--ping" "string" "-p"; v_DOMAIN="$v_RESULT"
+         v_RUN_TYPE="--ping"
       elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ssh-)*load($|=)" ) -eq 1 ]]; then
          fn_parse_cl_argument "--ssh-load" "string" "--load"; v_DOMAIN="$v_RESULT"
          v_RUN_TYPE="--ssh-load"
@@ -2177,11 +2299,15 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       v_RUNNING_STATE="control"
    elif [[ $v_ARGUMENT == "--save" ]]; then
       v_SAVE_JOBS=true
-   elif [[ $v_ARGUMENT == "--user-agent" ]]; then
-      v_USER_AGENT=true
-   elif [[ $v_ARGUMENT == "--wget" ]]; then
-      v_USE_WGET=true
-      fn_use_wget
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--user-agent($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--user-agent" "bool" "--user-agent" "true"; v_USER_AGENT="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ldd|log-duration-data)($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--ldd" "bool" "--log-duration-data" "true"; v_LOG_DURATION_DATA="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--wget($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--wget" "bool" "--wget" "true"; v_USE_WGET="$v_RESULT"
+      if [[ $v_USE_WGET == "true" ]]; then
+         fn_use_wget
+      fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(e)*mail($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--mail" "string" "--email"; v_EMAIL_ADDRESS="$v_RESULT"
       if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | grep -c "^[^@][^@]*@[^.]*\..*$" ) -lt 1 ]]; then
@@ -2202,6 +2328,12 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fn_parse_cl_argument "--load-fail" "float"; v_MIN_LOAD_FAILURE="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--port($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--port" "num"; v_CL_PORT="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ndr|num-durations-recent)($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--ndr" "num" "--num-durations-recent"; v_NUM_DURATIONS_RECENT="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(nsr|num-statuses-recent)($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--nsr" "num" "--num-statuses-recent"; v_NUM_STATUSES_RECENT="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(nsns|num-statuses-not-success)($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--nsns" "num" "--num-statuses-not-success"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ident|ticket)($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--ident" "num" "--ticket"; v_IDENT="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--ip(-address)*($|=)" ) -eq 1 ]]; then
