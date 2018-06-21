@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.0.2"
+v_VERSION="2.1.0"
 
 ##################################
 ### Functions that create jobs ###
@@ -972,9 +972,12 @@ function fn_master {
    v_TIMESTAMP_LOCAL_CHECK=0
    if [[ "$v_WGET_BIN" == "false" ]]; then
       $v_CURL_BIN -Lsm 10 http://lwmon.com/die_list.txt > "$v_WORKINGDIR"die_list
+      v_REMOTE_VERSION="$( $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.sh | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
    else
       $v_WGET_BIN -q --timeout=10 -O "$v_WORKINGDIR"die_list http://lwmon.com/die_list.txt
+      v_REMOTE_VERSION="$( $v_WGET_BIN -q --timeout=10 -O "/dev/stdout" http://lwmon.com/lwmon.sh | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
    fi
+   fn_compare_version
    fn_create_mini_script
    echo "$( date +%F" "%T" "%Z ) - [$$] - Starting the Master Process" >> "$v_LOG"
    while [[ 1 == 1 ]]; do
@@ -1084,6 +1087,24 @@ function fn_master {
    done
 }
 
+function fn_compare_version {
+   ### Check to see if a newer version of the script is available; report if that's the case
+   if [[ -n "$v_REMOTE_VERSION" ]]; then
+      if [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -gt $( echo "$v_VERSION" | cut -d "." -f1 ) ]]; then
+         v_UPDATE=true
+      elif [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -eq $( echo "$v_VERSION" | cut -d "." -f1 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f2 ) -gt $( echo "$v_VERSION" | cut -d "." -f2 ) ]]; then
+         v_UPDATE=true
+      elif [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -eq $( echo "$v_VERSION" | cut -d "." -f1 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f2 ) -eq $( echo "$v_VERSION" | cut -d "." -f2 ) && $( echo "$v_REMOTE_VERSION" | cut -d "." -f3 ) -gt $( echo "$v_VERSION" | cut -d "." -f3 ) ]]; then
+         v_UPDATE=true
+      fi
+      if [[ $v_UPDATE == true ]]; then
+         echo
+         echo -e "\e[1;31mThere is a newer version of lwmon available at http://wlmon.com/lwmon.sh\e[00m"
+         echo
+      fi
+   fi
+}
+
 function fn_create_mini_script {
    v_MINI_SCRIPT="$v_WORKINGDIR""$v_PROGRAMNAME"
    echo "#! /bin/bash" > "$v_MINI_SCRIPT"
@@ -1176,8 +1197,7 @@ function fn_master_exit {
 function fn_list {
    ### This is the menu front-end for modifying child processes.
    if [[ $v_RUNNING_STATE == "master" ]]; then
-      echo "For more information on how to start a lwmon.sh monitoring job, run this script with the \"--help-flags\" flag."
-      exit
+      fn_modify_no_master
    fi
    echo "List of currently running lwmon processes:"
    echo
@@ -1201,7 +1221,8 @@ function fn_modify_master {
    echo "  2) First back-up the child processes so that they'll run immediately when lwmon is next started, then exit out of the master process."
    echo "  3) Edit the configuration file."
    echo "  4) View the log file."
-   echo "  5) Exit out of this menu."
+   echo "  5) Old monotoring jobs."
+   echo "  6) Exit out of this menu."
    echo
    read -p "Choose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
@@ -1218,6 +1239,101 @@ function fn_modify_master {
    elif [[ $v_OPTION_NUM == "4" ]]; then
       echo "Viewing the log at $v_LOG"
       less +G "$v_LOG"
+   elif [[ $v_OPTION_NUM == "5" ]]; then
+      fn_modify_old_jobs
+   else
+      echo "Exiting."
+   fi
+   exit
+}
+
+function fn_modify_no_master {
+   echo -e "Options:\n"
+   echo "  1) Output general help information (same as with \"--help\" flag)."
+   echo "  2) Output help information specific to flags (same as with \"--help-flags\" flag)."
+   echo "  3) Launch a master process (same as with \"--master\" flag)."
+   echo "  4) View the log file."
+   echo "  5) Old monotoring jobs."
+   echo "  6) Exit out of this menu."
+   echo
+   read -p "Choose an option from the above list: " v_OPTION_NUM
+   if [[ $v_OPTION_NUM == "1" ]]; then
+      fn_help
+   elif [[ $v_OPTION_NUM == "2" ]]; then
+      fn_help_flags
+   elif [[ $v_OPTION_NUM == "3" ]]; then
+      fn_master
+   elif [[ $v_OPTION_NUM == "4" ]]; then
+      echo "Viewing the log at $v_LOG"
+      less +G "$v_LOG"
+   elif [[ $v_OPTION_NUM == "5" ]]; then
+      fn_modify_old_jobs
+   else
+      echo "Exiting."
+   fi
+   exit
+}
+
+function fn_modify_old_jobs {
+   ### This is the menu front-end for modifying child processes.
+   echo "List of old lwmon jobs:"
+   echo
+   v_CHILD_NUMBER=1
+   a_CHILD_PID=()
+   for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
+      v_CHILD_PID="$( basename $i )"
+      v_ENDED_DATE="$( basename $i | cut -d "_" -f3 )"
+      v_ENDED_DATE="$( date --date="@$v_ENDED_DATE" +%m"/"%d" "%H":"%M":"%S )"
+      ### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
+      fn_read_conf JOB_NAME "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_NAME="$v_RESULT"
+      fn_read_conf JOB_TYPE "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_TYPE="$v_RESULT"
+      echo "  $v_CHILD_NUMBER) $v_JOB_TYPE $v_JOB_NAME (ended $v_ENDED_DATE)"
+      a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]="$v_CHILD_PID"
+      v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
+   done
+   echo
+   read -p "Which process do you want to modify? " v_CHILD_NUMBER
+   if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -gt $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
+      echo "Invalid Option. Exiting."
+      exit
+   fi
+   v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]}"
+   fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+   echo "$v_JOB_NAME:"
+   echo
+   echo "  1) Delete this monitoring job."
+   echo "  2) Output the command to go to the working directory for this monitoring job."
+   echo "  3) Restart this monitoring job"
+   echo "  4) View the log file associated with this monitoring job."
+   echo "  5) Output the commands to reproduce this job."
+   echo "  6) Change the end stamp on this job (stop it from being auto-deleted until 7 days from now)"
+   echo "  7) Exit out of this menu."
+   echo
+   read -p "Chose an option from the above list: " v_OPTION_NUM
+if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
+      rm -rf "$v_WORKINGDIR""$v_CHILD_PID"
+      echo "This job has been parmanently removed."
+   elif [[ $v_OPTION_NUM == "2" ]]; then
+      echo -en "\ncd $v_WORKINGDIR""$v_CHILD_PID/\n\n"
+   elif [[ $v_OPTION_NUM == "3" ]]; then
+      v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+      cp -a "$v_WORKINGDIR""$v_CHILD_PID"/params "$v_WORKINGDIR""new/$v_NEW_JOB.job"
+      if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/log ]]; then
+         ### If there's a log file, let's keep that too.
+         cp -a "$v_WORKINGDIR""$v_CHILD_PID"/log "$v_WORKINGDIR""new/$v_NEW_JOB".log
+      fi
+   elif [[ "$v_OPTION_NUM" == "4" ]]; then
+      echo "Viewing the log at $v_WORKINGDIR""$v_CHILD_PID/log"
+      less +G "$v_WORKINGDIR""$v_CHILD_PID/log"
+   elif [[ "$v_OPTION_NUM" == "5" ]]; then
+      echo
+      echo "wget http://lwmon.com/lwmon.sh"
+      echo "chmod +x lwmon.sh"
+      echo "./lwmon.sh $( cat "$v_WORKINGDIR""$v_CHILD_PID/cl" )"
+      echo
+   elif [[ "$v_OPTION_NUM" == "6" ]]; then
+      v_NEW_DIRECTORY="$( basename $i | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
+      mv -f "$v_WORKINGDIR""$v_CHILD_PID" "$v_WORKINGDIR""$v_NEW_DIRECTORY"
    else
       echo "Exiting."
    fi
@@ -1631,6 +1747,7 @@ FLAGS FOR MONITORING JOB TYPES:
      --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control
 
 --ssh-load (host name or IP)
+--load (host name or IP)
 
      This flag is used to start a new monitoring job to watch a remote server's load. It requires the "--user" flag, and also requires the presence of an SSH control socket. It can be used in conjunction with the following flags:
 
@@ -1726,6 +1843,7 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 OTHER FLAGS:
 
 --help
+-h
 
      Displays the basic help information.
 
@@ -1746,6 +1864,7 @@ OTHER FLAGS:
      Used to terminate the master lwmon process, which in turn prompts any child processes to exit as well. This can be used in conjunction with the "--save" flag.
 
 --list
+-l
 
      Lists the current lwmon child processes, then exits.
      
@@ -1754,6 +1873,7 @@ OTHER FLAGS:
      Immediately designates itself as the master process. If any prompts are waiting, it spawns child processes as they describe, it then checks periodically for new prompts and spawns processes accordingly. If the master process ends, all child processes it has spawned will recognize that it has ended, and end as well. Run ./lwmon.sh --help-process-types for more information on master, control, and child processes.
 
 --modify
+-m
 
      Prompts you with a list of currently running child processes and allows you to modify how they function and what they're checking against, or kill them off if they're no longer desired.
 
@@ -1837,7 +1957,7 @@ After changes are made to the params file, these changes will not be recognized 
      This is the email address that messages regarding failed or successful checks will be sent to.
 
 "IP_ADDRESS"
-     For URL jobs, this will be "false" if an IP address has not been specified. Otherwise, it will contain the IP address that we're connecting to before telling the remote server the domain we're trying sending a request to.
+     For URL jobs, this will be "false" if an IP address has not been specified. Otherwise, it will contain the IP address that we're connecting to before telling the remote server the domain we're trying sending a request to. With this as false, a DNS query is used to determine what IP the site needs to be pulled from. This directive is perfect for situations where multiple load balanced servers need to be monitored at once, or where the customer's A record is pointing at cloudflare, and you're trying to determine whether connectivity issues are server specific, or cloudflare specific.
 
 "JOB_NAME"
      This is the identifier for the job. It will be output in the terminal window where the master process is being run (Or to where ever the "OUTPUT_FILE" directive indicates). This will also be referenced in emails.
@@ -1873,7 +1993,7 @@ After changes are made to the params file, these changes will not be recognized 
      For a ssh-load job, this is the user that LWmon will be accessing the server as.
 
 "USE_WGET"
-     Forces the script to use wget rather than curl.
+     Forces the child process to use wget rather than curl.
 
 "USER_AGENT"
      For URL jobs, this is a true or false value that dictates whether or not the curl for the site will be run with curl as the user agent (false) or with a user agent that makes it look as if it's Google Chrome (true).
@@ -1898,6 +2018,11 @@ Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
 
+2.1.0 (2015-12-23) -
+     The master process now checks for a newer version of lwmon and lets the user know if one is available.
+     ssh-load jobs can now be started with just the "--load" flag, in addition to the "--ssh-load" flag
+     Added menu options for old jobs.
+
 2.0.2 (2015-12-19) -
      The script now has the ability to use wget instead of curl. Added the "--wget" flag to force this.
 
@@ -1921,40 +2046,11 @@ Future Versions -
      In the child directory, there is a file named "cl" that has the command line flags for the job. You can output this from the menus.
      Implimented ssh-load job types. Made sure that there was an explanation for how to start them.
 
-1.4.1 (2015-12-10) - 
-     Improved checking for the output file
-     Fixed an error where the WAIT_SECONDS variable was being assigned to the wrong variable under some circumstances at the command line.
-     Fixed an issue where child processes were outputting data after the parent was killed.
-     Added the --port flag so that you can specify a port at the command line (this can still be achieved by specifying the port within the URL as well).
-     replaced all variables named "CURL_PORT" to "SERVER_PORT".
-     Fixed a bug where "--modify" would occasionally show the incorrect information for a child process.
-     Fixed a bug where "--kill" wasn't telling the child processes to die.
-     Fixed a bug where log files from re-started jobs weren't getting copied over to their new job.
-
-1.4.0 (2015-12-09) -
-     Instances of the child pid have the same variable name (With a few exceptions), whether or not they're being referenced by the child process.
-     fn_read_conf and fn_test_variable are no longer run in subshells.
-     The reload file is no longer used to test whether the parameters have changed - rather, the script checks if the mtime stamp has been updated.
-     The params file and the conf file are now read and kept in memory as a variable, and only re-read if their timestamp changes.
-     More than one curl string can be declared at the command line. All of them present must match the curl'd result in order for it to be counted as a success.
-     Replaced the phrase "server string" with "job name".
-     "Hits" and "misses" are now referred to as "successes" and "failures".
-     LWmon now gathers data on how long it takes for each check to run, and the user has the option to log this data (on by default).
-     Checks how long it takes for the busy-work portion of checks and subtracts that from WAIT_SECONDS.
-     Added "more verbose" mode.
-     email messages now include data on how long the checks took.
-     Implimented partial successes for URL based checks.
-     The master process now creates a mini script with just the functions that the child proces needs (reduces memory footprint).
-     Set the minimum wait seconds to 5 for URL's and 2 for ping and DNS.
-     All potential parameters are output to the params file; the unpopulated ones are commented out.
-     Added an option for the script to send an email if X out of the last Y checks were not successes.
-     condensed the email functions by reworking tem to combine common verbiage.
-
-1.3.3 (2015-11-25) - 1.3.1 (2015-12-02) -
-     Older revision informaion can be viewed here: http://www.sporks5000.com/scripts/lwmon.sh.1.3.1
-
-1.0.0 (2013-07-09) - 1.2.1 (2015-11-23) -
-     Older revision informaion can be viewed here: http://www.sporks5000.com/scripts/xmonitor.sh.1.2.1
+1.0.0 (2013-07-09) - 1.4.1 (2015-12-10)
+     Older revision information can be viewed here:
+     - http://www.sporks5000.com/scripts/xmonitor.sh.1.2.1
+     - http://www.sporks5000.com/scripts/lwmon.sh.1.3.1
+     - http://www.sporks5000.com/scripts/lwmon.sh.1.4.1
 
 EOF
 #'do
@@ -2054,7 +2150,7 @@ v_CURL_STRING_COUNT=0
 ### For each command line argument, determine what needs to be done.
 for (( c=0; c<=$(( $# - 1 )); c++ )); do
    v_ARGUMENT="${a_CL_ARGUMENTS[$c]}"
-   if [[ $( echo $v_ARGUMENT | egrep -c "^(--((url|dns|ping|kill|ssh-load)(=.*)*|list|master|version|help|help-flags|help-process-types|help-params-file|modify)|[^-]*-[hmpudl])$" ) -gt 0 ]]; then
+   if [[ $( echo $v_ARGUMENT | egrep -c "^(--((url|dns|ping|kill|(ssh-)*load)(=.*)*|list|master|version|help|help-flags|help-process-types|help-params-file|modify)|[^-]*-[hmpudl])$" ) -gt 0 ]]; then
       ### These flags indicate a specific action for the script to take. Two actinos cannot be taken at once.
       if [[ -n $v_RUN_TYPE ]]; then
          ### If another of these actions has already been specified, end.
@@ -2068,8 +2164,9 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          fn_parse_cl_argument "--dns" "string" "-d"; v_DOMAIN="$v_RESULT"
       elif [[ $( echo "$v_ARGUMENT" | egrep -c "^-(p|-ping)($|=)" ) -eq 1 ]]; then
          fn_parse_cl_argument "--ping" "string" "-p"; v_DOMAIN="$v_RESULT"
-      elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--ssh-load($|=)" ) -eq 1 ]]; then
-         fn_parse_cl_argument "--ssh-load" "string"; v_DOMAIN="$v_RESULT"
+      elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ssh-)*load($|=)" ) -eq 1 ]]; then
+         fn_parse_cl_argument "--ssh-load" "string" "--load"; v_DOMAIN="$v_RESULT"
+         v_RUN_TYPE="--ssh-load"
       elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--kill($|=)" ) -eq 1 ]]; then
          if [[ $( echo "$v_ARGUMENT" | egrep -c "^--kill=" ) -eq 1 || ( -n ${a_CL_ARGUMENTS[$(( $c + 1 ))]} && $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ) ]]; then
             fn_parse_cl_argument "--kill" "num"; v_CHILD_PID="$v_RESULT"
