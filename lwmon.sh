@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.2.1"
+v_VERSION="2.2.2"
 
 ##################################
 ### Functions that create jobs ###
@@ -78,7 +78,7 @@ function fn_url_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
-      echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control, --ldd, --ndr, --nsns, --nds"
+      echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    ### If there is an IP address, check to make sure that it's really an IP address, or can be translated into one.
@@ -95,9 +95,9 @@ function fn_url_cl {
    ### If there isn't an IP address, we don't need to specify it in the job name.
    if [[ -z "$v_IP_ADDRESS" || "$v_IP_ADDRESS" == "false" ]]; then
       v_IP_ADDRESS=false
-      v_JOB_NAME="$v_CURL_URL"
+      v_ORIG_JOB_NAME="$v_CURL_URL"
    else
-      v_JOB_NAME="$v_CURL_URL at $v_IP_ADDRESS"
+      v_ORIG_JOB_NAME="$v_CURL_URL at $v_IP_ADDRESS"
    fi 
    ### Start inputting the values into the params file
    v_NEW_JOB="$( date +%s )""_$RANDOM.job"
@@ -129,7 +129,7 @@ function fn_ping_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with ping jobs are the following:"
-      echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds"
+      echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    fn_parse_server "$v_DOMAIN"
@@ -137,7 +137,7 @@ function fn_ping_cl {
       echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
       exit
    fi
-   v_JOB_NAME="$v_DOMAINa"
+   v_ORIG_JOB_NAME="$v_DOMAINa"
    v_DOMAIN=$v_DOMAINa
    v_NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "JOB_TYPE = ping" > "$v_WORKINGDIR""$v_NEW_JOB"
@@ -152,7 +152,7 @@ function fn_dns_cl {
       exit
    elif [[ $( echo -n "$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with dns jobs are the following:"
-      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds"
+      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    ### Make sure that the domain resolves and is properly formatted
@@ -165,7 +165,7 @@ function fn_dns_cl {
    ### Make sure that the domain we're digging is properly formatted as well
    fn_parse_server "$v_DNS_CHECK_DOMAIN"
    v_DNS_CHECK_DOMAIN="$v_DOMAINa"
-   v_JOB_NAME="$v_DNS_CHECK_DOMAIN @$v_DOMAIN"
+   v_ORIG_JOB_NAME="$v_DNS_CHECK_DOMAIN @$v_DOMAIN"
    v_NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "JOB_TYPE = dns" > "$v_WORKINGDIR""$v_NEW_JOB"
    echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$v_WORKINGDIR""$v_NEW_JOB"
@@ -181,7 +181,7 @@ function fn_load_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
-      echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds"
+      echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
    fn_parse_server "$v_DOMAIN"
@@ -193,7 +193,7 @@ function fn_load_cl {
       echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
       exit
    fi
-   v_JOB_NAME="$v_DOMAINa"
+   v_ORIG_JOB_NAME="$v_DOMAINa"
    v_DOMAIN="$v_DOMAINa"
    if [[ -z "$v_CL_PORT" && "$v_SERVER_PORTa" == "22" ]]; then
       v_SERVER_PORT=22
@@ -206,9 +206,12 @@ function fn_load_cl {
    fn_test_variable "$v_SSH_CONTROL_PATH" false SSH_CONTROL_PATH "~/.ssh/control:%h:%p:%r"; v_SSH_CONTROL_PATH="$v_RESULT"
    fn_test_file "$v_SSH_CONTROL_PATH" false false; v_SSH_CONTROL_PATH2="$v_RESULT"
    if [[ ! -e "$( echo "$v_SSH_CONTROL_PATH2" | sed "s/%h/$v_DOMAIN/;s/%p/$v_SERVER_PORT/;s/%r/$v_SSH_USER/" )" && "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" ]]; then
-      echo "There doesn't appear to be an SSH control socket open for this server. Use the following command to SSH into this server, and then try starting the job again:"
+      echo
+      echo "There doesn't appear to be an SSH control socket open for this server. Use the following command to SSH into this server (you'll probably want to do this in another window, or a screen), and then try starting the job again:"
       echo
       echo "ssh -o ControlMaster=auto -o ControlPath=\"$v_SSH_CONTROL_PATH\" -p $v_SERVER_PORT $v_SSH_USER@$v_DOMAIN"
+      echo
+      echo "Be sure to exit out of the master ssh process when you're done."
       echo
       exit
    fi
@@ -224,10 +227,13 @@ function fn_load_cl {
 
 function fn_mutual_cl {
    if [[ -n "$v_IDENT" ]]; then
-      v_JOB_NAME="$v_JOB_NAME $v_IDENT"
+      v_ORIG_JOB_NAME="$v_ORIG_JOB_NAME $v_IDENT"
+   fi
+   if [[ -z "$v_JOB_NAME" ]]; then
+      v_JOB_NAME="$v_ORIG_JOB_NAME"
    fi
    echo "JOB_NAME = $v_JOB_NAME" >> "$v_WORKINGDIR""$v_NEW_JOB"
-   echo "ORIG_JOB_NAME = $v_JOB_NAME" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   echo "ORIG_JOB_NAME = $v_ORIG_JOB_NAME" >> "$v_WORKINGDIR""$v_NEW_JOB"
    if [[ "$v_RUN_TYPE" == "--url" || "$v_RUN_TYPE" == "-u" || "$v_RUN_TYPE" == "--ssh-load" ]]; then
       if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS" ]]; then
          echo "#CHECK_TIME_PARTIAL_SUCCESS = " >> "$v_WORKINGDIR""$v_NEW_JOB"
@@ -490,7 +496,7 @@ function fn_child_vars {
       fn_parse_server "$v_DNS_CHECK_DOMAIN"; v_DNS_CHECK_DOMAIN="$v_DOMAINa"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --check-domain $v_DNS_CHECK_DOMAIN"
    fi
-   v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY --verbosity \"$v_VERBOSITY\" --outfile \"$v_OUTPUT_FILE\" --seconds $v_WAIT_SECONDS --ldd $v_LOG_DURATION_DATA --ndr $v_NUM_DURATIONS_RECENT --nsns $v_NUM_STATUSES_NOT_SUCCESS --nsr $v_NUM_STATUSES_RECENT"
+   v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY --verbosity \"$v_VERBOSITY\" --outfile \"$v_OUTPUT_FILE\" --seconds $v_WAIT_SECONDS --ldd $v_LOG_DURATION_DATA --ndr $v_NUM_DURATIONS_RECENT --nsns $v_NUM_STATUSES_NOT_SUCCESS --nsr $v_NUM_STATUSES_RECENT --job-name \"$v_JOB_NAME\""
    echo "$v_JOB_CL_STRING" > "$v_WORKINGDIR""$v_CHILD_PID"/cl
 }
 
@@ -1731,7 +1737,7 @@ COLOR_SUCCESS =
 COLOR_FIRST_SUCCESS = \e[1;32m
 COLOR_FAILURE = \e[1;33m
 COLOR_FIRST_FAILURE = \e[1;31m
-COLOR_PARTIAL_SUCCESS = \e[1;34m
+COLOR_PARTIAL_SUCCESS = \e[1;35m
 COLOR_FIRST_PARTIAL_SUCCESS = \e[1;34m
 RETURN_SUCCESS = 
 RETURN_FIRST_SUCCESS = \e[00m
@@ -1741,7 +1747,7 @@ RETURN_PARTIAL_SUCCESS = \e[00m
 RETURN_FIRST_PARTIAL_SUCCESS = \e[00m
 EOF
 #'do
-echo -e "\e[1;32m a configuration file has been created at \"$v_WORKINGDIR""lwmon.conf\". You totally want to check it out.\e[00m"
+echo -e "\e[1;32mA configuration file has been created at \"$v_WORKINGDIR""lwmon.conf\". You totally want to check it out.\e[00m"
 sleep 1
 }
 
@@ -1750,7 +1756,7 @@ sleep 1
 ##################################
 
 function fn_help {
-cat << 'EOF' > /dev/stdout
+cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 
 LWmon (Less Worry Monitor) - A script to organize and consolidate the monitoring of multiple servers. With LWmon you can run checks against multiple servers simultaneously, starting new jobs and stopping old ones as needed without interfering with any that are currently running. All output from the checks go by default to a single terminal window, allowing you to keep an eye on multiple things going on at once.
 
@@ -1818,7 +1824,7 @@ exit
 }
 
 function fn_help_flags {
-cat << 'EOF' > /dev/stdout
+cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 
 FLAGS FOR MONITORING JOB TYPES:
 
@@ -1826,26 +1832,26 @@ FLAGS FOR MONITORING JOB TYPES:
 
      This flag is used to start a new monitoring job for DNS services on a remote server. It requires the use of the "--domain" flag, and can also be used in conjunction with the following flags:
 
-     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds
+     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds
 
 --ping (host name or IP)
 
      This flag is used to start a new monitoring job to watch whether or not a server is pinging. It can be used in conjunction with the following flags:
 
-     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds
+     --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds
 
 --ssh-load (host name or IP)
 --load (host name or IP)
 
-     This flag is used to start a new monitoring job to watch a remote server's load. It requires the "--user" flag, and also requires the presence of an SSH control socket. It can be used in conjunction with the following flags:
+     This flag is used to start a new monitoring job to watch a remote server's load. It requires the "--user" flag, and also requires the presence of an SSH control socket (You will be told hiw to fix this if you try running a job without one). It can be used in conjunction with the following flags:
 
-     --load-ps, --load-fail, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control, --ldd, --ndr, --nsns, --nds
+     --load-ps, --load-fail, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds
 
 --url (url)
 
      This flag is used to start a new monitoring job to confirm that a URL is loading as expected. It requires one or more uses of the "--string" flag, and can also be used in conjunction with the following flags:
 
-     --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control, --ldd, --ndr, --nsns, --nds
+     --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds
 
 
 FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
@@ -1870,12 +1876,16 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 --ident (number)
 --ticket (number)
 
-     Allows the user to specify an identifying string of numbers that can be added to the job name. This can, for example, be an account number or ticket number.
+     Allows the user to specify an identifying string of numbers that can be added to the job name. This can, for example, be an account number or ticket number. If the --job-name flag isn't used, this string is added to the end of the job name. 
 
 --ip (IP address)
 --ip-address (IP address)
 
      Used with "--url". This flag is used to specify the IP address of the server that you're running the check against. Without this flag, a DNS query is used to determine what IP the site needs to be pulled from. "--ip" is perfect for situations where multiple load balanced servers need to be monitored at once, or where the customer's A record is pointing at cloudflare, and you're trying to determine whether connectivity issues are server specific, or cloudflare specific.
+
+--job-name (string of text)
+
+     Allows the user to specify an identifying job name at the command line.
 
 --ldd (true|false)
 --log-duration-data (true|false)
@@ -1999,7 +2009,7 @@ exit
 }
 
 function fn_help_process_types {
-cat << 'EOF' > /dev/stdout
+cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 
 MASTER, CONTROL, AND CHILD PROCESSES
 
@@ -2022,7 +2032,7 @@ exit
 }
 
 function fn_help_params_file {
-cat << 'EOF' > /dev/stdout
+cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 
 PARAMETERS FILE
 (located at ".lwmon/[CHILD PID]/params")
@@ -2120,11 +2130,15 @@ exit
 
 function fn_version {
 echo "Current Version: $v_VERSION"
-cat << 'EOF' > /dev/stdout
+cat << 'EOF' | fold -s -w $(tput cols) > /dev/stdout
 
 Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
+
+2.2.2 (2016-01-04) -
+     Added the "--job-name" flag, because it seemed weird that you couldn't specify a job name.
+     Help output now word wraps with line breaks on spaces.
 
 2.2.1 (2015-12-28) -
      No longer relies on ps aux to check if processes are running.
@@ -2347,6 +2361,8 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fn_parse_cl_argument "--domain" "string" "--check-domain"; v_DNS_CHECK_DOMAIN="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ssh-)*user($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--user" "string" "--ssh-user"; v_SSH_USER="$v_RESULT"
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--job-name($|=)" ) -eq 1 ]]; then
+      fn_parse_cl_argument "--job-name" "string"; v_JOB_NAME="$v_RESULT"
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--verbos(e|ity)($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--verbosity" "string" "--verbose"; v_VERBOSITY="$v_RESULT"
       if [[ $v_VERBOSITY == "more" && "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" == "verbose" ]]; then
