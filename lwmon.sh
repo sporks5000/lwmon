@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.2.0"
+v_VERSION="2.2.1"
 
 ##################################
 ### Functions that create jobs ###
@@ -746,7 +746,7 @@ function fn_report_status {
    ### Statistics and duration information.
 
    ### Check to see if the parent is still in palce, and die if not.
-   if [[ $( ps aux | grep "$v_MASTER_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+   if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 ]]; then
       fn_child_exit
    fi
    ### Figure out how long the script has run and what percent are successes, etc.
@@ -1041,7 +1041,7 @@ function fn_master {
          fi
          ### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
          for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "^[0-9][0-9]*$" ); do
-            if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+            if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 ]]; then
                ### If it hasn't been marked to die, restart it.
                if [[ ! -f "$v_WORKINGDIR""$v_CHILD_PID/die" ]]; then
                   fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
@@ -1062,26 +1062,25 @@ function fn_master {
       fi
 
       ### Every Two Seconds, check if there are any new files within the new/ directory. Assume that they're params files for new jobs
-      if [[ $( ls -1 "$v_WORKINGDIR""new/" | wc -l ) -gt 0 ]]; then
-         for v_LWMON_JOB in "$v_WORKINGDIR"new/*.job; do
-            ### Find all files that are not marked as log files.
-            fn_read_conf JOB_TYPE "$v_LWMON_JOB"; v_JOB_TYPE="$v_RESULT"
-            fn_read_conf JOB_NAME "$v_LWMON_JOB"; v_JOB_NAME="$v_RESULT"
-            if [[ $v_JOB_TYPE == "url" ]]; then
-               v_JOB_NAME="URL $v_JOB_NAME"
-               fn_spawn_child_process
-            elif [[ $v_JOB_TYPE == "ping" ]]; then
-               v_JOB_NAME="PING $v_JOB_NAME"
-               fn_spawn_child_process
-            elif [[ $v_JOB_TYPE == "dns" ]]; then
-               v_JOB_NAME="DNS $v_JOB_NAME"
-               fn_spawn_child_process
-            elif [[ $v_JOB_TYPE == "ssh-load" ]]; then
-               v_JOB_NAME="SSH-LOAD $v_JOB_NAME"
-               fn_spawn_child_process
-            fi
-         done
-         ### If there's anything else left in this directory, it is neither a job, nor a log file. Let's get rid of it.
+      if [[ $( ls -1 "$v_WORKINGDIR"new/*.job 2> /dev/null | wc -l ) -gt 0 ]]; then
+      ### If there are any at all, take the first one and start a job from it. The next one can wait for the next loop.
+         v_LWMON_JOB="$( ls -1 "$v_WORKINGDIR"new/*.job 2> /dev/null | head -n1 )"
+         fn_read_conf JOB_TYPE "$v_LWMON_JOB"; v_JOB_TYPE="$v_RESULT"
+         fn_read_conf JOB_NAME "$v_LWMON_JOB"; v_JOB_NAME="$v_RESULT"
+         if [[ $v_JOB_TYPE == "url" ]]; then
+            v_JOB_NAME="URL $v_JOB_NAME"
+            fn_spawn_child_process
+         elif [[ $v_JOB_TYPE == "ping" ]]; then
+            v_JOB_NAME="PING $v_JOB_NAME"
+            fn_spawn_child_process
+         elif [[ $v_JOB_TYPE == "dns" ]]; then
+            v_JOB_NAME="DNS $v_JOB_NAME"
+            fn_spawn_child_process
+         elif [[ $v_JOB_TYPE == "ssh-load" ]]; then
+            v_JOB_NAME="SSH-LOAD $v_JOB_NAME"
+            fn_spawn_child_process
+         fi
+      else
          if [[ $( ls -1 "$v_WORKINGDIR""new/" | wc -l ) -gt 0 ]]; then
             rm -f "$v_WORKINGDIR"new/*
          fi
@@ -1178,7 +1177,7 @@ function fn_master_exit {
       if [[ $v_OPTION_NUM == "1" ]]; then
          for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
             v_CHILD_PID=$( basename $i )
-            if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+            if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
                touch "$v_WORKINGDIR""$v_CHILD_PID/die"
             fi
          done
@@ -1188,7 +1187,7 @@ function fn_master_exit {
    elif [[ -f "$v_WORKINGDIR"die && ! -f "$v_WORKINGDIR"save ]]; then
       for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
          v_CHILD_PID=$( basename $i )
-         if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+         if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
             touch "$v_WORKINGDIR""$v_CHILD_PID/die"
          fi
       done
@@ -1225,7 +1224,7 @@ function fn_list {
 function fn_modify_master {
 ### Options for the master process
    echo -e "Options:\n"
-   echo "  1) Exit out of the master process."
+   echo "  1) Exit out of the master process without backing up the child processes."
    echo "  2) First back-up the child processes so that they'll run immediately when lwmon is next started, then exit out of the master process."
    echo "  3) Edit the configuration file."
    echo "  4) View the log file."
@@ -2127,6 +2126,10 @@ Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
 
+2.2.1 (2015-12-28) -
+     No longer relies on ps aux to check if processes are running.
+     The master process only spawns one child process per loop rather than potentially spawning several all at once. Staggering them makes for less chance of overloading the processor.
+
 2.2.0 (2015-12-24) -
      Master process now checks for killed jobs every five minutes rather than every two seconds.
      The master process doesn't need to announce that the verbosity has changed.
@@ -2158,7 +2161,7 @@ Future Versions -
      "DNS_DOMAIN" is not "DNS_CHECK_DOMAIN"
      Consolidated the status reporting functions into one function (and saved a few KB as a result).
      Revised the process of checking command line arguments. It is slightly less CPU efficient now, but it's significantly more uniform.
-     Revised fn_parse_server to make its output more accurate and (hopefully) compensate for IPv6
+     Revised fn_parse_server to make its output more accurate and (hopefully) compensate for IPv6.
      Revised the functions that organize data from the command line and put them into the parameters files.
      Removed the majority of the menus; restructured the remaining ones.
      Menu items to view log files.
@@ -2237,8 +2240,8 @@ for i in bc mail dig ping stat ssh; do
 done
 
 ### Determine the running state
-if [[ -f "$v_WORKINGDIR"lwmon.pid && $( ps aux | grep "$( cat "$v_WORKINGDIR"lwmon.pid 2> /dev/null ).*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
-   if [[ $PPID == $( cat "$v_WORKINGDIR"lwmon.pid 2> /dev/null ) ]]; then
+if [[ -f "$v_WORKINGDIR"lwmon.pid && $( cat /proc/$( cat "$v_WORKINGDIR"lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
+   if [[ $PPID == $( cat "$v_WORKINGDIR"lwmon.pid ) ]]; then
       ### Child processes monitor one thing only they are spawned only by the master process and when the master process is no longer present, they die.
       v_RUNNING_STATE="child"
       fn_child
