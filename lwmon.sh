@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.3.4"
+v_VERSION="2.3.5"
 
 ##################################
 ### Functions that create jobs ###
@@ -453,7 +453,7 @@ function fn_child_vars {
       fn_read_conf CHECK_TIME_PARTIAL_SUCCESS child; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
       fn_test_variable "$v_CHECK_TIME_PARTIAL_SUCCESS" true CHECK_TIME_PARTIAL_SUCCESS "7"; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --check-timeout $v_CHECK_TIMEOUT --ctps $v_CHECK_TIME_PARTIAL_SUCCESS"
-      v_CHECK_TIME_PARTIAL_SUCCESS="$( echo "scale=4; $v_CHECK_TIME_PARTIAL_SUCCESS *100" | bc | cut -d "." -f1 )"
+      v_CHECK_TIME_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_CHECK_TIME_PARTIAL_SUCCESS} * 100}" )"
    fi
    if [[ $v_JOB_TYPE == "url" ]]; then
       fn_read_conf IP_ADDRESS child; v_IP_ADDRESS="$v_RESULT"
@@ -493,7 +493,7 @@ function fn_child_vars {
       fi
       if [[ $v_USER_AGENT == true ]]; then
          v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent"
-         v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36'
+         v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.110 Safari/537.36'
       elif [[ $v_USER_AGENT == false && $v_WGET_BIN == "false" ]]; then
          v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent false"
          v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
@@ -511,8 +511,8 @@ function fn_child_vars {
       fn_test_variable "$v_MIN_LOAD_FAILURE" true false "8"; v_MIN_LOAD_FAILURE="$v_RESULT"
       fn_read_conf SSH_USER child; v_SSH_USER="$v_RESULT"
       v_JOB_CL_STRING="$v_JOB_CL_STRING --port $v_SERVER_PORT --load-ps $v_MIN_LOAD_PARTIAL_SUCCESS --load-fail $v_MIN_LOAD_FAILURE --user $v_SSH_USER"
-      v_MIN_LOAD_PARTIAL_SUCCESS="$( echo "scale=4; $v_MIN_LOAD_PARTIAL_SUCCESS *100" | bc | cut -d "." -f1 )"
-      v_MIN_LOAD_FAILURE="$( echo "scale=4; $v_MIN_LOAD_FAILURE *100" | bc | cut -d "." -f1 )"
+      v_MIN_LOAD_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_MIN_LOAD_PARTIAL_SUCCESS} * 100}" )"
+      v_MIN_LOAD_FAILURE="$( awk "BEGIN {printf \"%.0f\",${v_MIN_LOAD_FAILURE} * 100}" )"
       fn_read_conf SSH_CONTROL_PATH child; v_SSH_CONTROL_PATH="$v_RESULT"
       fn_test_variable "$v_SSH_CONTROL_PATH" false SSH_CONTROL_PATH "~/.ssh/control:%h:%p:%r"; v_SSH_CONTROL_PATH="$v_RESULT"
       fn_test_file "$v_SSH_CONTROL_PATH" false false; v_SSH_CONTROL_PATH="$v_RESULT"
@@ -619,7 +619,7 @@ function fn_url_child {
          fi
          rm -f "$v_WORKINGDIR""$v_CHILD_PID"/curl_verbose_output.txt
       fi
-      v_CHECK_DURATION="$( echo "scale=4; ( $v_CHECK_END - $v_CHECK_START ) *100" | bc )"
+      v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",( ${v_CHECK_END} - ${v_CHECK_START} ) * 100}" )"
       if [[ $j -lt $i && $j -gt 0 ]]; then
          fn_report_status "partial success" save
       elif [[ $( echo $v_CHECK_DURATION | cut -d "." -f1 ) -ge "$v_CHECK_TIME_PARTIAL_SUCCESS" && $j -gt 0 ]]; then
@@ -658,9 +658,9 @@ function fn_load_child {
          v_CHECK_END=$( date +%s"."%N | head -c -6 )
       fi
       if [[ -n $v_LOAD_AVG ]]; then
-         v_MODIFIED_LOAD_AVERAGE="$( echo "scale=4; $v_LOAD_AVG *100" | bc | cut -d "." -f1 )"
+         v_MODIFIED_LOAD_AVERAGE="$( awk "BEGIN {printf \"%.0f\",${v_LOAD_AVG} * 100}" )"
       fi
-      v_CHECK_DURATION="$( echo "scale=4; ( $v_CHECK_END - $v_CHECK_START ) *100" | bc )"
+      v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",(${v_CHECK_END} - ${v_CHECK_START} ) * 100}" )"
       if [[ -n $v_LOAD_AVG && $v_MODIFIED_LOAD_AVERAGE -lt $v_MIN_LOAD_PARTIAL_SUCCESS && $v_MODIFIED_LOAD_AVERAGE -lt $v_MIN_LOAD_FAILURE && $( echo $v_CHECK_DURATION | cut -d "." -f1 ) -ge "$v_CHECK_TIME_PARTIAL_SUCCESS" ]]; then
          fn_report_status "partial success"
       elif [[ -n $v_LOAD_AVG && $v_MODIFIED_LOAD_AVERAGE -lt $v_MIN_LOAD_PARTIAL_SUCCESS && $v_MODIFIED_LOAD_AVERAGE -lt $v_MIN_LOAD_FAILURE ]]; then
@@ -744,7 +744,7 @@ function fn_child_checks {
    fi
    ### Generally all of the STUFF between the actual check and running sleep lasts 0.1 seconds-ish. No harm in calculating exactly how long it took and then subtracting that from the wait seconds.
    v_CHECK_END2=$( date +%s"."%N | head -c -6 )
-   v_SLEEP_SECONDS="$( echo "scale=2; $v_WAIT_SECONDS - ( $v_CHECK_END2 - $v_CHECK_END )" | bc )"
+   v_SLEEP_SECONDS="$( awk "BEGIN {printf \"%.2f\",${v_WAIT_SECONDS} - ( ${v_CHECK_END2} - ${v_CHECK_END} )}" )"
    if [[ "${v_SLEEP_SECONDS:0:1}" != "-" ]]; then
       sleep $v_SLEEP_SECONDS
    fi
@@ -831,22 +831,25 @@ function fn_report_status {
    ### Figure out how long the script has run and what percent are successes, etc.
    v_RUN_TIME="$( fn_convert_seconds $(( $v_DATE3 - $v_START_TIME )) )"
    v_TOTAL_CHECKS=$(( $v_TOTAL_CHECKS + 1 ))
-   v_PERCENT_SUCCESSES=$( echo "scale=2; $v_TOTAL_SUCCESSES * 100 / $v_TOTAL_CHECKS" | bc )
-   v_PERCENT_PARTIAL_SUCCESSES=$( echo "scale=2; $v_TOTAL_PARTIAL_SUCCESSES * 100 / $v_TOTAL_CHECKS" | bc )
-   v_PERCENT_FAILURES=$( echo "scale=2; $v_TOTAL_FAILURES * 100 / $v_TOTAL_CHECKS" | bc )
+   v_PERCENT_SUCCESSES=$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_SUCCESSES} * 100 ) / ${v_TOTAL_CHECKS}}" )
+   v_PERCENT_PARTIAL_SUCCESSES=$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_PARTIAL_SUCCESSES} * 100 ) / ${v_TOTAL_CHECKS}}" )
+   v_PERCENT_FAILURES=$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_FAILURES} * 100 ) / ${v_TOTAL_CHECKS}}" )
    ### How long did the check itself take?
-   v_CHECK_DURATION="$( echo "scale=4; $v_CHECK_END - $v_CHECK_START" | bc )"
-   v_TOTAL_DURATIONS="$( echo "scale=4; $v_CHECK_DURATION + $v_TOTAL_DURATIONS" | bc )"
-   v_AVERAGE_DURATION="$( echo "scale=4; $v_TOTAL_DURATIONS / $v_TOTAL_CHECKS" | bc )"
+   v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_END} - ${v_CHECK_START}}" )"
+   v_TOTAL_DURATIONS="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_DURATION} + ${v_TOTAL_DURATIONS}}" )"
+   v_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_DURATIONS} / ${v_TOTAL_CHECKS}}" )"
    if [[ ${#a_RECENT_DURATIONS[@]} -eq $v_NUM_DURATIONS_RECENT ]]; then
       a_RECENT_DURATIONS=("${a_RECENT_DURATIONS[@]:1}")
    fi
    a_RECENT_DURATIONS[${#a_RECENT_DURATIONS[@]}]="$v_CHECK_DURATION"
-   v_TOTAL_RECENT_DURATION="$( echo "scale=4; $( IFS="+"; echo "${a_RECENT_DURATIONS[*]}"; IFS=$" \t\n")" | bc )"
-   v_AVERAGE_RECENT_DURATION="$( echo "scale=4; $v_TOTAL_RECENT_DURATION/${#a_RECENT_DURATIONS[@]}" | bc )"
+   v_TOTAL_RECENT_DURATION=0
+   for (( c=0; c<=$(( ${#a_RECENT_DURATIONS[@]} - 1 )); c++ )); do
+      v_TOTAL_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} + ${a_RECENT_DURATIONS[$c]}}" )"
+   done
+   v_AVERAGE_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} / ${#a_RECENT_DURATIONS[@]}}" )"
    if [[ "$v_THIS_STATUS" == "success" ]]; then
-      v_TOTAL_SUCCESS_DURATIONS="$( echo "scale=4; $v_CHECK_DURATION+$v_TOTAL_SUCCESS_DURATIONS" | bc )"
-      v_AVERAGE_SUCCESS_DURATION="$( echo "scale=4; $v_TOTAL_SUCCESS_DURATIONS/$v_TOTAL_SUCCESSES" | bc )"
+      v_TOTAL_SUCCESS_DURATIONS="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_DURATION} + ${v_TOTAL_SUCCESS_DURATIONS}}" )"
+      v_AVERAGE_SUCCESS_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_SUCCESS_DURATIONS} / ${v_TOTAL_SUCCESSES}}" )"
    fi
 
    ### Set the status strings
@@ -1199,31 +1202,30 @@ function fn_master {
 }
 
 function fn_compare_version {
-### Function Version 1.1.1
+### Function Version 1.1.2
 ### "$1" is the remote URL of the script. "$2" is "run" if a newer version should be run automatically, "color" if we should alert the user in color, and "plain" if we should alert the user with plain text. "plain" is assumed if none of these values are set.
 ### The "run" functionality assumes that "${a_CL_ARGUMENTS[@]}" is populated with the command line arguments of the current run. It also assumes that the string "End of Script" is within the last 10 lines of the script.
 ### This function can optionally make use of the fn_timeout function.
    ### Check to see if a newer version of the script is available; report if that's the case.
-   v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-   v_PROGRAMDIR="$( echo "$v_PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
+   v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd | sed "s/\([^/]\)$/\1\//" )"
    v_PROGRAMNAME="$( basename "${BASH_SOURCE[0]}" )"
    v_SCRIPT_URL="$1"
    if [[ ! -f "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check" || $(( $(date +%s) - $( stat --format=%Y "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check" ) )) -gt 7200 ]]; then
       if [[ "$2" == "run" && "$( type -t timeout )" == "file" ]]; then
          timeout 5 wget -q --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL"
-         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
       elif [[ "$( type -t timeout )" == "file" ]]; then
-         v_REMOTE_VERSION="$( timeout 5 wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+         v_REMOTE_VERSION="$( timeout 5 wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
       elif [[ "$2" == "run" && "$( type -t fn_timeout )" == "function" ]]; then
          fn_timeout 5 wget -q --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL" 
-         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
       elif [[ "$( type -t fn_timeout )" == "function" ]]; then
-         v_REMOTE_VERSION="$( fn_timeout 5 wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+         v_REMOTE_VERSION="$( fn_timeout 5 wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
       elif [[ "$2" == "run" ]]; then
          wget -q --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL" 
-         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+         v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
       else
-         v_REMOTE_VERSION="$( wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+         v_REMOTE_VERSION="$( wget -q --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
       fi
       if [[ -n "$v_REMOTE_VERSION" ]]; then
          if [[ ( "$2" == "run" && $( tail -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep -c "^### End of Script" ) -eq 1 ) || "$2" != "run" ]]; then
@@ -1375,7 +1377,7 @@ function fn_master_exit {
       echo "  1) Kill the master process and all child processes."
       echo "  2) Back up the data for the child processes so that they'll start again next time LWmon is run, then kill the master process and all child processes."
       echo
-      read -t 15 -p "How would you like to proceed? " v_OPTION_NUM
+      read -t 15 -ep "How would you like to proceed? " v_OPTION_NUM
       # If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
       if [[ $v_OPTION_NUM == "1" ]]; then
          for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
@@ -1434,7 +1436,7 @@ function fn_modify_master {
    echo "  5) Old monotoring jobs."
    echo "  6) Exit out of this menu."
    echo
-   read -p "Choose an option from the above list: " v_OPTION_NUM
+   read -ep "Choose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
       touch "$v_WORKINGDIR"die
    elif [[ $v_OPTION_NUM == "2" ]]; then
@@ -1468,7 +1470,7 @@ function fn_modify_no_master {
    echo "  6) Old monotoring jobs."
    echo "  7) Exit out of this menu."
    echo
-   read -p "Choose an option from the above list: " v_OPTION_NUM
+   read -ep "Choose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
       fn_help
    elif [[ $v_OPTION_NUM == "2" ]]; then
@@ -1514,7 +1516,7 @@ function fn_modify_old_jobs {
       exit 1
    fi
    echo
-   read -p "Which process do you want to modify? " v_CHILD_NUMBER
+   read -ep "Which process do you want to modify? " v_CHILD_NUMBER
    if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
       echo "Invalid Option. Exiting."
       exit 1
@@ -1532,7 +1534,7 @@ function fn_modify_old_jobs {
    echo "  7) View associated html files (if any)."
    echo "  8) Exit out of this menu."
    echo
-   read -p "Chose an option from the above list: " v_OPTION_NUM
+   read -ep "Chose an option from the above list: " v_OPTION_NUM
 if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" ]]; then
       rm -rf "$v_WORKINGDIR""$v_CHILD_PID"
       echo "This job has been parmanently removed."
@@ -1584,7 +1586,7 @@ function fn_modify_html {
       echo "There are no html files associated with this job. Exiting."
       exit 1
    fi
-   read -p "Which html file do you want options on? " v_HTML_NUMBER
+   read -ep "Which html file do you want options on? " v_HTML_NUMBER
    if [[ "$v_HTML_NUMBER" == "0" || $( echo "$v_HTML_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_HTML_NUMBER" -ge $(( ${#a_HTML_LIST[@]} + 1 )) ]]; then
       echo "Invalid Option. Exiting."
       exit 1
@@ -1596,7 +1598,7 @@ function fn_modify_html {
    echo "  2) Output the full file name."
    echo "  3) Exit out of this menu."
    echo
-   read -p "Chose an option from the above list: " v_OPTION_NUM
+   read -ep "Chose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" && -n "$v_WORKINGDIR" && -n "$v_CHILD_PID" && "$v_HTML_NAME" ]]; then
       rm -f "$v_WORKINGDIR""$v_CHILD_PID"/"$v_HTML_NAME"
       echo "The file has been deleted."
@@ -1617,7 +1619,7 @@ function fn_modify {
    fi
    fn_list
    echo
-   read -p "Which process do you want to modify? " v_CHILD_NUMBER
+   read -ep "Which process do you want to modify? " v_CHILD_NUMBER
    if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
       echo "Invalid Option. Exiting."
       exit 1
@@ -1639,7 +1641,7 @@ function fn_modify {
    echo "  8) View associated html files (if any)."
    echo "  9) Exit out of this menu."
    echo
-   read -p "Chose an option from the above list: " v_OPTION_NUM
+   read -ep "Chose an option from the above list: " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
       touch "$v_WORKINGDIR""$v_CHILD_PID/die"
       echo "Process will exit out shortly."
@@ -1663,7 +1665,7 @@ function fn_modify {
       echo "./lwmon.sh $( cat "$v_WORKINGDIR""$v_CHILD_PID/cl" )"
       echo
    elif [[ "$v_OPTION_NUM" == "6" ]]; then
-      read -p "Enter a new identifying string to associate with this check: " v_JOB_NAME
+      read -ep "Enter a new identifying string to associate with this check: " v_JOB_NAME
       fn_update_conf JOB_NAME "$v_JOB_NAME" "$v_WORKINGDIR""$v_CHILD_PID/params"
       echo "The job name has been updated."
    elif [[ "$v_OPTION_NUM" == "7" ]]; then
@@ -1804,44 +1806,51 @@ function fn_test_file {
 }
 
 function fn_parse_cl_argument {
-   ### Function Version 1.0.1
+   ### Function Version 1.1.0
    ### For this function, $1 is the flag that was passed (without trailing equal sign), $2 is "num" or "int" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, "date" if it's a date, "file" if it's a file, "directory" if it's a directory, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. If $2 is bool, then $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error. If $2 is "file" or "directory", then $4 can be "create" if the file should be created, and "error" if the file needs to have existed previously.
-   ### This script makes use of, but does not rely on the function "fn_fix_home".
+   ### This function will prompt for responses if the variable "$v_CL_PROMPT" is set to "true".
+   ### This function makes use of, but does not rely on the function "fn_fix_home".
    ### Currently scrub.sh has the prettiest implimentation of passing data to this function.
    unset v_RESULT
    if [[ "$2" == "none" ]]; then
       v_RESULT="true"
    elif [[ "$v_ARGUMENT" =~ ^$1$ && "$2" != "none" ]]; then
    ### If there is no equal sign, the next argument is the modifier for the flag
-      if [[ ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
+      if [[ -n "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" && ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
       ### If the next argument doesn't begin with a dash.
          if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
          ### If it's not bool, or if it is bool, but the next argument is neither true nor false
             c=$(( $c + 1 ))
             v_RESULT="${a_CL_ARGUMENTS[$c]}"
          fi
-      elif [[ "$2" != "bool" ]]; then
+      elif [[ "$2" != "bool" && $v_CL_PROMPT == true ]]; then
+         read -ep "The \"$v_ARGUMENT\" flag requires an argument: " v_RESULT
+      elif [[ "$2" != "bool" && $v_CL_PROMPT != true ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
          exit 1
       fi
    elif [[ "$v_ARGUMENT" =~ ^$1[0-9]*$ && ( $2 == "int" || $2 == "num" ) ]]; then
-   ### If the argument has a number on the end, and it's type is "int" or "num", then the number is the modifier
+   ### If the argument doesn't have an equal sign, has a number on the end, and it's type is "int" or "num", then the number is the modifier (example "-n1")
       v_RESULT="$( echo "$v_ARGUMENT" | sed "s/^$1//" )"
    elif [[ "$v_ARGUMENT" =~ ^$1= && "$2" != "none" ]]; then
    ### If the argument has an equal sign, then the modifier for the flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
+      if [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT == true ]]; then
+         read -ep "The \"$v_ARGUMENT\" flag requires an argument: " v_RESULT
+      elif [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT != true ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
          exit 1
       fi
    elif [[ -n "$3" && "$v_ARGUMENT" =~ ^$3$ && "$2" != "none" ]]; then
    ### If there is no equal sign, the next argument is the modifier for the alternate flag
-      if [[ ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
+      if [[ -n "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" && ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
          if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
             c=$(( $c + 1 ))
             v_RESULT="${a_CL_ARGUMENTS[$c]}"
          fi
-      elif [[ "$2" != "bool" ]]; then
+      elif [[ "$2" != "bool" && $v_CL_PROMPT == true ]]; then
+         read -ep "The \"$v_ARGUMENT\" flag requires an argument: " v_RESULT
+      elif [[ "$2" != "bool" && $v_CL_PROMPT != true ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
          exit 1
       fi
@@ -1851,7 +1860,9 @@ function fn_parse_cl_argument {
    elif [[ -n "$3" && "$v_ARGUMENT" =~ ^$3= && "$2" != "none" ]]; then
    ### If the argument has an equal sign, then the modifier for the alternate flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
+      if [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT == true ]]; then
+         read -ep "The \"$v_ARGUMENT\" flag requires an argument: " v_RESULT
+      elif [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT != true ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
          exit 1
       fi
@@ -1866,12 +1877,13 @@ function fn_parse_cl_argument {
          echo "The flag \"$1\" needs to be followed by a date. Exiting."
          exit 1
       fi
+      v_RESULT="$( date --date="$v_RESULT" +%F )"
    elif [[ $2 == "float" && ! "$v_RESULT" =~ ^[0-9.]+$ ]]; then
       echo "The flag \"$1\" needs to be followed by a number. Exiting."
       exit 1
    elif [[ $2 == "file" ]]; then
       if [[ $( type -t fn_fix_home ) == "function" ]]; then
-         fn_fix_home "$v_RESULT"
+         v_RESULT=$( fn_fix_home "$v_RESULT" )
       fi
       if [[ $4 == "error" && ! -f "$v_RESULT" ]]; then
          echo "File \"$v_RESULT\" does not appear to exist. Exiting."
@@ -1886,7 +1898,7 @@ function fn_parse_cl_argument {
       fi
    elif [[ $2 == "directory" ]]; then
       if [[ $( type -t fn_fix_home ) == "function" ]]; then
-         fn_fix_home "$v_RESULT" --directory
+         v_RESULT=$( fn_fix_home "$v_RESULT" --directory )
       fi
       if [[ $4 == "error" && ! -d "$v_RESULT" ]]; then
          echo "Directory \"$v_RESULT\" does not appear to exist. Exiting."
@@ -2412,6 +2424,9 @@ Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
      Rather than have a job run indefinitely, have the user set a duration or a time for it to stop.
 
+2.3.5 (2016-03-30) -
+     Replaced any math using bc with awk instead.
+
 2.3.4 (2016-03-23) -
      Newer version of the function that handles how command line arguments are processed.
      Any instance where the script exits now has an exit code of "0" or "1"
@@ -2460,9 +2475,8 @@ exit 0
 ########################
 
 function fn_start_script {
-   # Specify the working directory; create it if not present; specify the log file
-   v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-   v_PROGRAMDIR="$( echo "$v_PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
+   ### Specify the working directory; create it if not present; specify the log file
+   v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd | sed "s/\([^/]\)$/\1\//" )"
    #"
    v_PROGRAMNAME="$( basename "${BASH_SOURCE[0]}" )"
    #"
@@ -2507,9 +2521,9 @@ fn_start_script
 ### If there's a no-output file from the previous session, remove it.
 rm -f "$v_WORKINGDIR"no_output
 
-### Make sure that bc, ping, and dig are installed
+### Make sure that ping, and dig are installed
 ### curl, wget, and mail are being checked elsewhere within the script.
-for i in bc dig ping stat ssh; do
+for i in dig ping stat ssh; do
    if [[ -z $( which $i 2> /dev/null ) ]]; then
       echo "The \"$i\" binary needs to be installed for lwmon to perform some of its functions. Exiting."
       exit 1
