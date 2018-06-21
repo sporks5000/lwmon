@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="1.3.0"
+v_VERSION="1.3.1"
 
 #######################
 ### BEGIN FUNCTIONS ###
@@ -29,7 +29,7 @@ function fn_url_vars {
    echo
    echo "Enter the IP Address that this URL should be monitored on. (Or just press enter"
    read -p  "to have the IP resolved via DNS): " v_SERVER
-   if [[ ! -z $v_SERVER ]]; then
+   if [[ -n $v_SERVER ]]; then
       fn_parse_server
       v_IP_ADDRESS=$v_IP_ADDRESSa
    fi
@@ -201,10 +201,10 @@ function fn_url_cl {
    if [[ -z $v_CURL_STRING ]]; then
       echo "It is required that you specify a check string using \"--string\" followed by a string in quotes that will be searched for when checking a URL. Exiting."
       exit
-   elif [[ ! -z $v_CURL_URL && ! -z $v_DNS_DOMAIN && $v_CURL_URL != $v_DNS_DOMAIN ]]; then
+   elif [[ -n $v_CURL_URL && -n $v_DNS_DOMAIN && $v_CURL_URL != $v_DNS_DOMAIN ]]; then
       echo "Please specify either a URL or a domain, not both. Exiting."
       exit
-   elif [[ ! -z $v_IP_ADDRESS ]]; then
+   elif [[ -n $v_IP_ADDRESS ]]; then
       v_SERVER=$v_IP_ADDRESS
       fn_parse_server
       v_IP_ADDRESS=$v_IP_ADDRESSa
@@ -219,7 +219,7 @@ function fn_url_cl {
    if [[ -z $v_USER_AGENT ]]; then
       v_USER_AGENT="$v_DEFAULT_USER_AGENT"
    fi
-   if [[ -z $v_CURL_URL && ! -z $v_DNS_DOMAIN ]]; then
+   if [[ -z $v_CURL_URL && -n $v_DNS_DOMAIN ]]; then
       v_CURL_URL=$v_DNS_DOMAIN
    fi
    ### ...and then makes sure that those variables are correctly assigned.
@@ -250,22 +250,22 @@ function fn_ping_cl {
    if [[ -z $v_DOMAIN && -z $v_IP_ADDRESS && -z $v_DNS_DOMAIN ]]; then
       echo "You must specify an IP address or domain to ping, either as an argument after the \"--ip\" flag, the \"--domain\" flag or after the \"--ping\" flag itself. Exiting."
       exit
-   elif [[ ! -z $v_DOMAIN && ! -z $v_IP_ADDRESS && $v_DOMAIN != $v_IP_ADDRESS ]]; then
+   elif [[ -n $v_DOMAIN && -n $v_IP_ADDRESS && $v_DOMAIN != $v_IP_ADDRESS ]]; then
       echo "Please specify the IP address / domain name only once. Exiting."
       exit
-   elif [[ ! -z $v_DOMAIN && ! -z $v_DNS_DOMAIN && $v_DOMAIN != $v_DNS_DOMAIN ]]; then
+   elif [[ -n $v_DOMAIN && -n $v_DNS_DOMAIN && $v_DOMAIN != $v_DNS_DOMAIN ]]; then
       echo "Please specify the IP address / domain name only once. Exiting."
       exit
-   elif [[ ! -z $v_DNS_DOMAIN && ! -z $v_IP_ADDRESS && $v_DNS_DOMAIN != $v_IP_ADDRESS ]]; then
+   elif [[ -n $v_DNS_DOMAIN && -n $v_IP_ADDRESS && $v_DNS_DOMAIN != $v_IP_ADDRESS ]]; then
       echo "Please specify the IP address / domain name only once. Exiting."
       exit
-   elif [[ ! -z $v_CURL_STRING ]]; then
+   elif [[ -n $v_CURL_STRING ]]; then
       echo "You should not specify a check string when using \"--ping\". Exiting."
       exit
    fi
-   if [[ -z $v_DOMAIN && ! -z $v_DNS_DOMAIN ]]; then
+   if [[ -z $v_DOMAIN && -n $v_DNS_DOMAIN ]]; then
       v_DOMAIN=$v_DNS_DOMAIN
-   elif [[ -z $v_DOMAIN && ! -z $v_IP_ADDRESS ]]; then
+   elif [[ -z $v_DOMAIN && -n $v_IP_ADDRESS ]]; then
       v_DOMAIN=$v_IP_ADDRESS
    fi
    ### ...and then makes sure that those variables are correctly assigned.
@@ -294,7 +294,7 @@ function fn_ping_cl {
 
 function fn_dns_cl {
    ### When a DNS monitoring job is run from the command line, this parses out the commandline variables...
-   if [[ ! -z $v_IP_ADDRESS && ! -z $v_DOMAIN && $v_DOMAIN != $v_IP_ADDRESS ]]; then
+   if [[ -n $v_IP_ADDRESS && -n $v_DOMAIN && $v_DOMAIN != $v_IP_ADDRESS ]]; then
       echo "Please specify the IP address / domain name of the server you're checking against only once. Exiting."
       exit
    elif [[ -z $v_IP_ADDRESS && -z $v_DOMAIN ]]; then
@@ -303,11 +303,11 @@ function fn_dns_cl {
    elif [[ -z $v_DNS_DOMAIN ]]; then
       echo "Please specify a domain name that has a zone file on the server to check for as an argument after the \"--domain\" flag. Exiting."
       exit
-   elif [[ ! -z $v_CURL_STRING ]]; then
+   elif [[ -n $v_CURL_STRING ]]; then
       echo "You should not specify a check string when using \"--dns\". Exiting."
       exit
    fi
-   if [[ -z $v_DOMAIN && ! -z $v_IP_ADDRESS ]]; then
+   if [[ -z $v_DOMAIN && -n $v_IP_ADDRESS ]]; then
       v_DOMAIN=$v_IP_ADDRESS
    fi
    ### ...and then makes sure that those variables are correctly assigned.
@@ -449,23 +449,23 @@ function fn_cl_confirm {
 }
 
 function fn_get_defaults {
-   v_DEFAULT_EMAIL_ADDRESS="$( fn_read_conf EMAIL_ADDRESS "$v_WORKINGDIR"xmonitor.conf )"
+   v_DEFAULT_EMAIL_ADDRESS="$( fn_read_conf EMAIL_ADDRESS "$v_WORKINGDIR"lwmon.conf )"
    if [[ $( echo "$v_DEFAULT_EMAIL_ADDRESS" | grep -c "^[^@][^@]*@[^.@][^.@]*\..*$" ) -eq 0 ]]; then
       v_DEFAULT_EMAIL_ADDRESS=""
    fi
-   v_DEFAULT_MAIL_DELAY="$( fn_read_conf MAIL_DELAY "$v_WORKINGDIR"xmonitor.conf )"
+   v_DEFAULT_MAIL_DELAY="$( fn_read_conf MAIL_DELAY "$v_WORKINGDIR"lwmon.conf )"
    v_DEFAULT_MAIL_DELAY="$( fn_test_variable "$v_DEFAULT_MAIL_DELAY" true false 2 )"
-   v_DEFAULT_WAIT_SECONDS="$( fn_read_conf WAIT_SECONDS "$v_WORKINGDIR"xmonitor.conf )"
+   v_DEFAULT_WAIT_SECONDS="$( fn_read_conf WAIT_SECONDS "$v_WORKINGDIR"lwmon.conf )"
    v_DEFAULT_WAIT_SECONDS="$( fn_test_variable "$v_DEFAULT_WAIT_SECONDS" true false 10 )"
-   v_DEFAULT_CURL_TIMEOUT="$( fn_read_conf CURL_TIMEOUT "$v_WORKINGDIR"xmonitor.conf )"
+   v_DEFAULT_CURL_TIMEOUT="$( fn_read_conf CURL_TIMEOUT "$v_WORKINGDIR"lwmon.conf )"
    v_DEFAULT_CURL_TIMEOUT="$( fn_test_variable "$v_DEFAULT_CURL_TIMEOUT" true false 10 )"
-   v_DEFAULT_OUTPUT_FILE="$( fn_read_conf OUTPUT_FILE "$v_WORKINGDIR"xmonitor.conf )"
+   v_DEFAULT_OUTPUT_FILE="$( fn_read_conf OUTPUT_FILE "$v_WORKINGDIR"lwmon.conf )"
    touch $v_DEFAULT_OUTPUT_FILE
    v_STATUS=$?
    if [[ ( ! -f "$v_DEFAULT_OUTPUT_FILE" || ! -w "$v_DEFAULT_OUTPUT_FILE" || $v_STATUS == 1 ) && "$v_DEFAULT_OUTPUT_FILE" != "/dev/stdout" ]]; then
       v_DEFAULT_OUTPUT_FILE="/dev/stdout"
    fi
-   v_DEFAULT_USER_AGENT="$( fn_read_conf USER_AGENT "$v_WORKINGDIR"xmonitor.conf "false" )"
+   v_DEFAULT_USER_AGENT="$( fn_read_conf USER_AGENT "$v_WORKINGDIR"lwmon.conf "false" )"
 }
 
 #### Child Functions ####
@@ -478,7 +478,7 @@ function fn_child {
    trap fn_child_exit SIGINT SIGTERM SIGKILL
    ### Define the variables that will be used over the life of the child process
    v_MY_PID=$$
-   v_MASTER_PID=$( cat "$v_WORKINGDIR"xmonitor.pid )
+   v_MASTER_PID=$( cat "$v_WORKINGDIR"lwmon.pid )
    v_START_TIME=$( date +%s )
    v_TOTAL_CHECKS=0
    v_TOTAL_HITS=0
@@ -545,16 +545,16 @@ function fn_child_vars {
          v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_CURL_PORT/" )"
       fi
       if [[ $v_USER_AGENT == true ]]; then
-         v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) Xmonitor/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36'
+         v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36'
       elif [[ $v_USER_AGENT == false ]]; then
-         v_USER_AGENT='Xmonitor/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
+         v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
       fi
    fi
    v_OUTPUT_FILE2="$( fn_read_conf OUTPUT_FILE "$v_WORKINGDIR""$v_MY_PID""/params" )"
    v_OUTPUT_FILE2="$( fn_test_variable "$v_OUTPUT_FILE2" false OUTPUT_FILE "/dev/stdout" )"
    touch "$v_OUTPUT_FILE2" 2> /dev/null
    ### If the designated output file looks good, and is different than it was previously, log it.
-   if [[ ! -z "$v_OUTPUT_FILE2" && "${v_OUTPUT_FILE2:0:1}" == "/" && ( -f "$v_OUTPUT_FILE2" || "$v_OUTPUT_FILE2" == "/dev/stdout" ) && -w "$v_OUTPUT_FILE2" && "$v_OUTPUT_FILE2" != "$v_OUTPUT_FILE" ]]; then
+   if [[ -n "$v_OUTPUT_FILE2" && "${v_OUTPUT_FILE2:0:1}" == "/" && ( -f "$v_OUTPUT_FILE2" || "$v_OUTPUT_FILE2" == "/dev/stdout" ) && -w "$v_OUTPUT_FILE2" && "$v_OUTPUT_FILE2" != "$v_OUTPUT_FILE" ]]; then
       echo "$( date ) - [$v_MY_PID] - Output for child process $v_MY_PID is being directed to $v_OUTPUT2" >> "$v_LOG"
       v_OUTPUT_FILE="$v_OUTPUT_FILE2"
    elif [[ -z "$v_OUTPUT_FILE2" && -z "$v_OUTPUT_FILE" ]]; then
@@ -648,7 +648,7 @@ function fn_child_checks {
       echo "***Reloaded parameters for $v_URL_OR_PING $v_SERVER_STRING.***"
    fi
    ### Check the conf to see how many copies of the html files to keep. Remove any beyond that.
-   v_HTML_FILES_KEPT="$( fn_read_conf HTML_FILES_KEPT "$v_WORKINGDIR"xmonitor.conf )"
+   v_HTML_FILES_KEPT="$( fn_read_conf HTML_FILES_KEPT "$v_WORKINGDIR"lwmon.conf )"
    v_HTML_FILES_KEPT="$( fn_test_variable "$v_HTML_FILES_KEPT" true false 100 )"
    if [[ $( ls -1 "$v_WORKINGDIR""$v_MY_PID"/ | grep "^site_" | egrep -cv "current|previous" ) -gt $v_HTML_FILES_KEPT ]]; then
       ### You'll notice that it's only removing one file. There should be no instances where more than one is generated per run, so removing one per run should always be sufficient.
@@ -701,7 +701,7 @@ function fn_hit {
    fi
    v_LAST_HIT=$v_DATE3
    v_NUM_HITS_EMAIL=$(( $v_NUM_HITS_EMAIL + 1 ))
-   ### Determine how verbose Xmonitor is set to be and prepare the message accordingly.
+   ### Determine how verbose LWmon is set to be and prepare the message accordingly.
    v_VERBOSITY="$( fn_read_conf VERBOSITY "$v_WORKINGDIR""$v_MY_PID"/params )"
    v_VERBOSITY="$( fn_test_variable "$v_VERBOSITY" false VERBOSITY "standard" )"
    if [[ $( echo "$v_VERBOSITY" | egrep -c "^(standard|none|verbose|change)$" ) -eq 0 ]]; then
@@ -717,7 +717,7 @@ function fn_hit {
       v_REPORT="$v_DATE - $v_URL_OR_PING $v_SERVER_STRING: Succeeded!"
    fi
    ### Check to see if the parent is still in palce
-   if [[ $( ps aux | grep "$v_MASTER_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+   if [[ $( ps aux | grep "$v_MASTER_PID.*lwmon.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
       fn_child_exit
    fi
    ### If the last check was also successful
@@ -751,14 +751,14 @@ function fn_hit {
 }
 
 function fn_get_colors {
-   v_COLOR_SUCCESS="$( fn_read_conf COLOR_SUCCESS "$v_WORKINGDIR"xmonitor.conf "" )"
-   v_COLOR_FIRST_SUCCESS="$( fn_read_conf COLOR_FIRST_SUCCESS "$v_WORKINGDIR"xmonitor.conf "\e[1;32m" )"
-   v_COLOR_FAILURE="$( fn_read_conf COLOR_FAILURE "$v_WORKINGDIR"xmonitor.conf "\e[1;33m" )"
-   v_COLOR_FIRST_FAILURE="$( fn_read_conf COLOR_FIRST_FAILURE "$v_WORKINGDIR"xmonitor.conf "\e[1;31m" )"
-   v_RETURN_SUCCESS="$( fn_read_conf RETURN_SUCCESS "$v_WORKINGDIR"xmonitor.conf "" )"
-   v_RETURN_FIRST_SUCCESS="$( fn_read_conf RETURN_FIRST_SUCCESS "$v_WORKINGDIR"xmonitor.conf "\e[00m" )"
-   v_RETURN_FAILURE="$( fn_read_conf RETURN_FAILURE "$v_WORKINGDIR"xmonitor.conf "\e[00m" )"
-   v_RETURN_FIRST_FAILURE="$( fn_read_conf RETURN_FIRST_FAILURE "$v_WORKINGDIR"xmonitor.conf "\e[00m" )"
+   v_COLOR_SUCCESS="$( fn_read_conf COLOR_SUCCESS "$v_WORKINGDIR"lwmon.conf "" )"
+   v_COLOR_FIRST_SUCCESS="$( fn_read_conf COLOR_FIRST_SUCCESS "$v_WORKINGDIR"lwmon.conf "\e[1;32m" )"
+   v_COLOR_FAILURE="$( fn_read_conf COLOR_FAILURE "$v_WORKINGDIR"lwmon.conf "\e[1;33m" )"
+   v_COLOR_FIRST_FAILURE="$( fn_read_conf COLOR_FIRST_FAILURE "$v_WORKINGDIR"lwmon.conf "\e[1;31m" )"
+   v_RETURN_SUCCESS="$( fn_read_conf RETURN_SUCCESS "$v_WORKINGDIR"lwmon.conf "" )"
+   v_RETURN_FIRST_SUCCESS="$( fn_read_conf RETURN_FIRST_SUCCESS "$v_WORKINGDIR"lwmon.conf "\e[00m" )"
+   v_RETURN_FAILURE="$( fn_read_conf RETURN_FAILURE "$v_WORKINGDIR"lwmon.conf "\e[00m" )"
+   v_RETURN_FIRST_FAILURE="$( fn_read_conf RETURN_FIRST_FAILURE "$v_WORKINGDIR"lwmon.conf "\e[00m" )"
 }
 
 function fn_miss {
@@ -792,7 +792,7 @@ function fn_miss {
    else
       v_REPORT="$v_DATE - $v_URL_OR_PING $v_SERVER_STRING: Failed!"
    fi
-   if [[ $( ps aux | grep "$v_MASTER_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+   if [[ $( ps aux | grep "$v_MASTER_PID.*lwmon.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
       fn_child_exit
    fi
    if [[ $v_LAST_STATUS == "miss" ]]; then
@@ -832,8 +832,8 @@ function fn_miss {
 
 function fn_hit_email {
    ### Determines if a success e-mail needs to be sent and, if so, sends that e-mail.
-   if [[ $v_HIT_CHECKS -eq $v_MAIL_DELAY && ! -z $v_EMAIL_ADDRESS && $v_MISS_MAIL == true ]]; then
-      echo -e "$( if [[ ! -z $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - Xmonitor - $v_URL_OR_PING $v_SERVER_STRING - Status changed: Appears to be succeeding again.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_SERVER_STRING" == "$v_ORIG_SERVER_STRING" ]]; then echo "$v_SERVER_STRING"; else echo "$v_SERVER_STRING ($v_ORIG_SERVER_STRING)"; fi ) have succeeded, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_HITS_EMAIL successful checks, and $v_NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( cat "$v_WORKINGDIR""$v_MY_PID"/log )" | mail -s "Xmonitor - $v_URL_OR_PING $v_SERVER_STRING - Check PASSED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_MY_PID] - $v_URL_OR_PING $v_ORIG_SERVER_STRING: Success e-mail sent" >> "$v_LOG" &
+   if [[ $v_HIT_CHECKS -eq $v_MAIL_DELAY && -n $v_EMAIL_ADDRESS && $v_MISS_MAIL == true ]]; then
+      echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_SERVER_STRING - Status changed: Appears to be succeeding again.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_SERVER_STRING" == "$v_ORIG_SERVER_STRING" ]]; then echo "$v_SERVER_STRING"; else echo "$v_SERVER_STRING ($v_ORIG_SERVER_STRING)"; fi ) have succeeded, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_HITS_EMAIL successful checks, and $v_NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( cat "$v_WORKINGDIR""$v_MY_PID"/log )" | mail -s "LWmon - $v_URL_OR_PING $v_SERVER_STRING - Check PASSED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_MY_PID] - $v_URL_OR_PING $v_ORIG_SERVER_STRING: Success e-mail sent" >> "$v_LOG" &
       ### set the variables that prepare for the next message to be sent.
       v_HIT_MAIL=true
       v_MISS_MAIL=false
@@ -844,8 +844,8 @@ function fn_hit_email {
 
 function fn_miss_email {
    ### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
-   if [[ $v_MISS_CHECKS -eq $v_MAIL_DELAY && ! -z $v_EMAIL_ADDRESS && $v_HIT_MAIL == true ]]; then
-      echo -e "$( if [[ ! -z $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - Xmonitor - $v_URL_OR_PING $v_SERVER_STRING - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_SERVER_STRING" == "$v_ORIG_SERVER_STRING" ]]; then echo "$v_SERVER_STRING"; else echo "$v_SERVER_STRING ($v_ORIG_SERVER_STRING)"; fi ) have failed, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_HITS_EMAIL successful checks, and $v_NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( cat "$v_WORKINGDIR""$v_MY_PID"/log )" | mail -s "Xmonitor - $v_URL_OR_PING $v_SERVER_STRING - Check FAILED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_MY_PID] - $v_URL_OR_PING $v_ORIG_SERVER_STRING: Failure e-mail sent" >> "$v_LOG" &
+   if [[ $v_MISS_CHECKS -eq $v_MAIL_DELAY && -n $v_EMAIL_ADDRESS && $v_HIT_MAIL == true ]]; then
+      echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_SERVER_STRING - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_SERVER_STRING" == "$v_ORIG_SERVER_STRING" ]]; then echo "$v_SERVER_STRING"; else echo "$v_SERVER_STRING ($v_ORIG_SERVER_STRING)"; fi ) have failed, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_HITS_EMAIL successful checks, and $v_NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( cat "$v_WORKINGDIR""$v_MY_PID"/log )" | mail -s "LWmon - $v_URL_OR_PING $v_SERVER_STRING - Check FAILED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_MY_PID] - $v_URL_OR_PING $v_ORIG_SERVER_STRING: Failure e-mail sent" >> "$v_LOG" &
       ### set the variables that prepare for the next message to be sent.
       v_HIT_MAIL=false
       v_MISS_MAIL=true
@@ -859,19 +859,19 @@ function fn_miss_email {
 function fn_master {
    ### This is the loop for the master function.
    if [[ $v_RUNNING_STATE != "master" ]]; then
-      echo "Master process already present. Exiting"
+      echo "Master process already present. Exiting."
       exit
    fi
    ### try to prevent the master process from exiting unexpectedly.
    trap fn_master_exit SIGINT SIGTERM SIGKILL
-   v_VERBOSITY="$( fn_read_conf VERBOSITY "$v_WORKINGDIR"xmonitor.conf "standard" )"
+   v_VERBOSITY="$( fn_read_conf VERBOSITY "$v_WORKINGDIR"lwmon.conf "standard" )"
    ### Get rid of the save file (if there is one).
    if [[ -f "$v_WORKINGDIR"save ]]; then
       rm -f "$v_WORKINGDIR"save
    fi
    v_TIMESTAMP_REMOTE_CHECK=0
    v_TIMESTAMP_LOCAL_CHECK=0
-   $v_CURL_BIN -Lsm 10 http://72.52.228.74/xmonitor.txt --header "Host: tacobell.com" > "$v_WORKINGDIR"die_list
+   $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.txt > "$v_WORKINGDIR"die_list
    while [[ 1 == 1 ]]; do
       ### Check to see what the current IP address is (thanks to VPN, this can change, so we need to check every half hour.
       if [[ $(( $( date +%s ) - 1800 )) -gt $v_TIMESTAMP_REMOTE_CHECK ]]; then
@@ -891,10 +891,10 @@ function fn_master {
             fi
          done
       fi
-      ### Check a remote list to see if xmonitor should be stopped
+      ### Check a remote list to see if lwmon should be stopped
       if [[ $(( $( date +%s ) - 300 )) -gt $v_TIMESTAMP_REMOTE_CHECK ]]; then
          v_TIMESTAMP_REMOTE_CHECK="$( date +%s )"
-         $v_CURL_BIN -Lsm 10 http://72.52.228.74/xmonitor.txt --header "Host: tacobell.com" > "$v_WORKINGDIR"die_list
+         $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.txt > "$v_WORKINGDIR"die_list
          if [[ $( egrep -c "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list ) -gt 0 ]]; then
             touch "$v_WORKINGDIR"die
             touch "$v_WORKINGDIR"save
@@ -927,7 +927,7 @@ function fn_master {
       ### go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
       ### go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
       for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "^[0-9][0-9]*$" ); do
-         if [[ $( ps aux | grep "$v_CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
+         if [[ $( ps aux | grep "$v_CHILD_PID.*lwmon.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
             ### If it's been marked to die, back it up temporarily
             if [[ -f "$v_WORKINGDIR""$v_CHILD_PID/die" ]]; then
                v_TIMESTAMP="$( date +%s )"
@@ -947,10 +947,10 @@ function fn_master {
          fi
       done
       ### Has verbosity changed? If so, announce this fact!
-      v_VERBOSITY2="$( fn_read_conf VERBOSITY "$v_WORKINGDIR"xmonitor.conf )"
+      v_VERBOSITY2="$( fn_read_conf VERBOSITY "$v_WORKINGDIR"lwmon.conf )"
       if [[ "$v_VERBOSITY2" != "$v_VERBOSITY" ]]; then
          if [[ $( echo "$v_VERBOSITY2" | egrep -c "^(standard|verbose|change|none)$" ) -ne 1 ]]; then
-            fn_update_conf VERBOSITY "$v_VERBOSITY" "$v_WORKINGDIR"xmonitor.conf
+            fn_update_conf VERBOSITY "$v_VERBOSITY" "$v_WORKINGDIR"lwmon.conf
          else
             v_VERBOSITY="$v_VERBOSITY2"
             echo "***Verbosity is now set as \"$v_VERBOSITY\"***"
@@ -967,7 +967,7 @@ function fn_master {
 function fn_spawn_child_process {
    ### This function launches the child process and makes sure that it has it's own working directory.
    ### Launch the child process
-   "$v_PROGRAMDIR"xmonitor.sh $v_SERVER_STRING &
+   "$v_PROGRAMDIR"lwmon.sh $v_SERVER_STRING &
    ### Note - the server string doesn't need to be present, but it makes ps more readable. Each child process starts out as generic. Once the master process creates a working directory for it (based on its PID) and then puts the params file in place for it, only then does it discover its purpose.
    ### create the child's wirectory and move the params file there.
    v_CHILD_PID=$!
@@ -989,7 +989,7 @@ function fn_master_exit {
       echo "Options:"
       echo
       echo "  1) Kill the master process and all child processes."
-      echo "  2) Back up the data for the child processes so that they'll start again next time Xmonitor is run, then kill the master process and all child processes."
+      echo "  2) Back up the data for the child processes so that they'll start again next time LWmon is run, then kill the master process and all child processes."
       echo
       read -t 15 -p "How would you like to proceed? " v_OPTION_NUM
       # If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
@@ -998,7 +998,7 @@ function fn_master_exit {
             v_CHILD_PID=$( basename $i )
             # if [[ $( echo $v_CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
             if [[ $( echo $v_CHILD_PID | sed "s/[[:digit:]]//g" | grep -c . ) -eq 0 ]]; then
-               if [[ $( ps aux | grep "$v_CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+               if [[ $( ps aux | grep "$v_CHILD_PID.*lwmon.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
                   touch "$v_WORKINGDIR""$v_CHILD_PID/die"
                fi
             fi
@@ -1007,7 +1007,7 @@ function fn_master_exit {
          echo
       fi
    fi
-   rm -f "$v_WORKINGDIR"xmonitor.pid "$v_WORKINGDIR"die "$v_WORKINGDIR"no_output
+   rm -f "$v_WORKINGDIR"lwmon.pid "$v_WORKINGDIR"die "$v_WORKINGDIR"no_output
    exit
 }
 
@@ -1029,7 +1029,7 @@ function fn_verbosity {
    echo
    read -p "What would you like the new verbosity to be? " v_OPTION_NUM
    if [[ $( echo "$v_OPTION_NUM" | egrep -vc "^0-9" ) -eq 0 || $v_OPTION_NUM -gt 4 ]]; then
-      echo "Invalid input. Exiting"
+      echo "Invalid input. Exiting."
       exit
    fi
    if [[ $v_OPTION_NUM == "1" ]]; then
@@ -1064,14 +1064,14 @@ function fn_verbosity_assign {
 function fn_modify {
    ### This is the menu front-end for modifying child processes.
    if [[ $v_RUNNING_STATE == "master" ]]; then
-      echo "No current xmonitor processes. Exiting"
+      echo "No current lwmon processes. Exiting."
       exit
    fi
-   echo "List of currently running xmonitor processes:"
+   echo "List of currently running lwmon processes:"
    echo
    v_CHILD_NUMBER="0"
    a_CHILD_PID[0]="none"
-   ### List the current xmonitor processes.
+   ### List the current lwmon processes.
    for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
       v_CHILD_PID=$( basename $i )
       v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
@@ -1100,7 +1100,7 @@ function fn_modify {
       ### sub-menu for if the master process is selected.
       echo -e "Options:\n"
       echo "  1) Exit out of the master process."
-      echo "  2) First back-up the child processes so that they'll run immediately when xmonitor is next started, then exit out of the master process."
+      echo "  2) First back-up the child processes so that they'll run immediately when lwmon is next started, then exit out of the master process."
       echo "  3) Change the default verbosity."
       echo "  4) Edit the conf file."
       echo "  5) Exit out of this menu."
@@ -1112,13 +1112,13 @@ function fn_modify {
          touch "$v_WORKINGDIR"save
          touch "$v_WORKINGDIR"die
       elif [[ $v_OPTION_NUM == "3" ]]; then
-         v_VERBOSITY_FILE="$v_WORKINGDIR""xmonitor.conf"
+         v_VERBOSITY_FILE="$v_WORKINGDIR""lwmon.conf"
          fn_verbosity
       elif [[ $v_OPTION_NUM == "4" ]]; then
-         if [[ ! -z $EDITOR ]]; then
-            $EDITOR "$v_WORKINGDIR""xmonitor.conf"
+         if [[ -n $EDITOR ]]; then
+            $EDITOR "$v_WORKINGDIR""lwmon.conf"
          else
-            vi "$v_WORKINGDIR""xmonitor.conf"
+            vi "$v_WORKINGDIR""lwmon.conf"
          fi
       else
          echo "Exiting."
@@ -1146,7 +1146,7 @@ function fn_modify {
       elif [[ $v_OPTION_NUM == "2" ]]; then
          read -p "Enter the number of seconds the script should wait before performing each iterative check: " v_WAIT_SECONDS
          if [[ -z $v_WAIT_SECONDS || $( echo $v_WAIT_SECONDS | grep -c "[^0-9]" ) -eq 1 ]]; then
-            echo "Input must be a number. Exiting"
+            echo "Input must be a number. Exiting."
             exit
          fi
          fn_update_conf WAIT_SECONDS "$v_WAIT_SECONDS" "$v_WORKINGDIR""$v_CHILD_PID/params"
@@ -1155,8 +1155,8 @@ function fn_modify {
       elif [[ $v_OPTION_NUM == "3" ]]; then
          echo "Enter the e-mail address that you want changes in status sent to."
          read -p "(Or just press enter to have no e-mail messages sent): " v_EMAIL_ADDRESS
-         if [[ ! -z $v_EMAIL_ADDRESS && $( echo $v_EMAIL_ADDRESS | grep -c "[^@][^@]*@[^.]*\..*" ) -eq 0 ]]; then
-            echo "E-mail address does not appear to be valid. Exiting"
+         if [[ -n $v_EMAIL_ADDRESS && $( echo $v_EMAIL_ADDRESS | grep -c "[^@][^@]*@[^.]*\..*" ) -eq 0 ]]; then
+            echo "E-mail address does not appear to be valid. Exiting."
             exit
          elif [[ -z $v_EMAIL_ADDRESS ]]; then
             v_EMAIL_ADDRESS=""
@@ -1168,7 +1168,7 @@ function fn_modify {
          echo "Enter the number of consecutive failures or successes that should occur before an e-mail"
          read -p "message is sent (default 1; to never send a message, 0): " v_MAIL_DELAY
          if [[ -z $v_MAIL_DELAY || $( echo $v_MAIL_DELAY | grep -c "[^0-9]" ) -eq 1 ]]; then
-            echo "Input must be a number. Exiting"
+            echo "Input must be a number. Exiting."
             exit
          fi
          fn_update_conf MAIL_DELAY "$v_MAIL_DELAY" "$v_WORKINGDIR""$v_CHILD_PID/params"
@@ -1201,7 +1201,7 @@ function fn_modify {
          echo -en "\ncd $v_WORKINGDIR""$v_CHILD_PID/\n\n"
       elif [[ $v_OPTION_NUM == "9" ]]; then
          cp -a "$v_WORKINGDIR""$v_CHILD_PID/params" "$v_WORKINGDIR""$v_CHILD_PID/params.temp"
-         if [[ ! -z $EDITOR ]]; then
+         if [[ -n $EDITOR ]]; then
             $EDITOR "$v_WORKINGDIR""$v_CHILD_PID/params"
          else
             vi "$v_WORKINGDIR""$v_CHILD_PID/params"
@@ -1212,13 +1212,13 @@ function fn_modify {
          fi
          rm -f "$v_WORKINGDIR""$v_CHILD_PID/params.temp"
       else
-         echo "Exiting"
+         echo "Exiting."
       fi
    fi
 }
 
 function fn_options {
-   ### this is the menu front end that's accessed when xmonitor is run with no flags
+   ### this is the menu front end that's accessed when lwmon is run with no flags
    echo
    echo "Available Options:"
    echo
@@ -1276,46 +1276,46 @@ function fn_defaults {
    read -p "Which would you like to set? " v_OPTION_NUM
    if [[ $v_OPTION_NUM == "1" ]]; then
       echo
-      echo "Current default e-mail address is: \"$( fn_read_conf EMAIL_ADDRESS "$v_WORKINGDIR"xmonitor.conf )\"."
+      echo "Current default e-mail address is: \"$( fn_read_conf EMAIL_ADDRESS "$v_WORKINGDIR"lwmon.conf )\"."
       read -p "Enter the new default e-mail address: " v_EMAIL_ADDRESS
-      "$v_PROGRAMDIR"xmonitor.sh --default --mail $v_EMAIL_ADDRESS
+      "$v_PROGRAMDIR"lwmon.sh --default --mail $v_EMAIL_ADDRESS
    elif [[ $v_OPTION_NUM == "2" ]]; then
       echo
-      echo "Current default number of seconds is: \"$( fn_read_conf WAIT_SECONDS "$v_WORKINGDIR"xmonitor.conf "10" )\"."
+      echo "Current default number of seconds is: \"$( fn_read_conf WAIT_SECONDS "$v_WORKINGDIR"lwmon.conf "10" )\"."
       read -p "Enter the new default number of seconds: " v_WAIT_SECONDS
-      "$v_PROGRAMDIR"xmonitor.sh --default --seconds $v_WAIT_SECONDS
+      "$v_PROGRAMDIR"lwmon.sh --default --seconds $v_WAIT_SECONDS
    elif [[ $v_OPTION_NUM == "3" ]]; then
       echo
-      echo "Current default number of checks is: \"$( fn_read_conf MAIL_DELAY "$v_WORKINGDIR"xmonitor.conf "2" )\"."
+      echo "Current default number of checks is: \"$( fn_read_conf MAIL_DELAY "$v_WORKINGDIR"lwmon.conf "2" )\"."
       read -p "Enter the new default number of checks: " v_MAIL_DELAY
-      "$v_PROGRAMDIR"xmonitor.sh --default --mail-delay $v_MAIL_DELAY
+      "$v_PROGRAMDIR"lwmon.sh --default --mail-delay $v_MAIL_DELAY
    elif [[ $v_OPTION_NUM == "4" ]]; then
       echo
-      echo "Current default number of seconds before curl times out is: \"$( fn_read_conf CURL_TIMEOUT "$v_WORKINGDIR"xmonitor.conf "10" )\"."
+      echo "Current default number of seconds before curl times out is: \"$( fn_read_conf CURL_TIMEOUT "$v_WORKINGDIR"lwmon.conf "10" )\"."
       read -p "Enter the new default number of seconds: " v_CURL_TIMEOUT
-      "$v_PROGRAMDIR"xmonitor.sh --default --curl-timeout $v_CURL_TIMEOUT
+      "$v_PROGRAMDIR"lwmon.sh --default --curl-timeout $v_CURL_TIMEOUT
    elif [[ $v_OPTION_NUM == "5" ]]; then
-      v_VERBOSITY_FILE="$v_WORKINGDIR""xmonitor.conf"
+      v_VERBOSITY_FILE="$v_WORKINGDIR""lwmon.conf"
       fn_verbosity
    fi
 }
 
 function fn_set_defaults {
    ### This function is run when using the --default flag in order to set default values.
-   if [[ ! -z $v_EMAIL_ADDRESS ]]; then
-      fn_update_conf EMAIL_ADDRESS "$v_EMAIL_ADDRESS" "$v_WORKINGDIR"xmonitor.conf
+   if [[ -n $v_EMAIL_ADDRESS ]]; then
+      fn_update_conf EMAIL_ADDRESS "$v_EMAIL_ADDRESS" "$v_WORKINGDIR"lwmon.conf
       echo "Default e-mail address has been set to $v_EMAIL_ADDRESS."
    fi
-   if [[ ! -z $v_WAIT_SECONDS ]]; then
-      fn_update_conf WAIT_SECONDS "$v_WAIT_SECONDS" "$v_WORKINGDIR"xmonitor.conf
+   if [[ -n $v_WAIT_SECONDS ]]; then
+      fn_update_conf WAIT_SECONDS "$v_WAIT_SECONDS" "$v_WORKINGDIR"lwmon.conf
       echo "Default seconds between iterative checks has been set to $v_WAIT_SECONDS."
    fi
-   if [[ ! -z $v_MAIL_DELAY ]]; then
-      fn_update_conf MAIL_DELAY "$v_MAIL_DELAY" "$v_WORKINGDIR"xmonitor.conf
+   if [[ -n $v_MAIL_DELAY ]]; then
+      fn_update_conf MAIL_DELAY "$v_MAIL_DELAY" "$v_WORKINGDIR"lwmon.conf
       echo "Default consecutive failed or successful checks before an e-mail is sent has been set to $v_MAIL_DELAY."
    fi
-   if [[ ! -z $v_CURL_TIMEOUT ]]; then
-      fn_update_conf CURL_TIMEOUT "$v_CURL_TIMEOUT" "$v_WORKINGDIR"xmonitor.conf
+   if [[ -n $v_CURL_TIMEOUT ]]; then
+      fn_update_conf CURL_TIMEOUT "$v_CURL_TIMEOUT" "$v_WORKINGDIR"lwmon.conf
       echo "Default number of seconds before curl times out has been set to $v_CURL_TIMEOUT."
    fi
 }
@@ -1326,7 +1326,7 @@ function fn_read_conf {
    # This function reads an item from the conf file. It expects $1 to be the name of the directive, $2 to be the name of the configuration file, and $3 to be the result if the nothing is pulled from the conf.
    if [[ -f "$2" ]]; then
       v_RESULT="$( egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$2" 2> /dev/null | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//" )"
-      if [[ -z $v_RESULT && ! -z $3 ]]; then
+      if [[ -z $v_RESULT && -n $3 ]]; then
           v_RESULT="$3"
       fi
       echo "$v_RESULT"
@@ -1350,7 +1350,7 @@ function fn_update_conf {
 function fn_test_variable {
    ### This function assumes that $1 is the variable in question $2 is "true" or "false" whether it needs to be a number, $3 is "false" if the file cannot be pulled from the main config, and the directive name within the main config if it can be pulled from the main config, and $4 is what it should be set to if a setting is not found.
    if [[ $3 != "false" && ( -z $1 || $1 == "default" || ( $2 == true && $( echo $1 | grep -c "[^0-9]" ) -gt 0 ) ) ]]; then
-      v_MODIFIED_1="$( fn_read_conf "$3" "$v_WORKINGDIR""xmonitor.conf" )"
+      v_MODIFIED_1="$( fn_read_conf "$3" "$v_WORKINGDIR""lwmon.conf" )"
    else
       v_MODIFIED_1="$1"
    fi
@@ -1362,8 +1362,8 @@ function fn_test_variable {
 
 function fn_create_config {
 ### I tried to make everything run off of a configuration file at one point in time, however the results were overly complicated. This function remains in case I ever change my mind and try to go back to it.
-cat << 'EOF' > "$v_WORKINGDIR"xmonitor.conf
-# Xmonitor configuration file
+cat << 'EOF' > "$v_WORKINGDIR"lwmon.conf
+# LWmon configuration file
 
 # The "VERBOSITY" directive controls how verbose the output of the child processes is. 
 # There are four options available: 1) Standard: Outputs whether any specific check has succeeded or failed. 2) Verbose: In addition to the information given from the standard output, also indicates how long checks for that job have been running, how many have been run, and the percentage of successful checks. 3) Change: Only outputs text on the first failure after any number of successes, or the first success after any number of failures. 4) None: Child processes output no text.
@@ -1396,7 +1396,7 @@ CURL_TIMEOUT = 10
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
 OUTPUT_FILE = /dev/stdout
 
-# The "USER_AGENT" directive can be set to "true" or "false". For "true" the user agent string emulates chrome's user agent. For "false", the user agent string simply outputs the xmonitor and curl versions.
+# The "USER_AGENT" directive can be set to "true" or "false". For "true" the user agent string emulates chrome's user agent. For "false", the user agent string simply outputs the lwmon and curl versions.
 # Note: This can also be set on a per-child basis
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
 USER_AGENT = false
@@ -1422,61 +1422,61 @@ EOF
 function fn_help {
 cat << 'EOF' > /dev/stdout
 
-Xmonitor - A script to organize and consolidate the monitoring of multiple servers. With Xmonitor you can run checks against multiple servers simultaneously, starting new jobs and stopping old ones as needed without interfering with any that are currently running. All output from the checks go by default to a single terminal window, allowing you to keep an eye on multiple things going on at once.
+LWmon (Light Weight Monitor) - A script to organize and consolidate the monitoring of multiple servers. With LWmon you can run checks against multiple servers simultaneously, starting new jobs and stopping old ones as needed without interfering with any that are currently running. All output from the checks go by default to a single terminal window, allowing you to keep an eye on multiple things going on at once.
 
 
 USAGE:
 
-./xmonitor.sh (Followed by no arguments or flags)
+./lwmon.sh (Followed by no arguments or flags)
      Prompts you on how you want to proceed, allowing you to choose from options similar to those presented by the descriptions below.
 
 
 ADDITIONAL USAGE:
 
-./xmonitor.sh [--url (or -u)|--ping (or -p)|--dns (or -d)] (followed by other flags)
+./lwmon.sh [--url (or -u)|--ping (or -p)|--dns (or -d)] (followed by other flags)
      1) Leaves a prompt telling the master process to spawn a child process to either a) in the case of --url, check a site's contents for a string of characters b) in the case of --ping, ping a site and check for a response c) in the case of --dns, dig against a nameserver and check for a valid response.
      2) If there is no currently running master process, it goes on to declare itself the master process and spawn child processes accordingly.
-     NOTE: For more information on the additional arguments and flags that can be used here, run ./xmonitor.sh --help-flags
-     NOTE: For more information on Master, Child and Control processes, run ./xmonitor.sh --help-process-types
+     NOTE: For more information on the additional arguments and flags that can be used here, run ./lwmon.sh --help-flags
+     NOTE: For more information on Master, Child and Control processes, run ./lwmon.sh --help-process-types
 
-./xmonitor.sh --modify (or -m)
+./lwmon.sh --modify (or -m)
      Prompts you with a list of currently running child processes and allows you to change how frequently their checks occur and how they send e-mail allerts, or kill them off if they're no longer desired.
 
-./xmonitor.sh --help or (-h)
+./lwmon.sh --help or (-h)
      Displays this dialogue.
 
-./xmonitor.sh --help-flags
+./lwmon.sh --help-flags
      Outputs help information with specific descriptions of all of the command line flags.
 
-./xmonitor.sh --version
+./lwmon.sh --version
      Displays changes over the various versions.
 
-./xmonitor.sh --kill (--save)
-     Kills off the Xmonitor master process, which in turn prompts any child processes to exit as well. Optionally, you can use the "--save" flag in conjunction with "--kill" to save all of the current running child processes so that they will be restarted automaticaly when xmonitor is next launched.
+./lwmon.sh --kill (--save)
+     Kills off the lwmon master process, which in turn prompts any child processes to exit as well. Optionally, you can use the "--save" flag in conjunction with "--kill" to save all of the current running child processes so that they will be restarted automaticaly when lwmon is next launched.
 
 
 ADDITIONAL ADDITIONAL USAGE:
 
-Run ./xmonitor.sh --help-flags for further information.
+Run ./lwmon.sh --help-flags for further information.
 
-Run ./xmonitor.sh --help-process-types for more information on master, control, and child processes.
+Run ./lwmon.sh --help-process-types for more information on master, control, and child processes.
 
-Run ./xmonitor.sh --help-params-file for more information on editing the parameters file for a child process.
+Run ./lwmon.sh --help-params-file for more information on editing the parameters file for a child process.
 
 
 OTHER NOTES:
 
 Note: Regarding the configuration file!
-     There's a configuration file! Assuming that ./ is the directory where xmonitor.sh is located, the configuration file will be located at ./.xmonitor/xmonitor.conf.
+     There's a configuration file! Assuming that ./ is the directory where lwmon.sh is located, the configuration file will be located at ./.lwmon/lwmon.conf.
 
 Note: Regarding e-mail alerts!
-     Xmonitor sends e-mail messages using the "mail" binary (usually located in /usr/bin/mail). In order for this to work as expected, you will likely need to modify the ~/.mailrc file with credentials for a valid e-mail account, otherwise the messages that are sent will likely get rejected.
+     LWwmon sends e-mail messages using the "mail" binary (usually located in /usr/bin/mail). In order for this to work as expected, you will likely need to modify the ~/.mailrc file with credentials for a valid e-mail account, otherwise the messages that are sent will likely get rejected.
 
 Note: Regarding the log file!
-     Xmonitor keeps a log file titled "xmonitor.log" in the same directory in which xmonitor.sh is located. This file is used to log when checks are started and stopped, and when ever there is a change in status on any of the checks. In addition to this, there is another log file in the direcctory for each child process containing information only specific to that child process.
+     LWmon keeps a log file titled "lwmon.log" in the same directory in which lwmon.sh is located. This file is used to log when checks are started and stopped, and when ever there is a change in status on any of the checks. In addition to this, there is another log file in the direcctory for each child process containing information only specific to that child process.
 
 Note: Regarding url checks and specifying an IP!
-     Xmonitor allows you to specify an IP from which to pull a URL, rather than allowing DNS to resolve the domain name to an IP address. This is very useful in situations where you're attempting to monitor multiple servers within a load balanced setup, or if 
+     LWmon allows you to specify an IP from which to pull a URL, rather than allowing DNS to resolve the domain name to an IP address. This is very useful in situations where you're attempting to monitor multiple servers within a load balanced setup, or if 
 DNS for the site that you're monitoring isn't yet pointed to the server that it's on.
 
 Note: Regarding text color!
@@ -1499,7 +1499,7 @@ FLAGS FOR CREATING A NEW MONITORING JOB:
 
 --control
 
-     Designates the process as a control process - I.E. it just lays out the specifics of a child process and puts them in place for the master process to spawn, but even if there is not currently a master process, it does not designate itself master and spawn the process that's been specified. Run ./xmonitor.sh --help-process-types for more information on master, control, and child processes.
+     Designates the process as a control process - I.E. it just lays out the specifics of a child process and puts them in place for the master process to spawn, but even if there is not currently a master process, it does not designate itself master and spawn the process that's been specified. Run ./lwmon.sh --help-process-types for more information on master, control, and child processes.
 
 --domain (domain name)
 
@@ -1553,19 +1553,19 @@ OTHER FLAGS:
 
 --help-process-types
 
-     Gives a better explanation of xmonitor.sh's master, control, and child processes.
+     Gives a better explanation of lwmon.sh's master, control, and child processes.
 
 --kill
 
-     Used to terminate the master Xmonitor process, which in turn prompts any child processes to exit as well. This can be used in conjunction with the "--save" flag.
+     Used to terminate the master lwmon process, which in turn prompts any child processes to exit as well. This can be used in conjunction with the "--save" flag.
 
 --list
 
-     Lists the current xmonitor child processes, then exits.
+     Lists the current lwmon child processes, then exits.
      
 --master
 
-     Immediately designates itself as the master process. If any prompts are waiting, it spawns child processes as they describe, it then checks periodically for new prompts and spawns processes accordingly. If the master process ends, all child processes it has spawned will recognize that it has ended, and end as well. Run ./xmonitor.sh --help-process-types for more information on master, control, and child processes.
+     Immediately designates itself as the master process. If any prompts are waiting, it spawns child processes as they describe, it then checks periodically for new prompts and spawns processes accordingly. If the master process ends, all child processes it has spawned will recognize that it has ended, and end as well. Run ./lwmon.sh --help-process-types for more information on master, control, and child processes.
 
 --modify
 
@@ -1573,7 +1573,7 @@ OTHER FLAGS:
 
 --save
 
-     Used in conjunction with the "--kill" flag. Prompts Xmonitor to save all of the current running child processes before exiting so that they will be restarted automaticaly when xmonitor is next launched.
+     Used in conjunction with the "--kill" flag. Prompts lwmon to save all of the current running child processes before exiting so that they will be restarted automaticaly when lwmon is next launched.
 
 --verbosity
 
@@ -1594,14 +1594,14 @@ cat << 'EOF' > /dev/stdout
 
 MASTER, CONTROL, AND CHILD PROCESSES
 
-Any action taken by xmonitor.sh falls into one of three process categories - master processes, control processes or child processes.
+Any action taken by lwmon.sh falls into one of three process categories - master processes, control processes or child processes.
 
 MASTER PROCESS -
      The master process is just one continuius loop. It primarily accomplishes three things: 1) It checks to see if there is data for new child processes and spawns them accordingly. 2) It checks existing processes, makes sure that they are still running, and if they are not it decides whether they need to be respawned, or if they can be set aside as disabled. 3) If there is data from processes that has been set aside for more than seven days, it removes this data.
      Other than starting and stopping the master process, the user does not interact with it directly.
 
 CONTROL PROCESSES -
-     Control processes are how the user primarily interacts with xmonitor.sh, and they accomplish three primary tasks: 1) They gather data from the user regaring a new child process that the user wants to create, and then they put that data in a place where the master process will find it. 2) They gather data from the user on how a currently running child process should be modified (or exited). 3) They gather data from the user on how the master process should be modified (or exited).
+     Control processes are how the user primarily interacts with lwmon.sh, and they accomplish three primary tasks: 1) They gather data from the user regaring a new child process that the user wants to create, and then they put that data in a place where the master process will find it. 2) They gather data from the user on how a currently running child process should be modified (or exited). 3) They gather data from the user on how the master process should be modified (or exited).
      Control processes always exit after the data that they've collected has been put in place, except under the following circumstance: If there is no currently running master process, and the "--control" flag was not used, the control process will turn into the master process.
 
 CHILD PROCESSES -
@@ -1616,11 +1616,11 @@ function fn_help_params_file {
 cat << 'EOF' > /dev/stdout
 
 PARAMETERS FILE
-(located at ".xmonitor/[CHILD PID]/params")
+(located at ".lwmon/[CHILD PID]/params")
 
-The params file contains the specifics of an xmonitor.sh job. Any xmonitor.sh job that is currently running can be changed mid-run by editing the params file - this can be done manually, or some of the values can be modified using the "--modify" flag. The purpose of this document is to explain each variable in the params file and what it does. 
+The params file contains the specifics of an lwmon.sh job. Any lwmon.sh job that is currently running can be changed mid-run by editing the params file - this can be done manually, or some of the values can be modified using the "--modify" flag. The purpose of this document is to explain each variable in the params file and what it does. 
 
-After changes are made to the params file, these changes will not be recognized by the script until a file named ".xmonitor/[CHILD PID]/reload" is created.
+After changes are made to the params file, these changes will not be recognized by the script until a file named ".lwmon/[CHILD PID]/reload" is created.
 
 "JOB_TYPE" 
      This line specifies what kind of job is being run. (url, dns, or ping) It's used to identify the job type initially. Making changes to it after the job has been initiated will not have any impact on the job.
@@ -1696,7 +1696,9 @@ cat << 'EOF' > /dev/stdout
 Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size? Monitor page load times?
-     Command line flags that accept equal signs.
+
+1.3.1 (2015-12-02) -
+     Changed the project's name from "xmonitor" to "lwmon".
 
 1.3.0 (2015-12-01) -
      A custom message can now be added to email messages using the "CUSTOM_MESSAGE" directive in the params file.
@@ -1755,17 +1757,17 @@ exit
 v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 v_PROGRAMDIR="$( echo "$v_PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
 #"
-v_WORKINGDIR="$v_PROGRAMDIR"".xmonitor/"
+v_WORKINGDIR="$v_PROGRAMDIR"".lwmon/"
 mkdir -p "$v_WORKINGDIR"
 
-v_LOG="$v_PROGRAMDIR""xmonitor.log"
+v_LOG="$v_PROGRAMDIR""lwmon.log"
 
 ### find the newst version of curl
 ### /usr/bin/curl is the standard installation of curl
 ### /opt/curlssl/bin/curl is where cPanel keeps the version of curl that PHP works with, which is usually the most up to date
 v_CURL_BIN=$( echo -e "$( /opt/curlssl/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /opt/curlssl/bin/curl\n$( /usr/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /usr/bin/curl\n$( $( which curl ) --version 2> /dev/null | head -n1 | awk '{print $2}' ) $( which curl )" | sort -n | grep "^[0-9]*\.[0-9]*.[0-9]*" | tail -n1 | awk '{print $2}' )
 if [[ -z $v_CURL_BIN ]]; then
-   echo "curl needs to be installed for xmonitor to perform some of its functions. Exiting."
+   echo "curl needs to be installed for lwmon to perform some of its functions. Exiting."
    exit
 fi
 v_CURL_BIN_VERSION="$( $v_CURL_BIN --version 2> /dev/null | head -n1 | awk '{print $2}')"
@@ -1773,14 +1775,14 @@ v_CURL_BIN_VERSION="$( $v_CURL_BIN --version 2> /dev/null | head -n1 | awk '{pri
 ### Make sure that bc, mail, ping, and dig are installed\
 for i in bc mail dig ping; do
    if [[ -z $( which $i 2> /dev/null ) ]]; then
-      echo "$i needs to be installed for xmonitor to perform some of its functions. Exiting."
+      echo "$i needs to be installed for lwmon to perform some of its functions. Exiting."
       exit
    fi
 done
 
 ### Determine the running state
-if [[ -f "$v_WORKINGDIR"xmonitor.pid && $( ps aux | grep "$( cat "$v_WORKINGDIR"xmonitor.pid 2> /dev/null ).*xmonitor.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
-   if [[ $PPID == $( cat "$v_WORKINGDIR"xmonitor.pid 2> /dev/null ) ]]; then
+if [[ -f "$v_WORKINGDIR"lwmon.pid && $( ps aux | grep "$( cat "$v_WORKINGDIR"lwmon.pid 2> /dev/null ).*lwmon.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+   if [[ $PPID == $( cat "$v_WORKINGDIR"lwmon.pid 2> /dev/null ) ]]; then
       ### Child processes monitor one thing only they are spawned only by the master process and when the master process is no longer present, they die.
       v_RUNNING_STATE="child"
       fn_child
@@ -1793,14 +1795,14 @@ else
    v_RUNNING_STATE="master"
    ### Create some necessary configuration files and directories
    mkdir -p "$v_WORKINGDIR""new/"
-   echo $$ > "$v_WORKINGDIR"xmonitor.pid
+   echo $$ > "$v_WORKINGDIR"lwmon.pid
    if [[ -f "$v_WORKINGDIR"no_output ]]; then
       rm -f "$v_WORKINGDIR"no_output
    fi
 fi
 
 ### More necessary configuration files.
-if [[ ! -f "$v_WORKINGDIR"xmonitor.conf ]]; then
+if [[ ! -f "$v_WORKINGDIR"lwmon.conf ]]; then
    fn_create_config
 fi
 
@@ -1812,7 +1814,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
    v_ARGUMENT="${a_CL_ARGUMENTS[$c]}"
    if [[ $( echo $v_ARGUMENT | egrep -c "^(--((url|dns|ping|verbosity|kill)(=.*)*|list|default|master|version|help|help-flags|help-process-types|help-params-file|modify)|[^-]*-[hmvpudl])$" ) -gt 0 ]]; then
       ### These flags indicate a specific action for the script to take. Two actinos cannot be taken at once.
-      if [[ ! -z $v_RUN_TYPE ]]; then
+      if [[ -n $v_RUN_TYPE ]]; then
          ### If another of these actions has already been specified, end.
          echo "Cannot use \"$v_RUN_TYPE\" and \"$v_ARGUMENT\" simultaneously. Exiting."
          exit
@@ -1854,7 +1856,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          c=$(( $c + 1 ))
          v_EMAIL_ADDRESS="${a_CL_ARGUMENTS[$c]}"
       else
-         echo "The flag \"--mail\" needs to be followed by an e-mail address. Exiting"
+         echo "The flag \"--mail\" needs to be followed by an e-mail address. Exiting."
          exit
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(e)*mail=" ) -eq 1 ]]; then
@@ -1999,7 +2001,7 @@ elif [[ $v_RUN_TYPE == "--dns" || $v_RUN_TYPE == "-d" ]]; then
    fn_get_defaults
    fn_dns_cl
 elif [[ $v_RUN_TYPE == "--kill" ]]; then
-   if [[ ! -z $v_CHILD_PID ]]; then
+   if [[ -n $v_CHILD_PID ]]; then
       if [[ ! -f  "$v_WORKINGDIR"$v_CHILD_PID/params ]]; then
          echo "Child ID provided does not exist."
          exit
