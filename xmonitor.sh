@@ -1,6 +1,6 @@
 #! /bin/bash
 
-VERSION="1.1.1"
+VERSION="1.1.2"
 
 #######################
 ### BEGIN FUNCTIONS ###
@@ -524,9 +524,15 @@ function fn_child_checks {
 }
 
 function fn_child_exit {
-   # When a child process exits, it needs to cleam up after itself and log the fact that it has exited.
+   # When a child process exits, it needs to clean up after itself and log the fact that it has exited.
    echo "$( date ) - [$MY_PID] - Stopped watching $URL_OR_PING $SERVER_STRING: Running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate." >> $LOG
-   rm -rf "$WORKINGDIR""$MY_PID"
+   echo "$( date ) - [$MY_PID] - Stopped watching $URL_OR_PING $SERVER_STRING: Running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate." >> "$WORKINGDIR""$MY_PID"/log
+   # Instead of deleting the directory, back it up temporarily.
+   # rm -rf "$WORKINGDIR""$MY_PID"
+   if [[ -f "$WORKINGDIR""$MY_PID"/die ]]; then
+      TIMESTAMP="$( date +%s )"
+      mv "$WORKINGDIR""$MY_PID" "$WORKINGDIR""old_""$MY_PID""_""$TIMESTAMP"
+   fi
    exit
 }
 
@@ -534,7 +540,7 @@ function fn_child_exit {
 
 function fn_hit {
    # This is run every time a monitoring process has a successful check
-   # gather variables for use ni reporting, both to the log file and to e-mail.
+   # gather variables for use in reporting, both to the log file and to e-mail.
    RUN_TIME=$(( $( date +%s ) - $START_TIME ))
    TOTAL_CHECKS=$(( $TOTAL_CHECKS + 1 ))
    TOTAL_HITS=$(( $TOTAL_HITS + 1 ))
@@ -549,7 +555,7 @@ function fn_hit {
    fi
    LAST_HIT=$( date +%s )
    NUM_HITS_EMAIL=$(( $NUM_HITS_EMAIL + 1 ))
-   #Determine how verbose Xmonitor is set to be and prepare the message accordingly.
+   # Determine how verbose Xmonitor is set to be and prepare the message accordingly.
    VERBOSITY=$( cat "$WORKINGDIR"verbosity 2> /dev/null )
    if [[ $VERBOSITY == "verbose" ]]; then
       REPORT="$DATE - [$MY_PID] - $URL_OR_PING $SERVER_STRING: Succeeded! - Checking for $RUN_TIME seconds. Last failed check: $LAST_MISS_STRING. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate."
@@ -575,6 +581,7 @@ function fn_hit {
          echo -e "\e[1;32m""$REPORT""\e[00m"
       fi
       echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $SERVER_STRING: Check succeeded!" >> $LOG
+      echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $SERVER_STRING: Check succeeded!" >> "$WORKINGDIR""$MY_PID"/log
       HIT_CHECKS=1
    # If the last check failed
    else
@@ -582,6 +589,7 @@ function fn_hit {
          echo -e "\e[1;32m""$REPORT""\e[00m"
       fi
       echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $SERVER_STRING: Check succeeded after $MISS_CHECKS failed checks!" >> $LOG
+      echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $SERVER_STRING: Check succeeded after $MISS_CHECKS failed checks!" >> "$WORKINGDIR""$MY_PID"/log
       HIT_CHECKS=1
       fn_hit_email
    fi
@@ -629,6 +637,7 @@ function fn_miss {
          echo -e "\e[1;31m""$REPORT""\e[00m"
       fi
       echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $SERVER_STRING: Check failed!" >> $LOG
+      echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $SERVER_STRING: Check failed!" >> "$WORKINGDIR""$MY_PID"/log
       MISS_CHECKS=1
    else
       # If the last check was a hit.
@@ -636,6 +645,7 @@ function fn_miss {
          echo -e "\e[1;31m""$REPORT""\e[00m"
       fi
       echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $SERVER_STRING: Check failed after $HIT_CHECKS successful checks!" >> $LOG
+      echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $SERVER_STRING: Check failed after $HIT_CHECKS successful checks!" >> "$WORKINGDIR""$MY_PID"/log
       MISS_CHECKS=1
       fn_miss_email
    fi
@@ -674,18 +684,6 @@ function fn_master {
       echo "Master process already present. Exiting"
       exit
    fi
-   # Are there any directories from old child processes? Everything must have exited unexpectedly. Start them back up.
-   for i in $( find $WORKINGDIR -type d ); do
-      CHILD_PID=$( basename $i )
-      if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
-         if [[ $( ps aux | grep "$CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
-            echo "$( date ) - [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - CHILD process was found on startup. Restarting with new PID." >> $LOG
-            NEW_JOB="$( date +%s )""_$RANDOM"
-            mv -f "$WORKINGDIR""$CHILD_PID"/params "$WORKINGDIR""new/$NEW_JOB"
-            rm -rf "$WORKINGDIR""$CHILD_PID"
-         fi
-      fi
-   done
    # try to prevent the master process from exiting unexpectedly.
    trap fn_master_exit SIGINT SIGTERM SIGKILL
    VERBOSITY=$( cat "$WORKINGDIR"verbosity )
@@ -711,12 +709,31 @@ function fn_master {
             mv "$WORKINGDIR""new/$i" "$WORKINGDIR""$CHILD_PID""/params"
          done
       fi
-      # go through the directories for child processes. Make sure that each one is associated with a running child process. If not, clean up after it.
+      # go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
       for i in $( find $WORKINGDIR -type d ); do
          CHILD_PID=$( basename $i )
          if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
             if [[ $( ps aux | grep "$CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
-               echo "$( date ) - [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - CHILD process was found dead." >> $LOG
+               # If it's been marked to die, back it up temporarily
+               if [[ -f "$WORKINGDIR""$CHILD_PID/die" ]]; then
+                  TIMESTAMP="$( date +%s )"
+                  mv "$WORKINGDIR""$CHILD_PID" "$WORKINGDIR""old_""$CHILD_PID""_""$TIMESTAMP"
+               # Otherwise, restart it, then backup the old data temporarily.
+               else
+                  # Check to make sure it still exists and wasn't just killed off by the child process.
+                  if [ -d "$WORKINGDIR""$CHILD_PID" ]; then
+                     echo "$( date ) - [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - Child process was found dead. Restarting with new PID." >> $LOG
+                     NEW_JOB="$( date +%s )""_$RANDOM"
+                     cp -a "$WORKINGDIR""$CHILD_PID"/params "$WORKINGDIR""new/$NEW_JOB"
+                     TIMESTAMP="$( date +%s )"
+                     mv "$WORKINGDIR""$CHILD_PID" "$WORKINGDIR""old_""$CHILD_PID""_""$TIMESTAMP"
+                  fi
+               fi
+            fi
+         # If it's backed up process data from more than seven days ago, delete it.
+         elif [[ $( echo $CHILD_PID | grep -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
+            if [[ $(( $( date +%s ) - $( echo $CHILD_PID | cut -d "_" -f3 ) )) -gt 604800 ]]; then
+               echo "$( date ) - [$( echo "$CHILD_PID" | cut -d "_" -f2)] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - Child process dead for seven days. Deleting backed up data." >> $LOG
                rm -rf "$WORKINGDIR""$CHILD_PID"
             fi
          fi
@@ -728,7 +745,7 @@ function fn_master {
          VERBOSITY=$( cat "$WORKINGDIR"verbosity )
          echo "***Verbosity is now set as \"$VERBOSITY\"***"
       fi
-      # Is there a file named "die" in the worknig directory? If so, end the master process.
+      # Is there a file named "die" in the working directory? If so, end the master process.
       if [[ -f "$WORKINGDIR"die ]]; then
          fn_master_exit
       fi
@@ -753,20 +770,18 @@ function fn_master_exit {
       echo "  2) Back up the data for the child processes so that they'll start again next time Xmonitor is run, then kill the master process and all child processes."
       echo
       read -p "How would you like to proceed? " OPTION_NUM
-      if [[ $OPTION_NUM == "2" ]]; then
-         touch "$WORKINGDIR"save
+      # If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
+      if [[ $OPTION_NUM == "1" ]]; then
+         for i in $( find $WORKINGDIR -type d ); do
+            CHILD_PID=$( basename $i )
+            if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
+               if [[ $( ps aux | grep "$CHILD_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+                  touch "$WORKINGDIR""$CHILD_PID/die"
+               fi
+            fi
+         done
       fi
       echo $VERBOSITY > "$WORKINGDIR"verbosity
-   fi
-   # Is there a file in the working directory naemd "save"? If so, let's backup the current jobs.
-   if [[ -f "$WORKINGDIR"save ]]; then
-      rm -f "$WORKINGDIR"save
-      for i in $( find "$WORKINGDIR" -type d ); do 
-         CHILD_PID=$( basename $i )
-         if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then 
-            cp -a $i/params "$WORKINGDIR"new/$CHILD_PID.txt
-         fi
-      done
    fi
    rm -f "$WORKINGDIR"xmonitor.pid "$WORKINGDIR"die
    exit
@@ -1170,6 +1185,11 @@ Version Notes:
 Future Versions -
      For URL's, save the results every time their different, so that they can be compared.
 
+1.1.2 -
+     The default now is to restart a child process if it's found dead, no matter when it's found.
+     When a child process is stopped, it's folder is backed up for seven days. This may or may not be a references to the movie "The Ring"
+     Child processes log to their own directories as well.
+
 1.1.1 -
      If it finds a dead child process on startup, it restarts that process.
 
@@ -1207,7 +1227,7 @@ PROGRAMDIR="$( echo "$PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
 WORKINGDIR="$PROGRAMDIR"".xmonitor/"
 mkdir -p "$WORKINGDIR"
 
-LOG="$WORKINGDIR""../xmonitor.log"
+LOG="$PROGRAMDIR""xmonitor.log"
 
 # Determine the running state
 if [[ -f "$WORKINGDIR"xmonitor.pid && $( ps aux | grep "$( cat "$WORKINGDIR"xmonitor.pid 2> /dev/null ).*xmonitor.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
