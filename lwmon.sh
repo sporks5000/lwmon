@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.3.5"
+v_VERSION="2.3.6"
 
 ##################################
 ### Functions that create jobs ###
@@ -33,6 +33,7 @@ function fn_parse_server {
    ### At this point in the script, we have the beginnings of a domain, a curl URL and a port
    ### for the domain: get rid of the slash and anything else that follows the domain name
    v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/^\([^/]*\).*$/\1/' )"
+   v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/[\xef\xbb\xbf]//g' )" ### <- Apparently billing is sometimes throwing special characters when you copy.
    ### If the domain contains a closing square bracket followed by a colon, then numbers, then the end of the string, it's likely an ipv6 address with a port on the end
    if [[ $( echo "$v_DOMAINa" | grep -c "]:[0-9][0-9]*$" ) -ne 0 ]]; then
       v_SERVER_PORTa="$( echo "$v_DOMAINa" | sed "s/^.*]:\([0-9][0-9]*\)$/\1/" )"
@@ -2423,6 +2424,9 @@ Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
      Rather than have a job run indefinitely, have the user set a duration or a time for it to stop.
+
+2.3.6 (2016-11-09) -
+     Added the following sed command to remove non-printing characters that billing is sometimes throwing in apparently: sed 's/[\xef\xbb\xbf]//g'
 
 2.3.5 (2016-03-30) -
      Replaced any math using bc with awk instead.
