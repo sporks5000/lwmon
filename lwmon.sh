@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="1.4.0"
+v_VERSION="1.4.1"
 
 #######################################
 ### Functions that gather variables ###
@@ -15,7 +15,7 @@ function fn_url_vars {
    fi
    fn_parse_server
    v_DOMAIN=$v_DOMAINa
-   v_CURL_PORT=$v_CURL_PORTa
+   v_SERVER_PORT=$v_SERVER_PORTa
    v_CURL_URL=$v_CURL_URLa
 
    echo
@@ -141,37 +141,27 @@ function fn_email_address {
    echo
    echo "Enter a file for status information to be output to (or press enter for the default"
    read -p "of \"$v_DEFAULT_OUTPUT_FILE\".): " v_OUTPUT_FILE
-   if [[ -z $v_OUTPUT_FILE ]]; then
+   fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
+   if [[ -z "$v_OUTPUT_FILE" ]]; then
       v_OUTPUT_FILE="$v_DEFAULT_OUTPUT_FILE"
-   else
-      if [[ ${v_OUTPUT_FILE:0:1} != "/" ]]; then
-         echo "Please ensure that this file is referenced by an absolute path. Exiting."
-         exit
-      fi
-      touch "$v_OUTPUT_FILE" 2> /dev/null
-      v_STATUS=$?
-      if [[ ( ! -e "$v_OUTPUT_FILE" || ! -w "$v_OUTPUT_FILE" || $v_STATUS == 1 ) && "$v_OUTPUT_FILE" != "/dev/stdout" ]]; then
-         echo "Please ensure that this file is already created, and has write permissions. Exiting."
-         exit
-      fi
    fi
 }
 
 function fn_parse_server {
-   ### given a URL, Domain name, or IP address, this parses those out into the variables $v_CURL_URL, $v_DOMAIN, $v_IP_ADDRESS, and $v_CURL_PORT.
+   ### given a URL, Domain name, or IP address, this parses those out into the variables $v_CURL_URL, $v_DOMAIN, $v_IP_ADDRESS, and $v_SERVER_PORT.
    if [[ $( echo $v_SERVER | grep -ci "^HTTP" ) -eq 0 ]]; then
       v_DOMAINa=$v_SERVER
       v_CURL_URLa=$v_SERVER
-      v_CURL_PORTa="80"
+      v_SERVER_PORTa="80"
    else
       ### get rid of "http(s)" at the beginning of the domain name
       v_DOMAINa=$( echo $v_SERVER | sed -e "s/^[Hh][Tt][Tt][Pp][Ss]*:\/\///" )
       if [[ $( echo $v_SERVER | grep -ci "^HTTPS" ) -eq 1 ]]; then
          v_CURL_URLa=$v_SERVER
-         v_CURL_PORTa="443"
+         v_SERVER_PORTa="443"
       else
          v_CURL_URLa=$( echo $v_SERVER | sed -e "s/^[Hh][Tt][Tt][Pp]:\/\///" )
-         v_CURL_PORTa="80"
+         v_SERVER_PORTa="80"
       fi
    fi
    ### get rid of the slash and anything else that follows the domain name
@@ -187,8 +177,11 @@ function fn_parse_server {
    fi
    ### If the port is specified in the URL, lets use that.
    if [[ $( echo $v_DOMAINa | grep -c ":" ) -eq 1 ]]; then
-      v_CURL_PORTa="$( echo $v_DOMAINa | cut -d ":" -f2 )"
+      v_SERVER_PORTa="$( echo $v_DOMAINa | cut -d ":" -f2 )"
       v_DOMAINa="$( echo $v_DOMAINa | cut -d ":" -f1 )"
+   ### Otherwise, if there was a port specified at the command line, let's use that.
+   elif [[ -n $v_CL_PORT ]]; then
+      v_SERVER_PORTa="$v_CL_PORT"
    fi
 }
 
@@ -226,7 +219,7 @@ function fn_url_cl {
    v_SERVER=$v_CURL_URL
    fn_parse_server
    v_DOMAIN=$v_DOMAINa
-   v_CURL_PORT=$v_CURL_PORTa
+   v_SERVER_PORT=$v_SERVER_PORTa
    v_CURL_URL=$v_CURL_URLa
 
    if [[ -z $v_IP_ADDRESS ]]; then
@@ -376,7 +369,7 @@ function fn_url_confirm {
    if [[ $v_IP_ADDRESS != false ]]; then
       echo "---IP Address to check against: $v_IP_ADDRESS"
    fi
-   echo "---Port number: $v_CURL_PORT"
+   echo "---Port number: $v_SERVER_PORT"
    echo "---String that must be present to result in a success: \"$v_CURL_STRING\""
 
    v_NEW_JOB="$( date +%s )""_$RANDOM.job"
@@ -384,7 +377,7 @@ function fn_url_confirm {
    fn_mutual_confirm
    ### There are additional variables for URL based jobs. Those are input into the params file here.
    echo "CURL_URL = $v_CURL_URL" >> "$v_WORKINGDIR""$v_NEW_JOB"
-   echo "CURL_PORT = $v_CURL_PORT" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   echo "SERVER_PORT = $v_SERVER_PORT" >> "$v_WORKINGDIR""$v_NEW_JOB"
    echo "CURL_STRING = $v_CURL_STRING" >> "$v_WORKINGDIR""$v_NEW_JOB"
    echo "USER_AGENT = $v_USER_AGENT" >> "$v_WORKINGDIR""$v_NEW_JOB"
    echo "CURL_TIMEOUT = $v_CURL_TIMEOUT" >> "$v_WORKINGDIR""$v_NEW_JOB"
@@ -458,7 +451,7 @@ function fn_cl_confirm {
    ### Some directives are specific to URL jobs
    if [[ $v_RUN_TYPE == "--url" || $v_RUN_TYPE == "-u" ]]; then
       echo "CURL_URL = $v_CURL_URL" >> "$v_WORKINGDIR""$v_NEW_JOB"
-      echo "CURL_PORT = $v_CURL_PORT" >> "$v_WORKINGDIR""$v_NEW_JOB"
+      echo "SERVER_PORT = $v_SERVER_PORT" >> "$v_WORKINGDIR""$v_NEW_JOB"
       i=0; while [[ $i -le $(( $v_CURL_STRING_COUNT -1 )) ]]; do
          ### The sed at the end of this line should make the string egrep safe (which is good, because egrepping with it is exactly what we're gonig to do).
          echo "CURL_STRING = $( echo ${a_CURL_STRING[$i]} | sed 's/[]\.|$(){}?+*^]/\\&/g' )" >> "$v_WORKINGDIR""$v_NEW_JOB"
@@ -489,9 +482,8 @@ function fn_get_defaults {
    fn_read_conf CURL_TIMEOUT master; v_DEFAULT_CURL_TIMEOUT="$v_RESULT"
    fn_test_variable "$v_DEFAULT_CURL_TIMEOUT" true false 10; v_DEFAULT_CURL_TIMEOUT="$v_RESULT"
    fn_read_conf OUTPUT_FILE master; v_DEFAULT_OUTPUT_FILE="$v_RESULT"
-   touch $v_DEFAULT_OUTPUT_FILE
-   v_STATUS=$?
-   if [[ ( ! -e "$v_DEFAULT_OUTPUT_FILE" || ! -w "$v_DEFAULT_OUTPUT_FILE" || $v_STATUS == 1 ) && "$v_DEFAULT_OUTPUT_FILE" != "/dev/stdout" ]]; then
+   fn_test_file "$v_DEFAULT_OUTPUT_FILE" false true; v_DEFAULT_OUTPUT_FILE="$v_RESULT"
+   if [[ -z $DEFAULT_OUTPUT_FILE ]]; then
       v_DEFAULT_OUTPUT_FILE="/dev/stdout"
    fi
    fn_read_conf USER_AGENT master "false"; v_DEFAULT_USER_AGENT="$v_RESULT"
@@ -569,8 +561,8 @@ function fn_child_vars {
    fn_test_variable "$v_NUM_STATUSES_NOT_SUCCESS" true NUM_STATUSES_NOT_SUCCESS "4"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
    if [[ $v_JOB_TYPE == "url" ]]; then
       fn_read_conf CURL_URL child; v_CURL_URL="$v_RESULT"
-      fn_read_conf CURL_PORT child; v_CURL_PORT="$v_RESULT"
-      fn_test_variable "$v_CURL_PORT" true false "80"; v_CURL_PORT="$v_RESULT"
+      fn_read_conf SERVER_PORT child; v_SERVER_PORT="$v_RESULT"
+      fn_test_variable "$v_SERVER_PORT" true false "80"; v_SERVER_PORT="$v_RESULT"
       fn_read_conf CURL_STRING child "" "multi" ; a_CURL_STRING=("${a_RESULT[@]}")
       fn_read_conf USER_AGENT child; v_USER_AGENT="$v_RESULT"
       fn_test_variable "$v_USER_AGENT" false USER_AGENT "false"; v_USER_AGENT="$v_RESULT"
@@ -581,10 +573,13 @@ function fn_child_vars {
       ### If there's an IP address, then the URL needs to have the domain replaced with the IP address and the port number.
       if [[ $v_IP_ADDRESS != "false" && $( echo $v_CURL_URL | egrep -c "^(http://|https://)*$v_DOMAIN:[0-9][0-9]*" ) -eq 1 ]]; then
          ### If it's specified with a port in the URL, lets make sure that it's the right port (according to the params file).
-         v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_CURL_PORT/" )"
+         v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/" )"
       elif [[ $v_IP_ADDRESS != "false" ]]; then
          ### If it's not specified with the port in the URL, lets add the port.
-         v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_CURL_PORT/" )"
+         v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/" )"
+      else
+         ### Otherwise, lets throw the port on there.
+         v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN:*[0-9]*/$v_DOMAIN:$v_SERVER_PORT/" )"
       fi
       if [[ $v_USER_AGENT == true ]]; then
          v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36'
@@ -600,10 +595,10 @@ function fn_child_vars {
    fi
    fn_read_conf OUTPUT_FILE child; v_OUTPUT_FILE2="$v_RESULT"
    fn_test_variable "$v_OUTPUT_FILE2" false OUTPUT_FILE "/dev/stdout"; v_OUTPUT_FILE2="$v_RESULT"
-   touch "$v_OUTPUT_FILE2" 2> /dev/null
+   fn_test_file "$v_OUTPUT_FILE2" false true; v_OUTPUT_FILE2="$v_RESULT"
    ### If the designated output file looks good, and is different than it was previously, log it.
-   if [[ -n "$v_OUTPUT_FILE2" && "${v_OUTPUT_FILE2:0:1}" == "/" && -e "$v_OUTPUT_FILE2" && -w "$v_OUTPUT_FILE2" && "$v_OUTPUT_FILE2" != "$v_OUTPUT_FILE" ]]; then
-      echo "$( date ) - [$v_CHILD_PID] - Output for child process $v_CHILD_PID is being directed to $v_OUTPUT2" >> "$v_LOG"
+   if [[ -n "$v_OUTPUT_FILE2" && "$v_OUTPUT_FILE2" != "$v_OUTPUT_FILE" ]]; then
+      echo "$( date ) - [$v_CHILD_PID] - Output for child process $v_CHILD_PID is being directed to $v_OUTPUT_FILE2" >> "$v_LOG"
       v_OUTPUT_FILE="$v_OUTPUT_FILE2"
    elif [[ -z "$v_OUTPUT_FILE2" && -z "$v_OUTPUT_FILE" ]]; then
       ### If there is no designated output file, and there was none previously, stdout will be fine.
@@ -612,7 +607,7 @@ function fn_child_vars {
 }
 
 ### Here's an example to test the logic being used for port numbers:
-### v_CURL_URL="https://sporks5000.com:4670/index.php"; v_DOMAIN="sporks5000.com"; v_CURL_PORT=8080; v_IP_ADDRESS="10.30.6.88"; if [[ $( echo $v_CURL_URL | egrep -c "^(http://|https://)*$v_DOMAIN:[0-9][0-9]*" ) -eq 1 ]]; then echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_CURL_PORT/"; else echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_CURL_PORT/"; fi
+### v_CURL_URL="https://sporks5000.com:4670/index.php"; v_DOMAIN="sporks5000.com"; v_SERVER_PORT=8080; v_IP_ADDRESS="10.30.6.88"; if [[ $( echo $v_CURL_URL | egrep -c "^(http://|https://)*$v_DOMAIN:[0-9][0-9]*" ) -eq 1 ]]; then echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/"; else echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/"; fi
 
 function fn_url_child {
    ###The basic loop for a URL monitoring process.
@@ -1297,7 +1292,7 @@ function fn_master {
 }
 
 function fn_create_mini_script {
-   v_MINI_SCRIPT="$v_WORKINGDIR""lwmon.sh"
+   v_MINI_SCRIPT="$v_WORKINGDIR""$v_PROGRAMNAME"
    echo "#! /bin/bash" > "$v_MINI_SCRIPT"
    echo "v_VERSION=\"$v_VERSION\"" >> "$v_MINI_SCRIPT"
 
@@ -1319,6 +1314,7 @@ function fn_create_mini_script {
    type fn_partial_success_email | tail -n +2 >> "$v_MINI_SCRIPT"
    type fn_intermittent_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
    type fn_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
+   type fn_test_file | tail -n +2 >> "$v_MINI_SCRIPT"
    type fn_start_script | tail -n +2 >> "$v_MINI_SCRIPT"
 
    echo "v_RUNNING_STATE=\"child\"" >> "$v_MINI_SCRIPT"
@@ -1337,9 +1333,9 @@ function fn_spawn_child_process {
    mkdir -p "$v_WORKINGDIR""$v_CHILD_PID"
    touch "$v_WORKINGDIR""$v_CHILD_PID/#die" "$v_WORKINGDIR""$v_CHILD_PID/#status"
    mv "$v_WORKINGDIR""new/$i" "$v_WORKINGDIR""$v_CHILD_PID""/params"
-   if [[ -f "$v_WORKINGDIR""new/$i".log ]]; then
+   if [[ -f "$v_WORKINGDIR""new/${i:0:-4}".log ]]; then
    ### If there's a log file, let's move that log file into the appropriate directory as well.
-      mv "$v_WORKINGDIR""new/$i".log "$v_WORKINGDIR""$v_CHILD_PID""/log"
+      mv "$v_WORKINGDIR""new/${i:0:-4}".log "$v_WORKINGDIR""$v_CHILD_PID""/log"
    fi
 }
 
@@ -1357,20 +1353,24 @@ function fn_master_exit {
       read -t 15 -p "How would you like to proceed? " v_OPTION_NUM
       # If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
       if [[ $v_OPTION_NUM == "1" ]]; then
-         for i in $( find $v_WORKINGDIR -type d ); do
+         for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
             v_CHILD_PID=$( basename $i )
-            # if [[ $( echo $v_CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
-            if [[ $( echo $v_CHILD_PID | sed "s/[[:digit:]]//g" | grep -c . ) -eq 0 ]]; then
-               if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
-                  touch "$v_WORKINGDIR""$v_CHILD_PID/die"
-               fi
+            if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+               touch "$v_WORKINGDIR""$v_CHILD_PID/die"
             fi
          done
       elif [[ -z $v_OPTION_NUM ]]; then
          echo
       fi
+   elif [[ -f "$v_WORKINGDIR"die && ! -f "$v_WORKINGDIR"save ]]; then
+      for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
+         v_CHILD_PID=$( basename $i )
+         if [[ $( ps aux | grep "$v_CHILD_PID.*$v_PROGRAMNAME" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
+            touch "$v_WORKINGDIR""$v_CHILD_PID/die"
+         fi
+      done
    fi
-   rm -f "$v_WORKINGDIR"lwmon.pid "$v_WORKINGDIR"die "$v_WORKINGDIR"no_output
+   rm -f "$v_WORKINGDIR"lwmon.pid "$v_WORKINGDIR"die
    exit
 }
 
@@ -1445,8 +1445,9 @@ function fn_modify {
    for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep "." | grep -v "[^0-9]" ); do
       v_CHILD_PID=$( basename $i )
       v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
-      fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
-      fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
+      ### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
+      fn_read_conf JOB_NAME "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_NAME="$v_RESULT"
+      fn_read_conf JOB_TYPE "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_TYPE="$v_RESULT"
       echo "  $v_CHILD_NUMBER) [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME"
       a_CHILD_PID[$v_CHILD_NUMBER]="$v_CHILD_PID"
    done
@@ -1557,19 +1558,11 @@ function fn_modify {
          fn_verbosity
       elif [[ $v_OPTION_NUM == "7" ]]; then
          read -p "Enter a new file for status information to be output to: " v_OUTPUT_FILE
-         if [[ ${v_OUTPUT_FILE:0:1} != "/" ]]; then
-            echo "Please ensure that this file is referenced by an absolute path."
-            exit
+         fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
+         if [[ -n $v_OUTPUT_FILE ]]; then
+            fn_update_conf OUTPUT_FILE "$v_OUTPUT_FILE" "$v_WORKINGDIR""$v_CHILD_PID/params"
+            echo "The output file has been updated."
          fi
-         touch "$v_OUTPUT_FILE" 2> /dev/null
-         v_STATUS=$?
-         if [[ ( ! -e "$v_OUTPUT_FILE" || ! -w "$v_OUTPUT_FILE" || $v_STATUS == 1 ) && "$v_OUTPUT_FILE" != "/dev/stdout" ]]; then
-            echo "Please ensure that this file is already created, and has write permissions."
-            exit
-         fi
-         fn_update_conf OUTPUT_FILE "$v_OUTPUT_FILE" "$v_WORKINGDIR""$v_CHILD_PID/params"
-
-         echo "The output file has been updated."
       elif [[ $v_OPTION_NUM == "8" ]]; then
          echo -en "\ncd $v_WORKINGDIR""$v_CHILD_PID/\n\n"
       elif [[ $v_OPTION_NUM == "9" ]]; then
@@ -1778,6 +1771,45 @@ function fn_test_variable {
    fi
 }
 
+function fn_test_file {
+   ### This function expects $1 to be the path to a file, $2 to be true or false whether the file needs to be tested for read permission, and $3 to be true or false whether the file needs to be tested for write permission.
+   v_RESULT="$1"
+   if [[ -n "$v_RESULT" ]]; then 
+      if [[ -n "$HOME" && "${v_RESULT:0:2}" == "~/" ]]; then
+         v_RESULT="$HOME""${v_RESULT:1}"
+      fi
+      if [[ ${v_RESULT:0:1} == "/" && "$3" == true && "$2" != true ]]; then
+         touch "$v_RESULT" 2> /dev/null
+         v_STATUS=$?
+         if [[ ! -e "$v_RESULT" || ! -w "$v_RESULT" || $v_STATUS == 1 ]]; then
+            unset v_RESULT
+         fi
+      elif [[ ${v_RESULT:0:1} == "/" && "$3" != true && "$2" == true ]]; then
+         tail -n1 "$v_RESULT" 2> /dev/null
+         v_STATUS=$?
+         if [[ ! -e "$v_RESULT" || ! -r "$v_RESULT" || $v_STATUS == 1 ]]; then
+            unset v_RESULT
+         fi
+      elif [[ ${v_RESULT:0:1} == "/" && "$3" == true && "$2" == true ]]; then
+         touch "$v_RESULT" 2> /dev/null
+         v_STATUS=$?
+         if [[ ! -e "$v_RESULT" || ! -w "$v_RESULT" || $v_STATUS == 1 ]]; then
+            unset v_RESULT
+         else
+            tail -n1 "$v_RESULT" 2> /dev/null
+            v_STATUS=$?
+            if [[ ! -e "$v_RESULT" || ! -r "$v_RESULT" || $v_STATUS == 1 ]]; then
+               unset v_RESULT
+            fi
+         fi
+      else
+         unset v_RESULT
+      fi
+   else
+      unset v_RESULT
+   fi
+}
+
 function fn_create_config {
 ### I tried to make everything run off of a configuration file at one point in time, however the results were overly complicated. This function remains in case I ever change my mind and try to go back to it.
 cat << 'EOF' > "$v_WORKINGDIR"lwmon.conf
@@ -1832,7 +1864,7 @@ NUM_STATUSES_NOT_SUCCESS = 4
 # For URL based jobs, it's possible to set a time limit for the process to be considered a "partial success" - Even if the curl process finished before it reaches CURL_TIMEOUT, the amount of time it look to complete took long enough that it should be brought to the user's attention.
 CHECK_TIME_PARTIAL_SUCCESS = 7
 
-# If the "LOG_DURATION_DATA" directive is true, then the amount of time it takes for each check to complete will be output to the log file in the child directory.
+# If the "LOG_DURATION_DATA" directive is set to "true", then the amount of time it takes for each check to complete will be output to the log file in the child directory.
 LOG_DURATION_DATA = true
 
 # The "COLOR_" and "RETURN_" directives allow the user to set specific strings that will be output before and after checks, depending on whether they're the first successful check, iterative successful checks, the first failed check, or iterative failed checks. This is designed to be used with bash color codes, but really anything that could be interpreted by "echo -e" can be used here.
@@ -1850,6 +1882,8 @@ RETURN_PARTIAL_SUCCESS = \e[00m
 RETURN_FIRST_PARTIAL_SUCCESS = \e[00m
 EOF
 #'do
+echo -e "\e[1;32m a configuration file has been created at \"$v_WORKINGDIR""lwmon.conf\". You totally want to check it out.\e[00m"
+sleep 1
 }
 
 ##################################
@@ -1974,6 +2008,10 @@ FLAGS FOR CREATING A NEW MONITORING JOB:
 
      When used with "--url", this flag specifies how long a curl process should wait before giving up. The default here is 10 seconds.
 
+--port (port number)
+
+     Specify a port number to connect to for a URL job. Alternate ports can also be achieved by specifying them within the url. Example http://lwmon.com:8080/index.html. a port specified in the URL will take precidence over a port specified with the --port flag, should both exist.
+
 OTHER FLAGS:
 
 --help
@@ -2091,8 +2129,8 @@ After changes are made to the params file, these changes will not be recognized 
      For URL jobs, this is the URL that's being curl'd.
      For DNS and ping jobs, this directive is not used.
 
-"CURL_PORT"
-     For URL jobs, this is the port that's being connected to.
+"SERVER_PORT"
+     For URL jobs, this is the port that's being connected to. If a port is also specified within the URL, the port listed here will bbe assumed to be correct.
      For DNS and ping jobs, this directive is not being used.
 
 "CURL_STRING"
@@ -2145,7 +2183,17 @@ Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size? Monitor page load times?
      replace the menus for creating jobs with... something?
 
-1.4.0 (2015-12-09 ) -
+1.4.1 (2015-12-10) - 
+     Improved checking for the output file
+     Fixed an error where the WAIT_SECONDS variable was being assigned to the wrong variable under some circumstances at the command line.
+     Fixed an issue where child processes were outputting data after the parent was killed.
+     Added the --port flag so that you can specify a port at the command line (this can still be achieved by specifying the port within the URL as well).
+     replaced all variables named "CURL_PORT" to "SERVER_PORT".
+     Fixed a bug where "--modify" would occasionally show the incorrect information.
+     Fixed a bug where "--kill" wasn't telling the child processes to die.
+     Fixed a bug where log files from re-started jobs weren't getting copied over to their new job.
+
+1.4.0 (2015-12-09) -
      Instances of the child pid have the same variable name (With a few exceptions), whether or not they're being referenced by the child process.
      fn_read_conf and fn_test_variable are no longer run in subshells.
      The reload file is no longer used to test whether the parameters have changed - rather, the script checks if the mtime stamp has been updated.
@@ -2209,6 +2257,7 @@ function fn_start_script {
    # Specify the working directory; create it if not present; specify the log file
    v_PROGRAMDIR="$( cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
    v_PROGRAMDIR="$( echo "$v_PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
+   #"
    v_PROGRAMNAME="$( basename "${BASH_SOURCE[0]}" )"
    #"
    if [[ $v_RUNNING_STATE == "child" ]]; then
@@ -2236,6 +2285,9 @@ function fn_start_script {
 #####################
 
 fn_start_script
+
+### If there's a no-output file from the previous session, remove it.
+rm -f "$v_WORKINGDIR"no_output
 
 ### Make sure that bc, mail, ping, and dig are installed\
 for i in bc mail dig ping stat; do
@@ -2278,7 +2330,7 @@ v_CURL_STRING_COUNT=0
 ### For each command line argument, determine what needs to be done.
 for (( c=0; c<=$(( $# - 1 )); c++ )); do
    v_ARGUMENT="${a_CL_ARGUMENTS[$c]}"
-   if [[ $( echo $v_ARGUMENT | egrep -c "^(--((url|dns|ping|verbosity|kill)(=.*)*|list|default|master|version|help|help-flags|help-process-types|help-params-file|modify)|[^-]*-[hmvpudl])$" ) -gt 0 ]]; then
+   if [[ $( echo $v_ARGUMENT | egrep -c "^(--((url|dns|ping|verbosity|kill|load)(=.*)*|list|default|master|version|help|help-flags|help-process-types|help-params-file|modify)|[^-]*-[hmvpudl])$" ) -gt 0 ]]; then
       ### These flags indicate a specific action for the script to take. Two actinos cannot be taken at once.
       if [[ -n $v_RUN_TYPE ]]; then
          ### If another of these actions has already been specified, end.
@@ -2290,11 +2342,12 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          if [[ $v_ARGUMENT == "--url" || $v_ARGUMENT == "-u" ]]; then
             c=$(( $c + 1 ))
             v_CURL_URL="${a_CL_ARGUMENTS[$c]}"
-         elif [[ $v_ARGUMENT == "--dns" || $v_ARGUMENT == "-d" || $v_ARGUMENT == "--ping" || $v_ARGUMENT == "-p" ]]; then
+         elif [[ $v_ARGUMENT == "--dns" || $v_ARGUMENT == "-d" || $v_ARGUMENT == "--ping" || $v_ARGUMENT == "-p" || $v_ARGUMENT == "--load" ]]; then
             c=$(( $c + 1 ))
             v_DOMAIN="${a_CL_ARGUMENTS[$c]}"
          elif [[ $v_ARGUMENT == "--verbosity" || $v_ARGUMENT == "-v" ]]; then
             c=$(( $c + 1 ))
+            ### If they forget to put "more verbose" in quotes, that's okay - we'll let them get away with that.
             if [[ "${a_CL_ARGUMENTS[$c]}" == "more" && "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" == "verbose" ]]; then
                c=$(( $c + 1 ))
                v_VERBOSITY="more verbose"
@@ -2308,7 +2361,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fi
       if [[ $( echo "$v_ARGUMENT" | egrep -c "^--url=" ) -eq 1 ]]; then
          v_CURL_URL="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(dns|ping)=" ) -eq 1 ]]; then
+      elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(dns|ping|load)=" ) -eq 1 ]]; then
          v_DOMAIN="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
       elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--verbosity=" ) -eq 1 ]]; then
          v_VERBOSITY="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
@@ -2332,6 +2385,10 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(e)*mail=" ) -eq 1 ]]; then
       v_EMAIL_ADDRESS="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
+      if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | grep -c "^[^@][^@]*@[^.]*\..*$" ) -lt 1 ]]; then
+         echo "The flag \"--seconds\" needs to be followed by a number of seconds. Exiting."
+         exit
+      fi
    elif [[ $v_ARGUMENT == "--seconds" ]]; then
       if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^[[:digit:]][[:digit:]]*$" ) -eq 1 ]]; then
          c=$(( $c + 1 ))
@@ -2341,8 +2398,8 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          exit
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--seconds=" ) -eq 1 ]]; then
-     v_WAIT_SECONDS="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z $v_WAIT_SECONDS ]]; then
+      v_WAIT_SECONDS="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
+      if [[ -z $v_WAIT_SECONDS || $( echo $v_WAIT_SECONDS | grep -c "^[[:digit:]][[:digit:]]*$" ) -lt 1 ]]; then
          echo "The flag \"--seconds\" needs to be followed by a number of seconds. Exiting."
          exit
       fi
@@ -2355,8 +2412,8 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          exit
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--curl-timeout=" ) -eq 1 ]]; then
-      v_WAIT_SECONDS="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z $v_WAIT_SECONDS ]]; then
+      v_CURL_TIMEOUT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
+      if [[ -z $v_CURL_TIMEOUT || $( echo $v_CURL_TIMEOUT | grep -c "^[[:digit:]][[:digit:]]*$" ) -lt 1  ]]; then
          echo "The flag \"--curl-timeout\" needs to be followed by a number of seconds. Exiting."
          exit
       fi
@@ -2370,8 +2427,22 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--mail-delay=" ) -eq 1 ]]; then
       v_MAIL_DELAY="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z $v_MAIL_DELAY ]]; then
+      if [[ -z $v_MAIL_DELAY || $( echo $v_MAIL_DELAY | grep -c "^[[:digit:]][[:digit:]]*$" ) -lt 1  ]]; then
          echo "The flag \"--mail-delay\" needs to be followed by a number. Exiting."
+         exit
+      fi
+   elif [[ $v_ARGUMENT == "--port" ]]; then
+      if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^[[:digit:]][[:digit:]]*$" ) -eq 1 ]]; then
+         c=$(( $c + 1 ))
+         v_CL_PORT="${a_CL_ARGUMENTS[$c]}"
+      else
+         echo "The flag \"--port\" needs to be followed by a number. Exiting."
+         exit
+      fi
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--port=" ) -eq 1 ]]; then
+      v_CL_PORT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
+      if [[ -z $v_CL_PORT || $( echo $v_CL_PORT | grep -c "^[[:digit:]][[:digit:]]*$" ) -lt 1  ]]; then
+         echo "The flag \"--port\" needs to be followed by a number. Exiting."
          exit
       fi
    elif [[ $v_ARGUMENT == "--ip" || $v_ARGUMENT == "--ip-address" ]]; then
@@ -2421,30 +2492,38 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          echo "The flag \"--domain\" needs to be followed by a domain name. Exiting."
          exit
       fi
+   elif [[ $v_ARGUMENT == "--user" ]]; then
+      if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ]]; then
+         c=$(( $c + 1 ))
+         v_LOAD_USER="${a_CL_ARGUMENTS[$c]}"
+      else
+         echo "The flag \"--user\" needs to be followed by a user name. Exiting."
+         exit
+      fi
+   elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--user=" ) -eq 1 ]]; then
+      v_LOAD_USER="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
+      if [[ -z $v_LOAD_USER ]]; then
+         echo "The flag \"--user\" needs to be followed by a user name. Exiting."
+         exit
+      fi
    elif [[ $v_ARGUMENT == "--outfile" ]]; then
-      if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^/" ) -eq 1 ]]; then
+      if [[ $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^-" ) -eq 0 ]]; then
          c=$(( $c + 1 ))
          v_OUTPUT_FILE="${a_CL_ARGUMENTS[$c]}"
-         touch "$v_OUTPUT_FILE" 2> /dev/null
-         v_STATUS=$?
-         if [[ ( ! -e "$v_OUTPUT_FILE" || ! -w "$v_OUTPUT_FILE" || $v_STATUS == 1 ) && "$v_OUTPUT_FILE" != "/dev/stdout" ]]; then
-            echo "Please ensure that the --outfile file is already created, and has write permissions."
+         fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
+         if [[ -z "$v_OUTPUT_FILE" ]]; then
+            echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
             exit
          fi
       else
-         echo "The flag \"--outfile\" needs to be followed by a file referenced by its full path. Exiting."
+         echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
          exit
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--outfile=" ) -eq 1 ]]; then
       v_OUTPUT_FILE="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
-      if [[ -z $v_OUTPUT_FILE ]]; then
-         echo "The flag \"--outfile\" needs to be followed by a file referenced by its full path. Exiting."
-         exit
-      fi
-      touch "$v_OUTPUT_FILE" 2> /dev/null
-      v_STATUS=$?
-      if [[ ( ! -e "$v_OUTPUT_FILE" || ! -w "$v_OUTPUT_FILE" || $v_STATUS == 1 ) && "$v_OUTPUT_FILE" != "/dev/stdout" ]]; then
-         echo "Please ensure that the --outfile file is already created, and has write permissions."
+      fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
+      if [[ -z "$v_OUTPUT_FILE" ]]; then
+         echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
          exit
       fi
    else
@@ -2533,3 +2612,4 @@ elif [[ -z $v_RUN_TYPE ]]; then
    fi
    fn_options
 fi
+
