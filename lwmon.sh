@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.0.1"
+v_VERSION="2.0.2"
 
 ##################################
 ### Functions that create jobs ###
@@ -78,7 +78,7 @@ function fn_url_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
-      echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --control"
+      echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control"
       exit
    fi
    ### If there is an IP address, check to make sure that it's really an IP address, or can be translated into one.
@@ -115,6 +115,9 @@ function fn_url_cl {
       echo "USER_AGENT = $v_USER_AGENT" >> "$v_WORKINGDIR""$v_NEW_JOB"
    fi
    echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   if [[ $v_USE_WGET == "true" ]]; then
+      echo "USE_WGET = true" >> "$v_WORKINGDIR""$v_NEW_JOB"
+   fi
 
    fn_mutual_cl
 }
@@ -126,7 +129,7 @@ function fn_ping_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with ping jobs are the following:"
-      echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --control"
+      echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control"
       exit
    fi
    fn_parse_server "$v_DOMAIN"
@@ -149,7 +152,7 @@ function fn_dns_cl {
       exit
    elif [[ $( echo -n "$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS$v_SSH_USER$v_MIN_LOAD_PARTIAL_SUCCESS$v_MIN_LOAD_FAILURE$v_CL_PORT" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with dns jobs are the following:"
-      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --control"
+      echo "--dns, --domain, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control"
       exit
    fi
    ### Make sure that the domain resolves and is properly formatted
@@ -178,7 +181,7 @@ function fn_load_cl {
       exit
    elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS" | wc -c ) -gt 0 ]]; then
       echo "The only flags that can be used with url jobs are the following:"
-      echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --control"
+      echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control"
       exit
    fi
    fn_parse_server "$v_DOMAIN"
@@ -422,6 +425,11 @@ function fn_child_vars {
          v_JOB_CL_STRING="$v_JOB_CL_STRING --string \"${a_CURL_STRING[$i]}\""
          i=$(( $i + 1 ))
       done
+      fn_read_conf USE_WGET child; v_USE_WGET="$v_RESULT"
+      fn_test_variable "$v_USE_WGET" false USE_WGET "false"; v_USE_WGET="$v_RESULT"
+      if [[ $v_USE_WGET == "true" ]]; then
+         fn_use_wget
+      fi
       fn_read_conf USER_AGENT child; v_USER_AGENT="$v_RESULT"
       fn_test_variable "$v_USER_AGENT" false USER_AGENT "false"; v_USER_AGENT="$v_RESULT"
       ### If there's an IP address, then the URL needs to have the domain replaced with the IP address and the port number.
@@ -438,8 +446,10 @@ function fn_child_vars {
       if [[ $v_USER_AGENT == true ]]; then
          v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent"
          v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36'
-      elif [[ $v_USER_AGENT == false ]]; then
+      elif [[ $v_USER_AGENT == false && $v_WGET_BIN == "false" ]]; then
          v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
+      elif [[ $v_USER_AGENT == false && $v_WGET_BIN != "false" ]]; then
+         v_USER_AGENT='LWmon/'"$v_VERSION"' wget/'"$v_WGET_BIN_VERSION"
       fi
    fi
    if [[ $v_JOB_TYPE == "ssh-load" ]]; then
@@ -485,22 +495,38 @@ function fn_url_child {
          ### The only instalce where this isn't the case should be on the first run of the loop.
          mv -f "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html
       fi
-      v_CHECK_START=$( date +%s"."%N | head -c -6 )
-      if [[ $v_IP_ADDRESS == false ]]; then
+      if [[ $v_IP_ADDRESS == false && $v_WGET_BIN == "false" ]]; then
          ### If an IP address was specified, and the correct version of curl is present
+         v_CHECK_START=$( date +%s"."%N | head -c -6 )
          $v_CURL_BIN -kLsm $v_CHECK_TIMEOUT $v_CURL_URL --header 'User-Agent: '"$v_USER_AGENT" 2> /dev/null > "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
          v_STATUS=$?
-      elif [[ $v_IP_ADDRESS != false ]]; then
+         v_CHECK_END=$( date +%s"."%N | head -c -6 )
+      elif [[ $v_IP_ADDRESS != false && $v_WGET_BIN == "false" ]]; then
          ### If no IP address was specified
+         v_CHECK_START=$( date +%s"."%N | head -c -6 )
          $v_CURL_BIN -kLsm $v_CHECK_TIMEOUT $v_CURL_URL --header "Host: $v_DOMAIN" --header 'User-Agent: '"$v_USER_AGENT" 2> /dev/null > "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
          v_STATUS=$?
+         v_CHECK_END=$( date +%s"."%N | head -c -6 )
+      elif [[ $v_IP_ADDRESS == false && $v_WGET_BIN != "false" ]]; then
+         ### If an IP address was specified, and the correct version of curl is present
+         v_CHECK_START=$( date +%s"."%N | head -c -6 )
+         $v_WGET_BIN --no-check-certificate -q --timeout=$v_CHECK_TIMEOUT -O "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html $v_CURL_URL --header='User-Agent: '"$v_USER_AGENT" 2> /dev/null
+         v_STATUS=$?
+         v_CHECK_END=$( date +%s"."%N | head -c -6 )
+      elif [[ $v_IP_ADDRESS != false && $v_WGET_BIN != "false" ]]; then
+         ### If no IP address was specified
+         v_CHECK_START=$( date +%s"."%N | head -c -6 )
+         $v_WGET_BIN --no-check-certificate -q --timeout=$v_CHECK_TIMEOUT -O "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html $v_CURL_URL --header="Host: $v_DOMAIN" --header='User-Agent: '"$v_USER_AGENT" 2> /dev/null
+         v_STATUS=$?
+         v_CHECK_END=$( date +%s"."%N | head -c -6 )
       fi
-      v_CHECK_END=$( date +%s"."%N | head -c -6 )
       ### If the exit status of curl is 28, this means that the page timed out.
-      if [[ $v_STATUS == 28 ]]; then
+      if [[ $v_STATUS == 28 && $v_WGET_BIN == "false" ]]; then
          echo "Curl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
-      elif [[ $v_STATUS != 0 ]]; then
+      elif [[ $v_STATUS != 0 && $v_WGET_BIN == "false" ]]; then
          echo "Curl return code: $v_STATUS" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
+      elif [[ $v_STATUS != 0 ]]; then
+         echo "Wget return code: $v_STATUS" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
       fi
       ### I like the line below, but I had to scrap it 1) on the off chance the multiple strings overlapped, and 2) Because it didn't account for the possibility of one string appearing multiple times, while another string didn't appear at all.
       # if [[ $( egrep -o "$( IFS="|"; echo "${a_CURL_STRING[*]}"; IFS=$" \t\n" )" "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html | wc -l ) -ge "${#a_CURL_STRING[@]}" ]]; then
@@ -944,14 +970,22 @@ function fn_master {
    fi
    v_TIMESTAMP_REMOTE_CHECK=0
    v_TIMESTAMP_LOCAL_CHECK=0
-   $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.txt > "$v_WORKINGDIR"die_list
+   if [[ "$v_WGET_BIN" == "false" ]]; then
+      $v_CURL_BIN -Lsm 10 http://lwmon.com/die_list.txt > "$v_WORKINGDIR"die_list
+   else
+      $v_WGET_BIN -q --timeout=10 -O "$v_WORKINGDIR"die_list http://lwmon.com/die_list.txt
+   fi
    fn_create_mini_script
    echo "$( date +%F" "%T" "%Z ) - [$$] - Starting the Master Process" >> "$v_LOG"
    while [[ 1 == 1 ]]; do
       ### Check to see what the current IP address is (thanks to VPN, this can change, so we need to check every half hour.
       if [[ $(( $( date +%s ) - 1800 )) -gt $v_TIMESTAMP_REMOTE_CHECK ]]; then
          v_TIMESTAMP_REMOTE_CHECK="$( date +%s )"
-         v_LOCAL_IP="$( $v_CURL_BIN -Lsm 10 http://ip.liquidweb.com/ )"
+         if [[ "$v_WGET_BIN" == "false" ]]; then
+            v_LOCAL_IP="$( $v_CURL_BIN -Lsm 10 http://ip.liquidweb.com/ )"
+         else
+            v_LOCAL_IP="$( $v_WGET_BIN -q --timeout=10 -O /dev/null http://ip.liquidweb.com/ )"
+         fi
          if [[ -z $v_LOCAL_IP ]]; then
             v_LOCAL_IP="Not_Found"
          fi
@@ -971,7 +1005,11 @@ function fn_master {
       ### Check a remote list to see if lwmon should be stopped
       if [[ $(( $( date +%s ) - 300 )) -gt $v_TIMESTAMP_REMOTE_CHECK ]]; then
          v_TIMESTAMP_REMOTE_CHECK="$( date +%s )"
-         $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.txt > "$v_WORKINGDIR"die_list
+         if [[ "$v_WGET_BIN" == "false" ]]; then
+            $v_CURL_BIN -Lsm 10 http://lwmon.com/die_list.txt > "$v_WORKINGDIR"die_list
+         else
+            $v_WGET_BIN -q --timeout=10 -O "$v_WORKINGDIR"die_list http://lwmon.com/die_list.txt
+         fi
          if [[ $( egrep -c "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list ) -gt 0 ]]; then
             touch "$v_WORKINGDIR"die
             touch "$v_WORKINGDIR"save
@@ -1070,6 +1108,7 @@ function fn_create_mini_script {
    type fn_intermittent_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
    type fn_failure_email | tail -n +2 >> "$v_MINI_SCRIPT"
    type fn_start_script | tail -n +2 >> "$v_MINI_SCRIPT"
+   type fn_use_wget | tail -n +2 >> "$v_MINI_SCRIPT"
    type fn_parse_server | tail -n +2 >> "$v_MINI_SCRIPT"
 
    echo "v_RUNNING_STATE=\"child\"" >> "$v_MINI_SCRIPT"
@@ -1137,7 +1176,7 @@ function fn_master_exit {
 function fn_list {
    ### This is the menu front-end for modifying child processes.
    if [[ $v_RUNNING_STATE == "master" ]]; then
-      echo "For more information on how to start a lwmon.sh monitoring job, run lwmon.sh with the \"--help-flags\" flag."
+      echo "For more information on how to start a lwmon.sh monitoring job, run this script with the \"--help-flags\" flag."
       exit
    fi
    echo "List of currently running lwmon processes:"
@@ -1477,6 +1516,9 @@ CHECK_TIME_PARTIAL_SUCCESS = 7
 # If the "LOG_DURATION_DATA" directive is set to "true", then the amount of time it takes for each check to complete will be output to the log file in the child directory.
 LOG_DURATION_DATA = true
 
+# Setting the "USE_WGET" directive to "true" forces the script to use wget rather than curl to pull files.
+USE_WGET = false
+
 # The "SSH_CONTROL_PATH" directive allows the user to specify where the control path socket file for an ssh-load job is located.
 SSH_CONTROL_PATH = ~/.ssh/control:%h:%p:%r
 
@@ -1598,7 +1640,7 @@ FLAGS FOR MONITORING JOB TYPES:
 
      This flag is used to start a new monitoring job to confirm that a URL is loading as expected. It requires one or more uses of the "--string" flag, and can also be used in conjunction with the following flags:
 
-     --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --control
+     --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --control
 
 
 FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
@@ -1677,6 +1719,9 @@ FLAGS FOR ADDITIONAL SPECIFICATINOS FOR MONITORING JOBS
 --verbose
 
      Allows the user to specify the verbosity level of the output of a child processes. "standard": Outputs whether any specific check has succeeded or failed. "verbose": In addition to the information given from the standard output, also indicates how long checks for that job have been running, how many have been run, and the percentage of successful checks. "more verbose": Outputs multiple lines with the data from verbose, as well as data on how lnog the checks are taking. "change": Only outputs text on the first failure after any number of successes, or the first success after any number of failures. "none": output no text.
+
+--wget
+     Forces the script to use wget rather than CURL.
 
 OTHER FLAGS:
 
@@ -1827,6 +1872,9 @@ After changes are made to the params file, these changes will not be recognized 
 "SSH_USER"
      For a ssh-load job, this is the user that LWmon will be accessing the server as.
 
+"USE_WGET"
+     Forces the script to use wget rather than curl.
+
 "USER_AGENT"
      For URL jobs, this is a true or false value that dictates whether or not the curl for the site will be run with curl as the user agent (false) or with a user agent that makes it look as if it's Google Chrome (true).
 
@@ -1850,11 +1898,14 @@ Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
 
+2.0.2 (2015-12-19) -
+     The script now has the ability to use wget instead of curl. Added the "--wget" flag to force this.
+
 2.0.1 (2015-12-18) -
      Re-added a menu item for changing the job name, as it's not as intuative as I would like just from editing the conf.
      Added the "--ident" flag, so that you can pre-include a ticket number or account number as part of a job's name.
      When determining a domain's IP address, the script first checks /etc/hosts before determining if it needs to do a dig.
-     ssh-load jobs can now be run against localhost. a user is not required.
+     Ssh-load jobs can now be run against localhost. A user is not required.
 
 2.0.0 (2015-12-17) -
      Moved to version 2.0 - Pretty much all of the original script has been rewritten at this point, and Nothing from earlier versions is compatible.
@@ -1934,11 +1985,23 @@ function fn_start_script {
    ### /usr/bin/curl is the standard installation of curl
    ### /opt/curlssl/bin/curl is where cPanel keeps the version of curl that PHP works with, which is usually the most up to date
    v_CURL_BIN=$( echo -e "$( /opt/curlssl/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /opt/curlssl/bin/curl\n$( /usr/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /usr/bin/curl\n$( $( which curl ) --version 2> /dev/null | head -n1 | awk '{print $2}' ) $( which curl )" | sort -n | grep "^[0-9]*\.[0-9]*.[0-9]*" | tail -n1 | awk '{print $2}' )
-   if [[ -z $v_CURL_BIN ]]; then
-      echo "curl needs to be installed for lwmon to perform some of its functions. Exiting."
+   fn_read_conf USE_WGET master; v_USE_WGET="$v_RESULT"
+   if [[ -z "$v_CURL_BIN" || $v_USE_WGET == "true" ]]; then
+      fn_use_wget
+   else
+      v_CURL_BIN_VERSION="$( $v_CURL_BIN --version 2> /dev/null | head -n1 | awk '{print $2}')"
+      v_WGET_BIN="false"
+   fi
+}
+
+function fn_use_wget {
+   v_WGET_BIN="$( which wget 2> /dev/null )"
+   if [[ -z "$v_WGET_BIN" ]]; then
+      echo "curl or wget needs to be installed for lwmon to perform some of its functions. Exiting."
       exit
    fi
-   v_CURL_BIN_VERSION="$( $v_CURL_BIN --version 2> /dev/null | head -n1 | awk '{print $2}')"
+   v_WGET_BIN_VERSION="$( wget --version | head -n1 | awk '{print $3}' )"
+   v_CURL_BIN="false"
 }
 
 #####################
@@ -2019,6 +2082,9 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
       v_SAVE_JOBS=true
    elif [[ $v_ARGUMENT == "--user-agent" ]]; then
       v_USER_AGENT=true
+   elif [[ $v_ARGUMENT == "--wget" ]]; then
+      v_USE_WGET=true
+      fn_use_wget
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(e)*mail($|=)" ) -eq 1 ]]; then
       fn_parse_cl_argument "--mail" "string" "--email"; v_EMAIL_ADDRESS="$v_RESULT"
       if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | grep -c "^[^@][^@]*@[^.]*\..*$" ) -lt 1 ]]; then
