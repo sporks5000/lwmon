@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.3.2"
+v_VERSION="2.3.3"
 
 ##################################
 ### Functions that create jobs ###
@@ -191,8 +191,8 @@ function fn_load_cl {
    if [[ -z "$v_DOMAIN" ]]; then
       echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
       exit
-   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_CHECK_TIMEOUT$v_IP_ADDRESS$v_CHECK_TIME_PARTIAL_SUCCESS" | wc -c ) -gt 0 ]]; then
-      echo "The only flags that can be used with url jobs are the following:"
+   elif [[ $( echo -n "$v_DNS_CHECK_DOMAIN$v_DNS_CHECK_RESULT$v_DNS_RECORD_TYPE$v_CURL_URL${a_CURL_STRING[0]}$v_USER_AGENT$v_IP_ADDRESS" | wc -c ) -gt 0 ]]; then
+      echo "The only flags that can be used with ssh-load jobs are the following:"
       echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
       exit
    fi
@@ -1710,7 +1710,7 @@ function fn_test_file {
 }
 
 function fn_parse_cl_argument {
-   ### For this function, $1 is the flag that was passed (wthout trailing equal sign), $2 is "num" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error.
+   ### For this function, $1 is the flag that was passed (without trailing equal sign), $2 is "num" or "int" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, "date" if it's a date, "file" if it's a file, "directory" if it's a directory, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. IF $2 is bool, then $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error. If $2 is "file" or "directory", then $4 can be "create" if the file should be created, and "error" if the file needs to have existed previously.
    unset v_RESULT
    if [[ "$2" == "none" ]]; then
       v_RESULT="true"
@@ -1721,14 +1721,14 @@ function fn_parse_cl_argument {
          v_RESULT="${a_CL_ARGUMENTS[$c]}"
       elif [[ "$2" != "bool" ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
-         exit
+         exit 1
       fi
    elif [[ $( echo "$v_ARGUMENT" | egrep -c "^$1=" ) -eq 1 && "$2" != "none" ]]; then
    ### If the argument has an equal sign, then the modifier for the flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
       if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
          echo "The flag \"$1\" needs to be followed by an argument. Exiting."
-         exit
+         exit 1
       fi
    elif [[ -n "$3" && $( echo "$v_ARGUMENT" | egrep -c "^$3$" ) -eq 1 && "$2" != "none" ]]; then
    ### If there is no equal sign, the next argument is the modifier for the alternate flag
@@ -1737,27 +1737,60 @@ function fn_parse_cl_argument {
          v_RESULT="${a_CL_ARGUMENTS[$c]}"
       elif [[ "$2" != "bool" ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
-         exit
+         exit 1
       fi
    elif [[ -n "$3" && $( echo "$v_ARGUMENT" | egrep -c "^$3=" ) -eq 1 && "$2" != "none" ]]; then
    ### If the argument has an equal sign, then the modifier for the alternate flag is within this argument
       v_RESULT="$( echo "$v_ARGUMENT" | cut -d "=" -f2- )"
       if [[ -z "$v_RESULT" && "$2" != "bool" ]]; then
          echo "The flag \"$3\" needs to be followed by an argument. Exiting."
-         exit
+         exit 1
       fi
    fi
-   if [[ $2 == "num" && $( echo "$v_RESULT" | egrep -c "^[0-9]+$" ) -eq 0 ]]; then
+   if [[ ( $2 == "num" || $2 == "int" ) && $( echo "$v_RESULT" | egrep -c "^[0-9]+$" ) -eq 0 ]]; then
       echo "The flag \"$1\" needs to be followed by an integer. Exiting."
-      exit
+      exit 1
+   elif [[ $2 == "date" ]]; then
+      date --date="$v_RESULT" > /dev/null 2>&1
+      if [[ $? -ne 0 ]]; then
+         echo "The flag \"$1\" needs to be followed by a date. Exiting."
+         exit 1
+      fi
    elif [[ $2 == "float" && $( echo "$v_RESULT" | egrep -c "^[0-9.]+$" ) -eq 0 ]]; then
       echo "The flag \"$1\" needs to be followed by a number. Exiting."
-      exit
+      exit 1
+   elif [[ $2 == "file" ]]; then
+      if [[ $4 == "error" && ! -f "$v_RESULT" ]]; then
+         echo "File \"$v_RESULT\" does not appear to exist. Exiting."
+         exit 1
+      elif [[ $4 == "create" ]]; then
+         touch "$v_RESULT"
+         v_EXIT_CODE=$?
+         if [[ $v_EXIT_CODE -ne 0 ]]; then
+            echo "Error creating file \"$v_RESULT\". Exiting."
+            exit 1
+         fi
+      fi
+   elif [[ $2 == "directory" ]]; then
+      if [[ $4 == "error" && ! -d "$v_RESULT" ]]; then
+         echo "Directory \"$v_RESULT\" does not appear to exist. Exiting."
+         exit 1
+      elif [[ $4 == "create" ]]; then
+         mkdir -p "$v_RESULT"
+         v_EXIT_CODE=$?
+         if [[ $v_EXIT_CODE -ne 0 ]]; then
+            echo "Error creating directory \"$v_RESULT\". Exiting."
+            exit 1
+         fi
+      fi
+      if [[ $( echo "$v_RESULT" | grep -c "/$" ) -eq 0 ]]; then
+         v_RESULT="$v_RESULT/"
+      fi
    elif [[ $2 == "bool" ]]; then
       if [[ $( echo "$v_RESULT" | tr '[:upper:]' '[:lower:]' | egrep -c "^(t(rue)*|f(alse)*)$" ) -eq 0  ]]; then
          if [[ -z "$4" || "$4" == "exit" ]]; then
             echo "The flag \"$1\" needs to be followed by \"true\" or \"false\". Exiting."
-            exit
+            exit 1
          elif [[ "$4" == "false" ]]; then
             v_RESULT="false"
          else
@@ -2262,6 +2295,9 @@ Version Notes:
 Future Versions -
      In URL jobs, should I compare the current pull to the previous pull? Compare file size?
      Rather than have a job run indefinitely, have the user set a duration or a time for it to stop.
+
+3.3.3. (2016-03-18) -
+     Fixed a mistake where ssh-load jobs couldn't use the check-timeout or ctps flags.
 
 2.3.2 (2016-02-19) -
      The amount of time the checks have been running is now reported in hh:mm:ss rather than seconds.
