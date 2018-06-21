@@ -1,12 +1,12 @@
 #! /bin/bash
 
-VERSION="1.1.5"
+VERSION="1.2.0"
 
 #######################
 ### BEGIN FUNCTIONS ###
 #######################
 
-#### Variable Gathering Functions ####
+#### Functions that gather variables ####
 
 function fn_url_vars {
    ### When a URL monitoring task is selected from the menu, it will run through this function in order to acquire the necessary variables.
@@ -32,14 +32,27 @@ function fn_url_vars {
    if [[ ! -z $SERVER ]]; then
       fn_parse_server
       IP_ADDRESS=$IP_ADDRESSa
-      curl --resolve google.com:80:127.0.0.1 http://google.com > /dev/null 2>&1
-      STATUS=$?
+      $v_CURL_BIN --resolve google.com:80:127.0.0.1 http://google.com > /dev/null 2>&1
+      v_STATUS=$?
    fi
-   if [[ $STATUS == 2 || -z $SERVER || $IP_ADDRESS == false ]]; then
+   if [[ $v_STATUS == 2 || -z $SERVER || $IP_ADDRESS == false ]]; then
       IP_ADDRESS=false
       SERVER_STRING=$URL
    else
       SERVER_STRING="$URL at $IP_ADDRESS"
+   fi
+   echo "Should the script use Google Chrome's useragent when trying to access the site?"
+   read -p "(Anything other than \"y\" or \"yes\" will be interpreted as \"no\".): " v_USER_AGENT
+   if [[ $v_USER_AGENT == "y" || $v_USER_AGENT == "yes" ]]; then
+      v_USER_AGENT=true
+   else
+      v_USER_AGENT=false
+   fi
+
+   echo "How many seconds should the script wait for a response from the server (default"
+   read -p "10 seconds).: " v_CURL_TIMEOUT
+   if [[ -z $v_CURL_TIMEOUT || $( echo $v_CURL_TIMEOUT | grep -c "[^0-9]" ) -eq 1 ]]; then
+      v_CURL_TIMEOUT="10"
    fi
 
    fn_email_address
@@ -162,7 +175,7 @@ function fn_parse_server {
    fi
 }
 
-#### Variable Command Line Functions ####
+#### Functions that gather variables from command line flags ####
 
 function fn_url_cl {
    ### When a URL monitoring job is run from the command line, this parses out the commandline variables...
@@ -176,9 +189,9 @@ function fn_url_cl {
       SERVER=$IP_ADDRESS
       fn_parse_server
       IP_ADDRESS=$IP_ADDRESSa
-      curl --resolve google.com:80:127.0.0.1 http://google.com > /dev/null 2>&1
-      STATUS=$?
-      if [[ $STATUS == 2 ]]; then
+      $v_CURL_BIN --resolve google.com:80:127.0.0.1 http://google.com > /dev/null 2>&1
+      v_STATUS=$?
+      if [[ $v_STATUS == 2 ]]; then
          echo "In order to specify an IP address, this script requires that you have curl version 7.21.3 or later. Exiting."
          exit
       elif [[ $IP_ADDRESS == false ]]; then
@@ -318,7 +331,7 @@ function fn_ping_confirm {
    ### When run from the menu, this confirms the settings for a Ping job.
    echo "I will begin monitoring the following:"
    echo "---Domain / IP to ping: $SERVER_STRING"
-   NEW_JOB="$( date +%s )""_$RANDOM"
+   NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "--ping" > "$WORKINGDIR""$NEW_JOB"
    fn_mutual_confirm
    mv -f "$WORKINGDIR""$NEW_JOB" "$WORKINGDIR""new/$NEW_JOB"
@@ -330,7 +343,7 @@ function fn_dns_confirm {
    echo "---Domain / IP to query: $SERVER_STRING"
    SERVER_STRING="$DOMAIN @$SERVER_STRING"
    echo "---Domain to query for: $DOMAIN"
-   NEW_JOB="$( date +%s )""_$RANDOM"
+   NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "--dns" > "$WORKINGDIR""$NEW_JOB"
    fn_mutual_confirm
    mv -f "$WORKINGDIR""$NEW_JOB" "$WORKINGDIR""new/$NEW_JOB"
@@ -345,14 +358,15 @@ function fn_url_confirm {
    fi
    echo "---Port number: $IP_PORT"
    echo "---String that must be present to result in a success: \"$CHECK_STRING\""
-   NEW_JOB="$( date +%s )""_$RANDOM"
+   NEW_JOB="$( date +%s )""_$RANDOM.job"
    echo "--url" > "$WORKINGDIR""$NEW_JOB"
    fn_mutual_confirm
    ### There are additional variables for URL based jobs. Those are input into the params file here.
-   echo "$URL" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$IP_PORT" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$CHECK_STRING" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$v_USER_AGENT" >> "$WORKINGDIR""$NEW_JOB"
+   echo "URL:$URL" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Port:$IP_PORT" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Check String:$CHECK_STRING" >> "$WORKINGDIR""$NEW_JOB"
+   echo "User Agent:$v_USER_AGENT" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Curl Timeout:$v_CURL_TIMEOUT" >> "$WORKINGDIR""$NEW_JOB"
    mv -f "$WORKINGDIR""$NEW_JOB" "$WORKINGDIR""new/$NEW_JOB"
 }
 
@@ -373,18 +387,18 @@ function fn_mutual_confirm {
       exit
    fi
    ### ...and then inputs those variables into the params file so that the child process can read them.
-   echo "$WAIT_SECONDS" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$EMAIL_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$MAIL_DELAY" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$DOMAIN" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$IP_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Wait Seconds:$WAIT_SECONDS" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Email Address:$EMAIL_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Mail Delay:$MAIL_DELAY" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Domain:$DOMAIN" >> "$WORKINGDIR""$NEW_JOB"
+   echo "IP Address:$IP_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Server String:$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Server Shring 2:$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
 }
 
 function fn_cl_confirm {
    ### This takes the variables from a job started from the command line, and then places them in the params file in order for a child process to read them.
-   NEW_JOB="$( date +%s )""_$RANDOM"
+   NEW_JOB="$( date +%s )""_$RANDOM.job"
    if [[ $RUN_TYPE == "--url" || $RUN_TYPE == "-u" ]]; then
       echo "--url" > "$WORKINGDIR""$NEW_JOB"
    elif [[ $RUN_TYPE == "--ping" || $RUN_TYPE == "-p" ]]; then
@@ -392,18 +406,19 @@ function fn_cl_confirm {
    elif [[ $RUN_TYPE == "--dns" || $RUN_TYPE == "-d" ]]; then
       echo "--dns" > "$WORKINGDIR""$NEW_JOB"
    fi
-   echo "$WAIT_SECONDS" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$EMAIL_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$MAIL_DELAY" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$DOMAIN" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$IP_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
-   echo "$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Wait Seconds:$WAIT_SECONDS" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Email Address:$EMAIL_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Mail Delay:$MAIL_DELAY" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Domain:$DOMAIN" >> "$WORKINGDIR""$NEW_JOB"
+   echo "IP Address:$IP_ADDRESS" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Server String:$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
+   echo "Server Shring (Original):$SERVER_STRING" >> "$WORKINGDIR""$NEW_JOB"
    if [[ $RUN_TYPE == "--url" || $RUN_TYPE == "-u" ]]; then
-      echo "$URL" >> "$WORKINGDIR""$NEW_JOB"
-      echo "$IP_PORT" >> "$WORKINGDIR""$NEW_JOB"
-      echo "$CHECK_STRING" >> "$WORKINGDIR""$NEW_JOB"
-      echo "$v_USER_AGENT" >> "$WORKINGDIR""$NEW_JOB"
+      echo "URL:$URL" >> "$WORKINGDIR""$NEW_JOB"
+      echo "Port:$IP_PORT" >> "$WORKINGDIR""$NEW_JOB"
+      echo "Check String:$CHECK_STRING" >> "$WORKINGDIR""$NEW_JOB"
+      echo "User Agent:$v_USER_AGENT" >> "$WORKINGDIR""$NEW_JOB"
+      echo "Curl Timeout:$v_CURL_TIMEOUT" >> "$WORKINGDIR""$NEW_JOB"
    fi
    mv -f "$WORKINGDIR""$NEW_JOB" "$WORKINGDIR""new/$NEW_JOB"
 }
@@ -443,18 +458,19 @@ function fn_child {
 function fn_child_vars {
    ### Pull the necessary variables for the child process from the params file.
    ### This function is run at the beginning of a child process, and each time a file named "reload" is found in it's directory.
-   WAIT_SECONDS=$( sed -n "2 p" "$WORKINGDIR""$MY_PID""/params" )
-   EMAIL_ADDRESS=$( sed -n "3 p" "$WORKINGDIR""$MY_PID""/params" )
-   MAIL_DELAY=$( sed -n "4 p" "$WORKINGDIR""$MY_PID""/params" )
-   DOMAIN=$( sed -n "5 p" "$WORKINGDIR""$MY_PID""/params" )
-   IP_ADDRESS=$( sed -n "6 p" "$WORKINGDIR""$MY_PID""/params" )
-   SERVER_STRING=$( sed -n "7 p" "$WORKINGDIR""$MY_PID""/params" )
-   ORIG_SERVER_STRING=$( sed -n "8 p" "$WORKINGDIR""$MY_PID""/params" )
+   WAIT_SECONDS=$( sed -n "2 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+   EMAIL_ADDRESS=$( sed -n "3 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+   MAIL_DELAY=$( sed -n "4 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+   DOMAIN=$( sed -n "5 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+   IP_ADDRESS=$( sed -n "6 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+   SERVER_STRING=$( sed -n "7 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+   ORIG_SERVER_STRING=$( sed -n "8 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
    if [[ $OPERATION == "--url" ]]; then
-      URL=$( sed -n "9 p" "$WORKINGDIR""$MY_PID""/params" )
-      IP_PORT=$( sed -n "10 p" "$WORKINGDIR""$MY_PID""/params" )
-      CHECK_STRING=$( sed -n "11 p" "$WORKINGDIR""$MY_PID""/params" )
-      v_USER_AGENT=$( sed -n "12 p" "$WORKINGDIR""$MY_PID""/params" )
+      URL=$( sed -n "9 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+      IP_PORT=$( sed -n "10 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+      CHECK_STRING=$( sed -n "11 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+      v_USER_AGENT=$( sed -n "12 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
+      v_CURL_TIMEOUT=$( sed -n "13 p" "$WORKINGDIR""$MY_PID""/params" | cut -d ":" -f2- )
    fi
 }
 
@@ -462,31 +478,43 @@ function fn_url_child {
    ###The basic loop for a URL monitoring process.
    URL_OR_PING="URL"
    while [[ 1 == 1 ]]; do
-      DATE=$( date +%m"/"%d" "%H":"%M":"%S )
+      v_DATE3_LAST="$v_DATE3"
+      v_DATE="$( date +%m"/"%d" "%H":"%M":"%S )"
+      v_DATE2="$( date )"
+      v_DATE3="$( date +%s )"
+      if [[ -f "$WORKINGDIR""$MY_PID"/site_current.html ]]; then
+         ### The only instalce where this isn't the case should be on the first run of the loop.
+         mv -f "$WORKINGDIR""$MY_PID"/site_current.html "$WORKINGDIR""$MY_PID"/site_previous.html
+      fi
       if [[ $IP_ADDRESS == false ]]; then
          ### If an IP address was specified, and the correct version of curl is present
          if [[ $v_USER_AGENT == true ]]; then
-            SITE=$( curl -k -L -m 10 $URL --header 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36' 2> /dev/null | egrep -c "$CHECK_STRING" )
+            $v_CURL_BIN -kLm $v_CURL_TIMEOUT $URL --header 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36' 2> /dev/null > "$WORKINGDIR""$MY_PID"/site_current.html
+            v_STATUS=$?
          else
-            SITE=$( curl -k -L -m 10 $URL 2> /dev/null | egrep -c "$CHECK_STRING" )
-         fi
-         if [[ "$SITE" -ne 0 ]]; then
-            fn_hit
-         else
-            fn_miss
+            $v_CURL_BIN -kLm $v_CURL_TIMEOUT $URL 2>/dev/null > "$WORKINGDIR""$MY_PID"/site_current.html
+            v_STATUS=$?
          fi
       elif [[ $IP_ADDRESS != false ]]; then
          ### If no IP address was specified
          if [[ $v_USER_AGENT == true ]]; then
-            SITE=$( curl -k -L -m 10 --resolve $DOMAIN:$IP_PORT:$IP_ADDRESS $URL --header 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36' 2> /dev/null | egrep -c "$CHECK_STRING" )
+            $v_CURL_BIN -kLm $v_CURL_TIMEOUT --resolve $DOMAIN:$IP_PORT:$IP_ADDRESS $URL --header 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36' 2> /dev/null > "$WORKINGDIR""$MY_PID"/site_current.html
+            v_STATUS=$?
          else
-            SITE=$( curl -k -L -m 10 --resolve $DOMAIN:$IP_PORT:$IP_ADDRESS $URL 2> /dev/null | egrep -c "$CHECK_STRING" )
+            $v_CURL_BIN -kLm $v_CURL_TIMEOUT --resolve $DOMAIN:$IP_PORT:$IP_ADDRESS $URL 2> /dev/null  > "$WORKINGDIR""$MY_PID"/site_current.html
+            v_STATUS=$?
          fi
-         if [[ "$SITE" -ne 0 ]]; then
-            fn_hit
-         else
-            fn_miss
-         fi
+      fi
+      ### If the exit status of curl is 28, this means that the page timed out.
+      if [[ $v_STATUS == 28 ]]; then
+         echo "Curl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$WORKINGDIR""$MY_PID"/site_current.html
+      elif [[ $v_STATUS != 0 ]]; then
+         echo "Curl return code: $v_STATUS" >> "$WORKINGDIR""$MY_PID"/site_current.html
+      fi
+      if [[ $( egrep -c "$CHECK_STRING" "$WORKINGDIR""$MY_PID"/site_current.html ) -ne 0 ]]; then
+         fn_hit
+      else
+         fn_miss
       fi
       fn_child_checks
    done
@@ -496,7 +524,9 @@ function fn_ping_child {
    ### The basic loop for a ping monitoring process
    URL_OR_PING="Ping of"
    while [[ 1 == 1 ]]; do
-      DATE=$( date +%m"/"%d" "%H":"%M":"%S )
+      v_DATE="$( date +%m"/"%d" "%H":"%M":"%S )"
+      v_DATE2="$( date )"
+      v_DATE3="$( date +%s )"
       PING_RESULT=$( ping -W2 -c1 $DOMAIN 2> /dev/null | grep "icmp_[rs]eq" )
       WATCH=$( echo $PING_RESULT | grep -c "icmp_[rs]eq" )
       if [[ $WATCH -ne 0 ]]; then
@@ -512,7 +542,9 @@ function fn_dns_child {
    ### The basic loop for a DNS monitoring process
    URL_OR_PING="DNS for"
    while [[ 1 == 1 ]]; do
-      DATE=$( date +%m"/"%d" "%H":"%M":"%S )
+      v_DATE="$( date +%m"/"%d" "%H":"%M":"%S )"
+      v_DATE2="$( date )"
+      v_DATE3="$( date +%s )"
       QUERY_RESULT=$( dig +tries=1 $DOMAIN @$IP_ADDRESS 2> /dev/null | grep -c "ANSWER SECTION" )
       if [[ $QUERY_RESULT -ne 0 ]]; then
          fn_hit
@@ -526,10 +558,15 @@ function fn_dns_child {
 function fn_child_checks {
    ### Is there a file in place telling the child process to reload its params file, or to die?
    if [[ -f "$WORKINGDIR""$MY_PID"/reload ]]; then
-      rm -f "$WORKINGDIR""$MY_PID"/reload
+      mv -f "$WORKINGDIR""$MY_PID"/reload "$WORKINGDIR""$MY_PID"/#reload
       fn_child_vars
-      echo "$( date ) - [$MY_PID] - Reloaded parameters for $URL_OR_PING $ORIG_SERVER_STRING." >> $LOG
+      echo "$v_DATE2 - [$MY_PID] - Reloaded parameters for $URL_OR_PING $ORIG_SERVER_STRING." >> $v_LOG
+      echo "$v_DATE2 - [$MY_PID] - Reloaded parameters for $URL_OR_PING $ORIG_SERVER_STRING." >> "$WORKINGDIR""$MY_PID"/log
       echo "***Reloaded parameters for $URL_OR_PING $SERVER_STRING.***"
+   fi
+   ### If there are more than 100 copies of the broken site, we only need to keep the last 100.
+   if [[ $( ls -1 "$WORKINGDIR""$MY_PID"/ | grep -c "^site_" ) -gt 100 ]]; then
+      rm -f "$WORKINGDIR""$MY_PID"/site_"$( ls -1t "$WORKINGDIR""$MY_PID"/ | grep "^site_" | tail -n1 | sed "s/site_//" )"
    fi
    if [[ -f "$WORKINGDIR""$MY_PID"/die ]]; then
       fn_child_exit
@@ -539,13 +576,13 @@ function fn_child_checks {
 
 function fn_child_exit {
    ### When a child process exits, it needs to clean up after itself and log the fact that it has exited.
-   echo "$( date ) - [$MY_PID] - Stopped watching $URL_OR_PING $ORIG_SERVER_STRING: Running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate." >> $LOG
-   echo "$( date ) - [$MY_PID] - Stopped watching $URL_OR_PING $ORIG_SERVER_STRING: Running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate." >> "$WORKINGDIR""$MY_PID"/log
+   echo "$v_DATE2 - [$MY_PID] - Stopped watching $URL_OR_PING $ORIG_SERVER_STRING: Running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate." >> $v_LOG
+   echo "$v_DATE2 - [$MY_PID] - Stopped watching $URL_OR_PING $ORIG_SERVER_STRING: Running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate." >> "$WORKINGDIR""$MY_PID"/log
    ### Instead of deleting the directory, back it up temporarily.
    ### rm -rf "$WORKINGDIR""$MY_PID"
    if [[ -f "$WORKINGDIR""$MY_PID"/die ]]; then
-      TIMESTAMP="$( date +%s )"
-      mv "$WORKINGDIR""$MY_PID" "$WORKINGDIR""old_""$MY_PID""_""$TIMESTAMP"
+      mv -f "$WORKINGDIR""$MY_PID"/die "$WORKINGDIR""$MY_PID"/#die
+      mv "$WORKINGDIR""$MY_PID" "$WORKINGDIR""old_""$MY_PID""_""$v_DATE3"
    fi
    exit
 }
@@ -555,7 +592,7 @@ function fn_child_exit {
 function fn_hit {
    ### This is run every time a monitoring process has a successful check
    ### gather variables for use in reporting, both to the log file and to e-mail.
-   RUN_TIME=$(( $( date +%s ) - $START_TIME ))
+   RUN_TIME=$(( $v_DATE3 - $START_TIME ))
    TOTAL_CHECKS=$(( $TOTAL_CHECKS + 1 ))
    TOTAL_HITS=$(( $TOTAL_HITS + 1 ))
    PERCENT_HITS=$( echo "scale=2; $TOTAL_HITS * 100 / $TOTAL_CHECKS" | bc )
@@ -567,14 +604,14 @@ function fn_hit {
    else
       LAST_MISS_STRING="$(( $LAST_HIT - $LAST_MISS )) seconds ago"
    fi
-   LAST_HIT=$( date +%s )
+   LAST_HIT=$v_DATE3
    NUM_HITS_EMAIL=$(( $NUM_HITS_EMAIL + 1 ))
    ### Determine how verbose Xmonitor is set to be and prepare the message accordingly.
    VERBOSITY=$( cat "$WORKINGDIR"verbosity 2> /dev/null )
    if [[ $VERBOSITY == "verbose" ]]; then
-      REPORT="$DATE - [$MY_PID] - $URL_OR_PING $SERVER_STRING: Succeeded! - Checking for $RUN_TIME seconds. Last failed check: $LAST_MISS_STRING. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate."
+      REPORT="$v_DATE - [$MY_PID] - $URL_OR_PING $SERVER_STRING: Succeeded! - Checking for $RUN_TIME seconds. Last failed check: $LAST_MISS_STRING. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate."
    else
-      REPORT="$DATE - $URL_OR_PING $SERVER_STRING: Succeeded!"
+      REPORT="$v_DATE - $URL_OR_PING $SERVER_STRING: Succeeded!"
    fi
    ### Check to see if the parent is still in palce
    if [[ $( ps aux | grep "$MASTER_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
@@ -594,16 +631,16 @@ function fn_hit {
       if [[ $VERBOSITY != "none" && $VERBOSITY != "none2" ]]; then
          echo -e "\e[1;32m""$REPORT""\e[00m"
       fi
-      echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded!" >> $LOG
-      echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded!" >> "$WORKINGDIR""$MY_PID"/log
+      echo "$v_DATE2 - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded!" >> $v_LOG
+      echo "$v_DATE2 - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded!" >> "$WORKINGDIR""$MY_PID"/log
       HIT_CHECKS=1
    ### If the last check failed
    else
       if [[ $VERBOSITY != "none" && $VERBOSITY != "none2" ]]; then
          echo -e "\e[1;32m""$REPORT""\e[00m"
       fi
-      echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded after $MISS_CHECKS failed checks!" >> $LOG
-      echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded after $MISS_CHECKS failed checks!" >> "$WORKINGDIR""$MY_PID"/log
+      echo "$v_DATE2 - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded after $MISS_CHECKS failed checks!" >> $v_LOG
+      echo "$v_DATE2 - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check succeeded after $MISS_CHECKS failed checks!" >> "$WORKINGDIR""$MY_PID"/log
       HIT_CHECKS=1
       fn_hit_email
    fi
@@ -613,7 +650,7 @@ function fn_hit {
 function fn_miss {
    ### This is run every time a monitoring process has a failed check
    ### gather variables for use in reporting, both to the log file and to e-mail.
-   RUN_TIME=$(( $( date +%s ) - $START_TIME ))
+   RUN_TIME=$(( $v_DATE3 - $START_TIME ))
    TOTAL_CHECKS=$(( $TOTAL_CHECKS + 1 ))
    PERCENT_HITS=$( echo "scale=2; $TOTAL_HITS * 100 / $TOTAL_CHECKS" | bc )
    if [[ $LAST_HIT == "never" ]]; then
@@ -624,14 +661,14 @@ function fn_miss {
    else
       LAST_HIT_STRING="$(( $LAST_MISS - $LAST_HIT )) seconds ago"
    fi
-   LAST_MISS=$( date +%s )
+   LAST_MISS=$v_DATE3
    NUM_MISSES_EMAIL=$(( $NUM_MISSES_EMAIL + 1 ))
    ### determine what the verbosity is set to and prepare the message accordingly.
    VERBOSITY=$( cat "$WORKINGDIR"verbosity 2> /dev/null )
    if [[ $VERBOSITY == "verbose" ]]; then
-      REPORT="$DATE - [$MY_PID] - $URL_OR_PING $SERVER_STRING: Failed! - Checking for $RUN_TIME seconds. Last successful check: $LAST_HIT_STRING. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate."
+      REPORT="$v_DATE - [$MY_PID] - $URL_OR_PING $SERVER_STRING: Failed! - Checking for $RUN_TIME seconds. Last successful check: $LAST_HIT_STRING. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate."
    else
-      REPORT="$DATE - $URL_OR_PING $SERVER_STRING: Failed!"
+      REPORT="$v_DATE - $URL_OR_PING $SERVER_STRING: Failed!"
    fi
    if [[ $( ps aux | grep "$MASTER_PID.*xmonitor.sh" | grep -vc " 0:00 grep " ) -eq 0 ]]; then
       fn_child_exit
@@ -650,16 +687,21 @@ function fn_miss {
       if [[ $VERBOSITY != "none" && $VERBOSITY != "none2" ]]; then
          echo -e "\e[1;31m""$REPORT""\e[00m"
       fi
-      echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check failed!" >> $LOG
-      echo "$( date ) - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check failed!" >> "$WORKINGDIR""$MY_PID"/log
+      echo "$v_DATE2 - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check failed!" >> $v_LOG
+      echo "$v_DATE2 - [$MY_PID] - Initial status for $URL_OR_PING $ORIG_SERVER_STRING: Check failed!" >> "$WORKINGDIR""$MY_PID"/log
       MISS_CHECKS=1
    else
       ### If the last check was a hit.
       if [[ $VERBOSITY != "none" && $VERBOSITY != "none2" ]]; then
          echo -e "\e[1;31m""$REPORT""\e[00m"
       fi
-      echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check failed after $HIT_CHECKS successful checks!" >> $LOG
-      echo "$( date ) - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check failed after $HIT_CHECKS successful checks!" >> "$WORKINGDIR""$MY_PID"/log
+      ### The first failure after a hit should be the only instance where we need to save a copy of the site (if we're in URL mode).
+      if [[ $URL_OR_PING == "URL" ]]; then
+         cp -a "$WORKINGDIR""$MY_PID"/site_current.html "$WORKINGDIR""$MY_PID"/site_fail_"$v_DATE3".html
+         cp -a "$WORKINGDIR""$MY_PID"/site_previous.html "$WORKINGDIR""$MY_PID"/site_success_"$v_DATE3_LAST".html
+      fi
+      echo "$v_DATE2 - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check failed after $HIT_CHECKS successful checks!" >> $v_LOG
+      echo "$v_DATE2 - [$MY_PID] - Status changed for $URL_OR_PING $ORIG_SERVER_STRING: Check failed after $HIT_CHECKS successful checks!" >> "$WORKINGDIR""$MY_PID"/log
       MISS_CHECKS=1
       fn_miss_email
    fi
@@ -669,7 +711,7 @@ function fn_miss {
 function fn_hit_email {
    ### Determines if a success e-mail needs to be sent and, if so, sends that e-mail.
    if [[ $HIT_CHECKS -eq $MAIL_DELAY && ! -z $EMAIL_ADDRESS && $MISS_MAIL == true ]]; then
-      echo -e "$( date ) - Xmonitor - $URL_OR_PING $SERVER_STRING - Status changed: Appears to be succeeding again.\n\nYou're recieving this message to inform you that $MAIL_DELAY consecutive check(s) against $URL_OR_PING $SERVER_STRING ($ORIG_SERVER_STRING) have succeeded, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $NUM_HITS_EMAIL successful checks, and $NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( tail -n $( echo $(( $( wc -l $LOG | cut -d " " -f1 ) - $( grep -n "\[$MY_PID\] - Initial" $LOG | tail -n1 | cut -d ":" -f1 ) + 5 )) ) $LOG | grep "\[$MY_PID\]" )" | mail -s "$URL_OR_PING $SERVER_STRING - Check PASSED!" $EMAIL_ADDRESS && echo "$( date ) - [$MY_PID] - $URL_OR_PING $ORIG_SERVER_STRING: Success e-mail sent" >> $LOG &
+      echo -e "$v_DATE2 - Xmonitor - $URL_OR_PING $SERVER_STRING - Status changed: Appears to be succeeding again.\n\nYou're recieving this message to inform you that $MAIL_DELAY consecutive check(s) against $URL_OR_PING $SERVER_STRING ($ORIG_SERVER_STRING) have succeeded, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $NUM_HITS_EMAIL successful checks, and $NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( cat "$WORKINGDIR""$MY_PID"/log )" | mail -s "$URL_OR_PING $SERVER_STRING - Check PASSED!" $EMAIL_ADDRESS && echo "$v_DATE2 - [$MY_PID] - $URL_OR_PING $ORIG_SERVER_STRING: Success e-mail sent" >> $v_LOG &
       ### set the variables that prepare for the next message to be sent.
       HIT_MAIL=true
       MISS_MAIL=false
@@ -681,7 +723,7 @@ function fn_hit_email {
 function fn_miss_email {
    ### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
    if [[ $MISS_CHECKS -eq $MAIL_DELAY && ! -z $EMAIL_ADDRESS && $HIT_MAIL == true ]]; then
-      echo -e "$( date ) - Xmonitor - $URL_OR_PING $SERVER_STRING - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $MAIL_DELAY consecutive check(s) against $URL_OR_PING $SERVER_STRING ($ORIG_SERVER_STRING) have failed, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $NUM_HITS_EMAIL successful checks, and $NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( tail -n $( echo $(( $( wc -l $LOG | cut -d " " -f1 ) - $( grep -n "\[$MY_PID\] - Initial" $LOG | tail -n1 | cut -d ":" -f1 ) + 5 )) ) $LOG | grep "\[$MY_PID\]" )" | mail -s "$URL_OR_PING $SERVER_STRING - Check FAILED!" $EMAIL_ADDRESS && echo "$( date ) - [$MY_PID] - $URL_OR_PING $ORIG_SERVER_STRING: Failure e-mail sent" >> $LOG &
+      echo -e "$v_DATE2 - Xmonitor - $URL_OR_PING $SERVER_STRING - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $MAIL_DELAY consecutive check(s) against $URL_OR_PING $SERVER_STRING ($ORIG_SERVER_STRING) have failed, thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $NUM_HITS_EMAIL successful checks, and $NUM_MISSES_EMAIL failed checks.\n\nChecks have been running for $RUN_TIME seconds. $TOTAL_CHECKS checks completed. $PERCENT_HITS% success rate.\n\nLogs related to this check;\n\n$( cat "$WORKINGDIR""$MY_PID"/log )" | mail -s "$URL_OR_PING $SERVER_STRING - Check FAILED!" $EMAIL_ADDRESS && echo "$v_DATE2 - [$MY_PID] - $URL_OR_PING $ORIG_SERVER_STRING: Failure e-mail sent" >> $v_LOG &
       ### set the variables that prepare for the next message to be sent.
       HIT_MAIL=false
       MISS_MAIL=true
@@ -701,27 +743,32 @@ function fn_master {
    ### try to prevent the master process from exiting unexpectedly.
    trap fn_master_exit SIGINT SIGTERM SIGKILL
    VERBOSITY=$( cat "$WORKINGDIR"verbosity )
+   ### Get rid of the save file (if there is one).
+   if [[ -f "$WORKINGDIR"save ]]; then
+      rm -f "$WORKINGDIR"save
+   fi
    while [[ 1 == 1 ]]; do
       ### Check if there are any new files within the new/ directory. Assume that they're params files for new jobs
       if [[ $( ls -1 "$WORKINGDIR""new/" | wc -l ) -gt 0 ]]; then
-         for i in $( ls -1 "$WORKINGDIR""new/" ); do
-            SERVER_STRING="$( sed -n "7 p" "$WORKINGDIR""new/$i" )"
+         for i in $( ls -1 "$WORKINGDIR""new/" | grep "\.job$" ); do
+            ### Find all files that are not marked as log files.
+            SERVER_STRING="$( sed -n "7 p" "$WORKINGDIR""new/$i" | cut -d ":" -f2- )"
             OPERATION=$( sed -n "1 p" "$WORKINGDIR""new/$i" )
             if [[ $OPERATION == "--url" ]]; then
                SERVER_STRING="URL $SERVER_STRING"
+               fn_spawn_child_process
             elif [[ $OPERATION == "--ping" ]]; then
                SERVER_STRING="PING $SERVER_STRING"
+               fn_spawn_child_process
             elif [[ $OPERATION == "--dns" ]]; then
                SERVER_STRING="DNS $SERVER_STRING"
+               fn_spawn_child_process
             fi
-            ### Note - the server string doesn't need to be present, but it makes ps more readable.
-            ### Launch the child process
-            "$PROGRAMDIR"xmonitor.sh $SERVER_STRING &
-            ### create the child's wirectory and move the params file there.
-            CHILD_PID=$!
-            mkdir -p "$WORKINGDIR""$CHILD_PID"
-            mv "$WORKINGDIR""new/$i" "$WORKINGDIR""$CHILD_PID""/params"
          done
+         ### If there's anything else left in this directory, it is neither a job, nor a log file. Let's get rid of it.
+         if [[ $( ls -1 "$WORKINGDIR""new/" | wc -l ) -gt 0 ]]; then
+            rm -f "$WORKINGDIR"new/*
+         fi
       fi
       ### go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
       for i in $( find $WORKINGDIR -type d ); do
@@ -738,9 +785,13 @@ function fn_master {
                else
                   ### Check to make sure it still exists and wasn't just killed off by the child process.
                   if [ -d "$WORKINGDIR""$CHILD_PID" ]; then
-                     echo "$( date ) - [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - Child process was found dead. Restarting with new PID." >> $LOG
-                     NEW_JOB="$( date +%s )""_$RANDOM"
+                     echo "$( date ) - [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | cut -d ":" -f2- ) - Child process was found dead. Restarting with new PID." >> $v_LOG
+                     NEW_JOB="$( date +%s )""_$RANDOM.job"
                      cp -a "$WORKINGDIR""$CHILD_PID"/params "$WORKINGDIR""new/$NEW_JOB"
+                     if [[ -f "$WORKINGDIR""$CHILD_PID"/log ]]; then
+                        ### If there's a log file, let's keep that too.
+                        cp -a "$WORKINGDIR""$CHILD_PID"/log "$WORKINGDIR""new/$NEW_JOB".log
+                     fi
                      TIMESTAMP="$( date +%s )"
                      mv "$WORKINGDIR""$CHILD_PID" "$WORKINGDIR""old_""$CHILD_PID""_""$TIMESTAMP"
                   fi
@@ -749,7 +800,7 @@ function fn_master {
          ### If it's backed up process data from more than seven days ago, delete it.
          elif [[ $( echo $CHILD_PID | grep -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
             if [[ $(( $( date +%s ) - $( echo $CHILD_PID | cut -d "_" -f3 ) )) -gt 604800 ]]; then
-               echo "$( date ) - [$( echo "$CHILD_PID" | cut -d "_" -f2)] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null ) - Child process dead for seven days. Deleting backed up data." >> $LOG
+               echo "$( date ) - [$( echo "$CHILD_PID" | cut -d "_" -f2)] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" 2> /dev/null | cut -d ":" -f2- ) - Child process dead for seven days. Deleting backed up data." >> $v_LOG
                rm -rf "$WORKINGDIR""$CHILD_PID"
             fi
          fi
@@ -767,6 +818,22 @@ function fn_master {
       fi
       sleep 2
    done
+}
+
+function fn_spawn_child_process {
+   ### This function launches the child process and makes sure that it has it's own working directory.
+   ### Launch the child process
+   "$PROGRAMDIR"xmonitor.sh $SERVER_STRING &
+   ### Note - the server string doesn't need to be present, but it makes ps more readable. Each child process starts out as generic. Once the master process creates a working directory for it (based on its PID) and then puts the params file in place for it, only then does it discover its purpose.
+   ### create the child's wirectory and move the params file there.
+   CHILD_PID=$!
+   mkdir -p "$WORKINGDIR""$CHILD_PID"
+   touch "$WORKINGDIR""$CHILD_PID/#die" "$WORKINGDIR""$CHILD_PID/#reload"
+   mv "$WORKINGDIR""new/$i" "$WORKINGDIR""$CHILD_PID""/params"
+   if [[ -f "$WORKINGDIR""new/$i".log ]]; then
+   ### If there's a log file, let's move that log file into the appropriate directory as well.
+      mv "$WORKINGDIR""new/$i".log "$WORKINGDIR""$CHILD_PID""/log"
+   fi
 }
 
 function fn_master_exit {
@@ -870,7 +937,7 @@ function fn_modify {
       ### if [[ $( echo $CHILD_PID | grep -vc [^0-9] ) -eq 1 ]]; then
       if [[ $( echo $CHILD_PID | sed "s/[[:digit:]]//g" | grep -c . ) -eq 0 ]]; then
          CHILD_NUMBER=$(( $CHILD_NUMBER + 1 ))
-         echo "  $CHILD_NUMBER) [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" )"
+         echo "  $CHILD_NUMBER) [$CHILD_PID] - $( sed -n "1 p" "$WORKINGDIR""$CHILD_PID/params" | sed "s/^--//" ) $( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" | cut -d ":" -f2- )"
          aCHILD_PID[$CHILD_NUMBER]="$CHILD_PID"
       fi
    done
@@ -911,14 +978,15 @@ function fn_modify {
       fi
    else
       ### Sub-menu for if a child process is selected.
-      echo "$( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" ):"
+      echo "$( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" | cut -d ":" -f2- ):"
       echo
       echo "  1) Kill this process."
-      echo "  2) Change the delay between checks from \"$( sed -n "2 p" "$WORKINGDIR""$CHILD_PID/params" )\" seconds."
-      echo "  3) Change e-mail address from \"$( sed -n "3 p" "$WORKINGDIR""$CHILD_PID/params" )\"."
-      echo "  4) Change the number of consecutive failures or successes before an e-mail is sent from \"$( sed -n "4 p" "$WORKINGDIR""$CHILD_PID/params" )\""
-      echo "  5) Change the title of the job as it's reported by the child process. (Currently \"$( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" )\")"
-      echo "  6) Exit out of this menu."
+      echo "  2) Change the delay between checks from \"$( sed -n "2 p" "$WORKINGDIR""$CHILD_PID/params" | cut -d ":" -f2- )\" seconds."
+      echo "  3) Change e-mail address from \"$( sed -n "3 p" "$WORKINGDIR""$CHILD_PID/params" | cut -d ":" -f2- )\"."
+      echo "  4) Change the number of consecutive failures or successes before an e-mail is sent from \"$( sed -n "4 p" "$WORKINGDIR""$CHILD_PID/params" | cut -d ":" -f2- )\""
+      echo "  5) Change the title of the job as it's reported by the child process. (Currently \"$( sed -n "7 p" "$WORKINGDIR""$CHILD_PID/params" | cut -d ":" -f2- )\")"
+      echo "  6) Command to go to the working directory for this process."
+      echo "  7) Exit out of this menu."
       echo
       read -p "Chose an option from the above list: " OPTION_NUM
       if [[ $OPTION_NUM == "1" ]]; then
@@ -930,7 +998,7 @@ function fn_modify {
             echo "Input must be a number. Exiting"
             exit
          fi
-         sed -i "2 c$WAIT_SECONDS" "$WORKINGDIR""$CHILD_PID/params"
+         sed -i "2 cwait Seconds:$WAIT_SECONDS" "$WORKINGDIR""$CHILD_PID/params"
          touch "$WORKINGDIR""$CHILD_PID/reload"
          echo "Wait Seconds has been updated."
       elif [[ $OPTION_NUM == "3" ]]; then
@@ -942,7 +1010,7 @@ function fn_modify {
          elif [[ -z $EMAIL_ADDRESS ]]; then
             EMAIL_ADDRESS=""
          fi
-         sed -i "3 c$EMAIL_ADDRESS" "$WORKINGDIR""$CHILD_PID/params"
+         sed -i "3 cEmail Address:$EMAIL_ADDRESS" "$WORKINGDIR""$CHILD_PID/params"
          touch "$WORKINGDIR""$CHILD_PID/reload"
          echo "E-mail address has been updated."
       elif [[ $OPTION_NUM == "4" ]]; then
@@ -952,14 +1020,16 @@ function fn_modify {
             echo "Input must be a number. Exiting"
             exit
          fi
-         sed -i "4 c$MAIL_DELAY" "$WORKINGDIR""$CHILD_PID/params"
+         sed -i "4 cMail Delay:$MAIL_DELAY" "$WORKINGDIR""$CHILD_PID/params"
          touch "$WORKINGDIR""$CHILD_PID/reload"
          echo "Mail delay has been updated."
       elif [[ $OPTION_NUM == "5" ]]; then
          read -p "Enter a new identifying string to associate with this check: " SERVER_STRING
-         sed -i "7 c$SERVER_STRING" "$WORKINGDIR""$CHILD_PID/params"
+         sed -i "7 cServer String:$SERVER_STRING" "$WORKINGDIR""$CHILD_PID/params"
          touch "$WORKINGDIR""$CHILD_PID/reload"
          echo "The server string has been updated."
+      elif [[ $OPTION_NUM == "6" ]]; then
+         echo -en "\ncd $WORKINGDIR""$CHILD_PID/\n\n"
       else
          echo "Exiting"
       fi
@@ -1011,6 +1081,7 @@ function fn_options {
 }
 
 function fn_defaults {
+   ### Gives the user a menu from which the defaults can be changed.
    echo
    echo "From this menu, you can set a default value for the following things:"
    echo
@@ -1092,7 +1163,7 @@ ADDITIONAL USAGE:
 
 ADDITIONAL ADDITIONAL USAGE:
 
-Run ./xmonitor --help-flags for further information.
+Run ./xmonitor.sh --help-flags for further information.
 
 
 OTHER NOTES:
@@ -1101,7 +1172,7 @@ Note: Regarding e-mail alerts!
      Xmonitor sends e-mail messages using the "mail" binary (usually located in /usr/bin/mail). In order for this to work as expected, you will likely need to modify the ~/.mailrc file with credentials for a valid e-mail account, otherwise the messages that are sent will likely get rejected.
 
 Note: Regarding the log file!
-     Xmonitor keeps a log file titled "xmonitor.log" in the same directory in which the script is located. This file is used to log when checks are started and stopped, and when ever there is a change in status on any of the checks.
+     Xmonitor keeps a log file titled "xmonitor.log" in the same directory in which the script is located. This file is used to log when checks are started and stopped, and when ever there is a change in status on any of the checks. In addition to this, there is another log file in the direcctory for each child process containing information only specific to that child process.
 
 Note: Regarding url checks and specifying an IP!
      Xmonitor allows you to specify an IP from which to pull a URL, rather than allowing DNS to resolve the domain name to an IP address. This is very useful in situations where you're attempting to monitor multiple servers within a load balanced setup. Unfortunately, the ability for curl to do this was only added in version 7.21.3. While that version is now more than two years old, it still has not made it into the standard repositories for some systems (CentOS 5 and 6, for example). Xmonitor checks if the functionality is present. If not, any IP addresses entered for URL checks will be ignored.
@@ -1125,7 +1196,7 @@ FLAGS FOR CREATING A NEW MONITORING JOB:
 
 --control
 
-     Designates the process as a control process - I.E. it just lays out the specifics of a child process and puts them in place for the master process to spawn, but even if there is not currently a master process, it does not designate itself master and spawn the process that's been specified.
+     Designates the process as a control process - I.E. it just lays out the specifics of a child process and puts them in place for the master process to spawn, but even if there is not currently a master process, it does not designate itself master and spawn the process that's been specified. Run ./xmonitor.sh --help-process-types for more information on master, control, and child processes.
 
 --domain (domain name)
 
@@ -1155,12 +1226,15 @@ FLAGS FOR CREATING A NEW MONITORING JOB:
 
      When used with "--url", this will cause the curl command to be run in such a way that the chrome 41 user agent is imitated. This is useful in situations where a site is refusing connections from the standard curl user agent.
 
+--curl-timeout (number)
+
+     When used with "--url", this flag specifies how long a curl process should wait before giving up.
 
 OTHER FLAGS:
 
 --default
 
-     Allows you to specify a default for "--mail", "--seconds", or "--mail-delay" (or any combination thereof) that will be assumed if ythey are not specified.
+     Allows you to specify a default for "--mail", "--seconds", or "--mail-delay" (or any combination thereof) that will be assumed if they are not specified.
 
 --help
 
@@ -1176,7 +1250,7 @@ OTHER FLAGS:
      
 --master
 
-     Immediately designates itself as the master process. If any prompts are waiting, it spawns child processes as they describe, it then checks periodically for new prompts and spawns processes accordingly. If the master process ends, all child processes it has spawned will end as well.
+     Immediately designates itself as the master process. If any prompts are waiting, it spawns child processes as they describe, it then checks periodically for new prompts and spawns processes accordingly. If the master process ends, all child processes it has spawned will recognize that it has ended, and end as well. Run ./xmonitor.sh --help-process-types for more information on master, control, and child processes.
 
 --modify
 
@@ -1199,14 +1273,58 @@ EOF
 exit
 }
 
+function fn_help_process_types {
+cat << 'EOF' > /dev/stdout
+
+MASTER, CONTROL, AND CHILD PROCESSES
+
+Any action taken by xmonitor.sh falls into one of three process categories - master processes, control processes or child processes.
+
+MASTER PROCESS -
+     The master process is just one continuius loop. It primarily accomplishes three things: 1) It checks to see if there is data for new child processes and spawns them accordingly. 2) It checks existing processes, makes sure that they are still running, and if they are not it decides whether they need to be respawned, or if they can be set aside as disabled. 3) If there is data from processes that has been set aside for more than seven days, it removes this data.
+     Other than starting and stopping the master process, the user does not interact with it directly.
+
+CONTROL PROCESSES -
+     Control processes are how the user primarily interacts with xmonitor.sh, and they accomplish three primary tasks: 1) They gather data from the user regaring a new child process that the user wants to create, and then they put that data in a place where the master process will find it. 2) They gather data from the user on how a currently running child process should be modified (or exited). 3) They gather data from the user on how the master process should be modified (or exited).
+     Control processes always exit after the data that they've collected has been put in place, except under the following circumstance: If there is no currently running master process, and the "--control" flag was not used, the control process will turn into the master process.
+
+CHILD PROCESSES -
+     These processes are not interacted with by the user at all, except through control processes. They are spawned by the master process. They loop continuously, checking against conditions set by the user, and then reporting success or failure. If at any point in time they detect that the associated master process has ended, they end as well.
+
+EOF
+#'do
+exit
+}
+
 function fn_version {
 echo "Current Version: $VERSION"
 cat << 'EOF' > /dev/stdout
 
 Version Notes:
 Future Versions -
-     For URL's, save the results every time they're different, so that they can be compared.
      Move away from "--resolve" and instead use "-H 'Host: domain.com'", so as to be compatible with the versions of curl that come with cent 5 and 6.
+     In URL jobs, should I compare the current pull to the previous pull? Compare file size?
+     Monitor page load times?
+
+1.2.0 (2015-11-16) -
+     Script does its best to check if there are newer versions of curl installed elsewhere.
+     The --curl-timeout flag allows the user to set how long to wait for the curl transaction to complete.
+     The menu options for URL's not invlude curl timeout and user agent.
+     Fixed a mistake where the "save" file never got deleted.
+     Child loops now collect timestamps all at once.
+     The Parameters file is not descriptive, and therefore easier to edit.
+     The child directories have a #reload and #die file by default (easier for manual editing)
+     There is an option in the --modify menu for a command to take you to the child process's working directory.
+     Now keeps copies of the downloaded site:
+          * The current copy
+          * The previous copy
+          * Any instance where the site has succeeded immediately before failing
+          * Any instance where the site has failed immediately after succeeding
+     Automatically cleans up these copies when there are more than 100 of them in total.
+     When a process is found dead and restarted, the log file is kept.
+     If anything that is not a job or a log ends up in the new/ directory, it is removed.
+     Added a command line flag for an explanation on master, control, and child processes.
+     The e-mail functions now use the child logs rather than pulling from the master log file.
 
 1.1.5 (2015-04-18) -
      Added the "--user-agent" flag.
@@ -1261,7 +1379,12 @@ PROGRAMDIR="$( echo "$PROGRAMDIR" | sed "s/\([^/]\)$/\1\//" )"
 WORKINGDIR="$PROGRAMDIR"".xmonitor/"
 mkdir -p "$WORKINGDIR"
 
-LOG="$PROGRAMDIR""xmonitor.log"
+v_LOG="$PROGRAMDIR""xmonitor.log"
+
+### find the newst version of curl
+### /usr/bin/curl is the standard installation of curl
+### /opt/curlssl/bin/curl is where cPanel keeps the version of curl that PHP works with, which is usually the most up to date
+v_CURL_BIN=$( echo -e "$( /opt/curlssl/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /opt/curlssl/bin/curl\n$( /usr/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /usr/bin/curl\n$( $( which curl ) --version 2> /dev/null | head -n1 | awk '{print $2}' ) $( which curl )" | sort -n | grep "^[0-9]*\.[0-9]*.[0-9]*" | tail -n1 | awk '{print $2}' )
 
 ### Determine the running state
 if [[ -f "$WORKINGDIR"xmonitor.pid && $( ps aux | grep "$( cat "$WORKINGDIR"xmonitor.pid 2> /dev/null ).*xmonitor.sh" | grep -vc " 0:00 grep " ) -gt 0 ]]; then
@@ -1296,13 +1419,16 @@ fi
 ### Turn the command line arguments into an array.
 CL_ARGUMENTS=( "$@" )
 
+### I can think of very few reasons why curl shouldn't time out at ten seconds.
+v_CURL_TIMEOUT=10
+
 ### User agent should start out as false.
 v_USER_AGENT=false
 
 ### For each command line argument, determine what needs to be done.
 for (( c=0; c<=$(( $# - 1 )); c++ )); do
    arg="${CL_ARGUMENTS[$c]}"
-   if [[ $( echo $arg | egrep -c "^(--(url|dns|list|default|ping|master|version|help|help-flags|modify|verbosity|kill)|[^-]*-[hmvpud])$" ) -gt 0 ]]; then
+   if [[ $( echo $arg | egrep -c "^(--(url|dns|list|default|ping|master|version|help|help-flags|help-process-types|modify|verbosity|kill)|[^-]*-[hmvpud])$" ) -gt 0 ]]; then
       ### These flags indicate a specific action for the script to take. Two actinos cannot be taken at once.
       if [[ ! -z $RUN_TYPE ]]; then
          ### If another of these actions has already been specified, end.
@@ -1346,6 +1472,14 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
          WAIT_SECONDS="${CL_ARGUMENTS[$c]}"
       else
          echo "The flag \"--seconds\" needs to be followed by a number of seconds. Exiting"
+         exit
+      fi
+   elif [[ $arg == "--curl-timeout" ]]; then
+      if [[ $( echo ${CL_ARGUMENTS[$(( $c + 1 ))]} | grep -c "^[[:digit:]][[:digit:]]*$" ) -eq 1 ]]; then
+         c=$(( $c + 1 ))
+         v_CURL_TIMEOUT="${CL_ARGUMENTS[$c]}"
+      else
+         echo "The flag \"--curl-timeout\" needs to be followed by a number of seconds. Exiting"
          exit
       fi
    elif [[ $arg == "--mail-delay" ]]; then
@@ -1443,6 +1577,9 @@ elif [[ $RUN_TYPE == "--help" || $1 == "-h" ]]; then
    exit
 elif [[ $RUN_TYPE == "--help-flags" ]]; then
    fn_help_flags
+   exit
+elif [[ $RUN_TYPE == "--help-process-types" ]]; then
+   fn_help_process_types
    exit
 elif [[ $RUN_TYPE == "--modify" || $1 == "-m" ]]; then
    fn_modify
