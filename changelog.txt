@@ -1,3 +1,8 @@
+Future Versions -
+    - In URL jobs, should I compare the current pull to the previous pull? Compare file size?
+    - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
+    - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep
+
 2.3.6 (2016-11-09) -
     - Added the following sed command to remove non-printing characters that billing is sometimes apparently throwing in: sed 's/[\xef\xbb\xbf]//g'
 
