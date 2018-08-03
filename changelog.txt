@@ -1,7 +1,34 @@
 Future Versions -
     - In URL jobs, should I compare the current pull to the previous pull? Compare file size?
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
-    - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep
+    - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
+    - Switch to using local variables where possible
+    - Have data on the last hour, last four hours, last 24 hours
+    - Separate curled output and the curl verbose information into two separate files
+
+2.3.8 (2018-08-02) -
+    - "--curl" is now synonymous with "--url"
+    - Fixed a bug where shild processes were not dying when being told to
+    - Fixed a bug where URLs with arguments might be interpreted incorrectly due to poor quoting
+    - Fixed a bug where wonky DNS resolvers could result in false negatives under circumstances where an IP was not specified
+    - Changed all instances of "grep" to "egrep"
+    - Custom messages can now be set in the master configuration file
+    - "CURL VERBOSE" now also outputs the curl command and all command line arguments as it was ran
+    - The commented out lines in child parameters files now include what the default value would have been
+    - Reorganized the script so that default values were declared at the top of the script
+    - Fixed a bug where intermittent failure emails did not have the correct text
+    - Added more definitive rules to when the intermittent failure emails would be sent
+    - Added help output for the various files and directories that LWmon uses
+    - Added the "SCRIPT" parameter. The user can define a script to run every time an eamil would be sent
+
+2.3.7 (2018-06-21) -
+    - "More verbose" output now includes the number of successes, partial successes, and failures
+    - The "more verbose" version of the status is output roughly every ten minutes to .lwmon/[CHILD PID]/#status
+    - The .lwmon/[CHILD PID]/#status file also contains the numbers being used to calculate durations (not output with "more verbose")
+    - The .lwmon/[CHILD PID]/#status file also contains information regarding the past hour and the past eight hours
+    - When child processes close, they will populate .lwmon/[CHILD PID]/#status with the final output
+    - Added the "--trace-time" flag for curl verbose output
+    - Fixed a bug where if the number of recent was reduced, it wouldn't actually reduce the size of the array of recent durations
 
 2.3.6 (2016-11-09) -
     - Added the following sed command to remove non-printing characters that billing is sometimes apparently throwing in: sed 's/[\xef\xbb\xbf]//g'
