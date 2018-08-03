@@ -635,10 +635,6 @@ function fn_url_child {
 	v_URL_OR_PING="URL"
 	while [[ 1 == 1 ]]; do
 		fn_child_dates
-		if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html ]]; then
-			### The only instance where this isn't the case should be on the first run of the loop.
-			mv -f "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html
-		fi
 		### Set up the command line arguments for curl
 		f_STDERR="/dev/null"
 		if [[ $v_WGET_BIN == "false" ]]; then
@@ -651,7 +647,7 @@ function fn_url_child {
 				a_CURL_ARGS=( "-kLsm" "${a_CURL_ARGS[@]}" )
 			else
 				a_CURL_ARGS=( "-kLsvm" "${a_CURL_ARGS[@]}" )
-				f_STDERR="$v_WORKINGDIR""$v_CHILD_PID"/curl_verbose_output.txt
+				f_STDERR="$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt
 				echo "$v_CURL_BIN ${a_CURL_ARGS[@]}" > "$f_STDERR"
 			fi
 		else
@@ -660,6 +656,17 @@ function fn_url_child {
 			else
 				a_WGET_ARGS=( "--no-check-certificate" "-q" "--timeout=$v_CHECK_TIMEOUT" "-O" "$v_WORKINGDIR""$v_CHILD_PID/site_current.html" "$v_CURL_URL" "--header=Host: $v_DOMAIN" "--header=User-Agent: $v_USER_AGENT" )
 			fi
+		fi
+		### Move the current download of the site to the previous
+		if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html ]]; then
+			### The only instance where this isn't the case should be on the first run of the loop.
+			mv -f "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html
+		fi
+		if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt ]]; then
+			rm -f "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt
+		fi
+		if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt ]]; then
+			mv -f "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt
 		fi
 		### curl it!
 		v_CHECK_START=$( date +%s"."%N | head -c -6 )
@@ -672,11 +679,18 @@ function fn_url_child {
 		v_CHECK_END=$( date +%s"."%N | head -c -6 )
 		### If the exit status of curl is 28, this means that the page timed out.
 		if [[ $v_STATUS == 28 && $v_WGET_BIN == "false" ]]; then
-			echo -e "\n\n\n\nCurl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
+			echo -e "\n\n\n\nCurl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt
 		elif [[ $v_STATUS != 0 && $v_WGET_BIN == "false" ]]; then
-			echo -e "\n\n\n\nCurl return code: $v_STATUS" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
+			echo -e "\n\n\n\nCurl return code: $v_STATUS" >> "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt
 		elif [[ $v_STATUS != 0 ]]; then
-			echo -e "\n\n\n\nWget return code: $v_STATUS" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
+			echo -e "\n\n\n\nWget return code: $v_STATUS" >> "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt
+		fi
+		if [[ $v_CURL_VERBOSE == true && $v_LOG_HTTP_CODE == true ]]; then
+		### Capture the html response code, if so directed.
+			v_HTML_RESPONSE_CODE="$( cat "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt | egrep -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
+			if [[ -z $v_HTML_RESPONSE_CODE ]]; then
+				v_HTML_RESPONSE_CODE="No Code Reported"
+			fi
 		fi
 		### Check the curl strings
 		i=0; j=0; while [[ $i -lt ${#a_CURL_STRING[@]} ]]; do
@@ -685,19 +699,6 @@ function fn_url_child {
 			fi
 			i=$(( $i + 1 ))
 		done
-		### If the verbose output was captured, append it to the end of the html file.
-		if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/curl_verbose_output.txt ]]; then
-			echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
-			cat "$v_WORKINGDIR""$v_CHILD_PID"/curl_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html
-			if [[ $v_LOG_HTTP_CODE == true ]]; then
-			### Capture the html response code, if so directed.
-				v_HTML_RESPONSE_CODE="$( cat "$v_WORKINGDIR""$v_CHILD_PID"/curl_verbose_output.txt | egrep -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
-				if [[ -z $v_HTML_RESPONSE_CODE ]]; then
-					v_HTML_RESPONSE_CODE="No Code Reported"
-				fi
-			fi
-			rm -f "$v_WORKINGDIR""$v_CHILD_PID"/curl_verbose_output.txt
-		fi
 		v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",( ${v_CHECK_END} - ${v_CHECK_START} ) * 100}" )"
 		if [[ $j -lt $i && $j -gt 0 ]]; then
 			fn_report_status "partial success" save
@@ -852,6 +853,7 @@ function fn_child_exit {
 function fn_report_status {
 	### $1 is the status. $2 is whether or not to try to save the file
 	v_THIS_STATUS="$1"
+	local v_SAVE="$2"
 
 	### This is present if, for testing purposes, we need to override the result of a check
 	if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/force_success ]]; then
@@ -1146,12 +1148,28 @@ function fn_report_status {
 		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$v_LOG"
 		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$v_WORKINGDIR""$v_CHILD_PID"/log
 		v_SUCCESS_CHECKS=0
-		if [[ $2 == "save" && "$v_THIS_STATUS" == "failure" ]]; then
-			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_fail_"$v_DATE3".html
-			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html "$v_WORKINGDIR""$v_CHILD_PID"/site_success_"$v_DATE3_LAST".html
-		elif [[ $2 == "save" && "$v_THIS_STATUS" == "partial success" ]]; then
-			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_psuccess_"$v_DATE3".html
-			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html "$v_WORKINGDIR""$v_CHILD_PID"/site_success_"$v_DATE3_LAST".html
+		if [[ "$v_SAVE" == "save" && "$v_THIS_STATUS" == "failure" ]]; then
+			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_fail.html
+			if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt ]]; then
+				echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_fail.html
+				cat "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_fail.html
+			fi
+			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_success.html
+			if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt ]]; then
+				echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_success.html
+				cat "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_success.html
+			fi
+		elif [[ "$v_SAVE" == "save" && "$v_THIS_STATUS" == "partial success" ]]; then
+			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_psuccess.html
+			if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt ]]; then
+				echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_psuccess.html
+				cat "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_psuccess.html
+			fi
+			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_success.html
+			if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt ]]; then
+				echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_success.html
+				cat "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_success.html
+			fi
 		fi
 		fn_send_email
 	### If the last status was partial success
@@ -1162,9 +1180,17 @@ function fn_report_status {
 		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$v_LOG"
 		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$v_WORKINGDIR""$v_CHILD_PID"/log
 		v_PARTIAL_SUCCESS_CHECKS=0
-		if [[ "$2" == "save" && "$v_THIS_STATUS" == "failure" ]]; then
-			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_fail_"$v_DATE3".html
-			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html "$v_WORKINGDIR""$v_CHILD_PID"/site_psuccess_"$v_DATE3_LAST".html
+		if [[ "$v_SAVE" == "save" && "$v_THIS_STATUS" == "failure" ]]; then
+			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_current.html "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_fail.html
+			if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt ]]; then
+				echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_fail.html
+				cat "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3"_fail.html
+			fi
+			cp -a "$v_WORKINGDIR""$v_CHILD_PID"/site_previous.html "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_psuccess.html
+			if [[ -f "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt ]]; then
+				echo -e "\n\n\n\n" >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_psuccess.html
+				cat "$v_WORKINGDIR""$v_CHILD_PID"/previous_verbose_output.txt >> "$v_WORKINGDIR""$v_CHILD_PID"/site_"$v_DATE3_LAST"_psuccess.html
+			fi
 		fi
 		fn_send_email
 	### If the last status was failure
@@ -1834,8 +1860,8 @@ function fn_modify_html {
 	echo
 	v_HTML_NUMBER=1
 	a_HTML_LIST=()
-	for v_HTML_NAME in $( find "$v_WORKINGDIR""$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | egrep "[0-9]\.html$" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
-		v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | egrep -o "[0-9]*\.html" | cut -d "." -f1 )"
+	for v_HTML_NAME in $( find "$v_WORKINGDIR""$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | egrep "(success|fail)\.html$" | awk -F_ '{print $2"_"$3"_"$1}' | sort -n | awk -F_ '{print $3"_"$1"_"$2}' ); do
+		v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | egrep -o "[0-9]+_[psf]" | cut -d "_" -f1 )"
 		v_HTML_TIMESTAMP="$( date --date="@$v_HTML_TIMESTAMP" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		echo "  $v_HTML_NUMBER) $v_HTML_TIMESTAMP - $v_HTML_NAME"
@@ -2715,8 +2741,8 @@ LWMON FILES AND DIRECTORIES
 ./.lwmon/[CHILD PID]/cl
     - The command line arguments to reproduce the child process
 
-./.lwmon/[CHILD PID]/curl_verbose_output.txt
-    - This file briefly captures the curl verbose output before the curl operation itself completes. After that point, the contents of this file are written to the "./.lwmon/[CHILD PID]/site_current.html" file and then this file is removed.
+./.lwmon/[CHILD PID]/current_verbose_output.txt
+    - This file captures the curl verbose output for "--url" monitoritoring job. 
 
 ./.lwmon/[CHILD PID]/die
     - If an LWmon child process sees this present in its working directory, it will output a full status to "./.lwmon/[CHILD PID]/#status" and then exit
@@ -2736,20 +2762,23 @@ LWMON FILES AND DIRECTORIES
 ./.lwmon/[CHILD PID]/params
     - These are the parameters for the child process. Editing this file will change the operation of the child process
 
+./.lwmon/[CHILD PID]/previous_verbose_output.txt
+    - When a new check for a "--url" monitorin job runs, the "./.lwmon/[CHILD PID]/current_verbose_output.txt" file is moved to this location incase the data is needed.
+
 ./.lwmon/[CHILD PID]/site_current.html
     - for a "--url" job, this file will contain the most recent curl of the site being monitored
 
-./.lwmon/[CHILD PID]/site_fail_[EPOCH TIMESTAMP].html
+./.lwmon/[CHILD PID]/site_[EPOCH TIMESTAMP]_fail.html
     - for a "--url" job, these files show the result of the first failure after any other status
 
 ./.lwmon/[CHILD PID]/site_previous.html
     - for a "--url" job, this file will contain the previous curl of the site.
 
-./.lwmon/[CHILD PID]/site_psuccess_[EPOCH TIMESTAMP].html
-    - for a "--url" job, these files show the result of the first partial success after any other status
+./.lwmon/[CHILD PID]/site_[EPOCH TIMESTAMP]_psuccess.html
+    - for a "--url" job, these files show the result of the first partial success after a success, or the last partial success before a failure
 
-./.lwmon/[CHILD PID]/site_success_[EPOCH TIMESTAMP].html
-    - for a "--url" job, these files show the result of the first success after any other status
+./.lwmon/[CHILD PID]/site_[EPOCH TIMESTAMP]_success.html
+    - for a "--url" job, these files show the result of the last success before any other status
 
 ./.lwmon/[CHILD PID]/status
     - Creating this file will tell an LWmon child process to output the full status on its next check
@@ -2797,11 +2826,12 @@ Future Versions -
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
     - Switch to using local variables where possible
     - Have data on the last hour, last four hours, last 24 hours
-    - Separate curled output and the curl verbose information into two separate files
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified
     - Scripts defined by the "SCRIPT" parameter can now include arguments
+    - Separated the curl result from the verbose output
+    - Saved html files now have the timestamp before the status, so alphabetical order will also be chronological order
 
 2.3.8 (2018-08-02) -
     - "--curl" is now synonymous with "--url"

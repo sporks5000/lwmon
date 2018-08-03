@@ -4,11 +4,12 @@ Future Versions -
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
     - Switch to using local variables where possible
     - Have data on the last hour, last four hours, last 24 hours
-    - Separate curled output and the curl verbose information into two separate files
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified
     - Scripts defined by the "SCRIPT" parameter can now include arguments
+    - Separated the curl result from the verbose output
+    - Saved html files now have the timestamp before the status, so alphabetical order will also be chronological order
 
 2.3.8 (2018-08-02) -
     - "--curl" is now synonymous with "--url"
