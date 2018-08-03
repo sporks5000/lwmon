@@ -6,6 +6,10 @@ Future Versions -
     - Have data on the last hour, last four hours, last 24 hours
     - Separate curled output and the curl verbose information into two separate files
 
+2.3.9 (2018-08-03) -
+    - Added the "ALT_MAIL" directive; an alternate mail program can be specified
+    - Scripts defined by the "SCRIPT" parameter can now include arguments
+
 2.3.8 (2018-08-02) -
     - "--curl" is now synonymous with "--url"
     - Fixed a bug where shild processes were not dying when being told to

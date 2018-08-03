@@ -1,6 +1,6 @@
 #! /bin/bash
 
-v_VERSION="2.3.8"
+v_VERSION="2.3.9"
 
 #====================#
 #== Default Values ==#
@@ -507,9 +507,14 @@ function fn_child_vars {
 	fn_read_conf OUTPUT_FILE child; v_OUTPUT_FILE2="$v_RESULT"
 	fn_test_variable "$v_OUTPUT_FILE2" false OUTPUT_FILE "$v_DEFAULT_OUTPUT_FILE"; v_OUTPUT_FILE2="$v_RESULT"
 	fn_test_file "$v_OUTPUT_FILE2" false true; v_OUTPUT_FILE2="$v_RESULT"
-	fn_read_conf SCRIPT child; f_SCRIPT="$v_RESULT"
-	if [[ ${f_SCRIPT:0:1} != "/" ]]; then
-		unset f_SCRIPT
+	a_SCRIPT=()
+	fn_read_conf SCRIPT child; v_SCRIPT="$v_RESULT"
+	for word in $( echo $v_SCRIPT ); do
+		a_SCRIPT[${#a_SCRIPT[@]}]="$word"
+	done
+	unset v_SCRIPT
+	if [[ ${a_SCRIPT[0]:0:1} != "/" ]]; then
+		unset a_SCRIPT
 	fi
 	### If the designated output file looks good, and is different than it was previously, log it.
 	if [[ -n "$v_OUTPUT_FILE2" && "$v_OUTPUT_FILE2" != "$v_OUTPUT_FILE" ]]; then
@@ -799,8 +804,8 @@ function fn_child_checks {
 		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$v_LOG"
 		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$v_WORKINGDIR""$v_CHILD_PID"/log
 		echo "***Reloaded parameters for $v_URL_OR_PING $v_JOB_NAME.***"
-	fi
-	if [[ "$( stat --format=%Y "$v_WORKINGDIR""lwmon.conf" )" -gt "$v_MASTER_RELOAD" ]]; then
+	elif [[ "$( stat --format=%Y "$v_WORKINGDIR""lwmon.conf" )" -gt "$v_MASTER_RELOAD" ]]; then
+	### fn_child_vars updates both the reload variables.
 		fn_child_vars
 	fi
 	if [[ $( ls -1 "$v_WORKINGDIR""$v_CHILD_PID"/ | egrep "^site_" | egrep -cv "current|previous" ) -gt $v_HTML_FILES_KEPT ]]; then
@@ -1207,6 +1212,7 @@ function fn_send_email {
 		fn_failure_email
 	fi
 	if [[ $v_SENT == true ]]; then
+	### Note the $v_SENT indicates any instance where an email WOULD HAVE BEEN sent whether or not it was sent
 		### set the variables that prepare for the next message to be sent.
 		v_NUM_SUCCESSES_EMAIL=0
 		v_NUM_PARTIAL_SUCCESSES_EMAIL=0
@@ -1229,10 +1235,10 @@ function fn_success_email {
 		fi
 		if [[ $v_GO == true ]]; then
 			if [[ $v_SEND_MAIL == true && -n $v_EMAIL_ADDRESS ]]; then
-				echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be succeeding.\n\nYou're recieving this message to inform you that $v_SUCCESS_CHECKS consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have succeeded, $v_MUTUAL_EMAIL" | mail -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check PASSED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Success e-mail sent" >> "$v_LOG" &
+				echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be succeeding.\n\nYou're recieving this message to inform you that $v_SUCCESS_CHECKS consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have succeeded, $v_MUTUAL_EMAIL" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check PASSED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Success e-mail sent" >> "$v_LOG" &
 			fi
-			if [[ -n $f_SCRIPT && -f $f_SCRIPT && -x $f_SCRIPT ]]; then
-				$f_SCRIPT success &
+			if [[ -n "${a_SCRIPT[0]}" && -f "${a_SCRIPT[0]}" && -x "${a_SCRIPT[0]}" ]]; then
+				"${a_SCRIPT[@]}" success &
 			fi
 			v_LAST_EMAIL_SENT="success"
 			v_SENT=true
@@ -1245,10 +1251,10 @@ function fn_partial_success_email {
 	### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
 	if [[ $v_PARTIAL_SUCCESS_CHECKS -eq $v_MAIL_DELAY && $v_TOTAL_CHECKS != $v_MAIL_DELAY && "$v_LAST_EMAIL_SENT" != "partial success" ]]; then
 		if [[ $v_SEND_MAIL == true && -n $v_EMAIL_ADDRESS ]]; then
-			echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be succeeding in some regards but failing in others.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have only been partially successful, $v_MUTUAL_EMAIL" | mail -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Partial success" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Partial Success e-mail sent" >> "$v_LOG" &
+			echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be succeeding in some regards but failing in others.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have only been partially successful, $v_MUTUAL_EMAIL" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Partial success" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Partial Success e-mail sent" >> "$v_LOG" &
 		fi
-		if [[ -n $f_SCRIPT && -f $f_SCRIPT && -x $f_SCRIPT ]]; then
-			$f_SCRIPT psuccess &
+		if [[ -n "${a_SCRIPT[0]}" && -f "${a_SCRIPT[0]}" && -x "${a_SCRIPT[0]}" ]]; then
+				"${a_SCRIPT[@]}" psuccess &
 		fi
 		v_LAST_EMAIL_SENT="partial success"
 		v_SENT=true
@@ -1266,10 +1272,10 @@ function fn_intermittent_failure_email {
 		### The mail binary has to be present
 	if [[ $v_LAST_EMAIL_SENT == "success" && $v_NUM_STATUSES_NOT_SUCCESS -gt 0 ]]; then
 		if [[ $v_SEND_MAIL == true && -n $v_EMAIL_ADDRESS ]]; then
-			echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be failing intermittently.\n\nYou're recieving this message to inform you that $v_NUM_STATUSES_NOT_SUCCESS out of the last $v_NUM_STATUSES_RECENT checks against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have not been fully successful, $v_MUTUAL_EMAIL\n\n" | mail -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check failing intermittently!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Failure e-mail sent" >> "$v_LOG" &
+			echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be failing intermittently.\n\nYou're recieving this message to inform you that $v_NUM_STATUSES_NOT_SUCCESS out of the last $v_NUM_STATUSES_RECENT checks against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have not been fully successful, $v_MUTUAL_EMAIL\n\n" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check failing intermittently!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Failure e-mail sent" >> "$v_LOG" &
 		fi
-		if [[ -n $f_SCRIPT && -f $f_SCRIPT && -x $f_SCRIPT ]]; then
-			$f_SCRIPT intermittent &
+		if [[ -n "${a_SCRIPT[0]}" && -f "${a_SCRIPT[0]}" && -x "${a_SCRIPT[0]}" ]]; then
+				"${a_SCRIPT[@]}" intermittent &
 		fi
 		v_LAST_EMAIL_SENT="intermittent"
 		v_SENT=true
@@ -1280,10 +1286,10 @@ function fn_failure_email {
 	### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
 	if [[ $v_FAILURE_CHECKS -eq $v_MAIL_DELAY && $v_TOTAL_CHECKS != $v_MAIL_DELAY && "$v_LAST_EMAIL_SENT" != "failure" ]]; then
 		if [[ $v_SEND_MAIL == true && -n $v_EMAIL_ADDRESS ]]; then
-			echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have failed, $v_MUTUAL_EMAIL" | mail -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check FAILED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Failure e-mail sent" >> "$v_LOG" &
+			echo -e "$( if [[ -n $v_CUSTOM_MESSAGE ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have failed, $v_MUTUAL_EMAIL" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check FAILED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Failure e-mail sent" >> "$v_LOG" &
 		fi
-		if [[ -n $f_SCRIPT && -f $f_SCRIPT && -x $f_SCRIPT ]]; then
-			$f_SCRIPT failure &
+		if [[ -n "${a_SCRIPT[0]}" && -f "${a_SCRIPT[0]}" && -x "${a_SCRIPT[0]}" ]]; then
+				"${a_SCRIPT[@]}" failure &
 		fi
 		v_LAST_EMAIL_SENT="failure"
 		v_SENT=true
@@ -1291,10 +1297,24 @@ function fn_failure_email {
 }
 
 function fn_check_mail_binary {
-	if [[ -z $( which mail 2> /dev/null ) ]]; then
-		v_SEND_MAIL=false
+	### Check to see if an alternate mail binary has been set
+	a_MAIL_BIN=()
+	fn_read_conf ALT_MAIL master; v_ALT_MAIL="$v_RESULT"
+	for word in $( echo "$v_ALT_MAIL" ); do
+		a_ALT_MAIL[${#a_ALT_MAIL[@]}]="$word"
+	done
+	unset v_ALT_MAIL
+	if [[ -z ${a_ALT_MAIL[0]} || ! -x "${a_ALT_MAIL[0]}" ]]; then
+		unset a_ALT_MAIL
+		if [[ -z $( which mail 2> /dev/null ) ]]; then
+			v_SEND_MAIL=false
+		else
+			v_SEND_MAIL=true
+			a_MAIL_BIN=( "$( which mail 2> /dev/null )" )
+		fi
 	else
 		v_SEND_MAIL=true
+		a_MAIL_BIN=( "${a_ALT_MAIL[@]}" )
 	fi
 }
 
@@ -2250,6 +2270,11 @@ LOG_HTTP_CODE = $v_DEFAULT_LOG_HTTP_CODE
 # Setting the "USE_WGET" directive to "true" forces the script to use wget rather than curl to pull files. Curl is typically preferred as its behavior is slightly more predictable and its error output is slightly more specific.
 USE_WGET = $v_DEFAULT_USE_WGET
 
+# The "ALT_MAIL" directive allows the user to set an alternate mail binary to use when sending mail. By default LWmon will use what ever is in the path for the user to send mail in the format of "echo 'message' | mail -s 'subject' user@example.com". using this directive will replace "mail" with what ever is specified.
+# You can include additional arguments for the alternate binary to use previous to "-s"
+# If the path to the alternate binary includes spaces, be sure to quote the path appropriately.
+ALT_MAIL = 
+
 # The "SSH_CONTROL_PATH" directive allows the user to specify where the control path socket file for an ssh-load job is located.
 SSH_CONTROL_PATH = $v_DEFAULT_SSH_CONTROL_PATH
 
@@ -2630,8 +2655,8 @@ After changes are made to the params file, these changes will not be recognized 
 
 "SCRIPT"
     - You can specify a script to be run at any time that an email would be sent (minus the requirements for having the "mail" binary and having the "EMAIL_ADDRESS" parameter defined)
-    - The script will be run with one of the following arguments (depending on the type of email that would be sent): "success" "psuccess" "intermittent" "failure". No other arguments can be passed to the script
-    - The full path to the script must be used, and the script itself must be executable.
+    - You can include any arguments or flags that you would like the script to be run with. The final argument passed to the script specified will be one of the following arguments (depending on the type of email that would be sent): "success" "psuccess" "intermittent" "failure".
+    - The full path to the script must be used, and the script itself must be executable. If the path to the script contains any spaces, it's path will need to be quoted
 
 "SERVER_PORT"
     - For ssh-load jobs, this is the port that's being connected to.
@@ -2774,6 +2799,10 @@ Future Versions -
     - Have data on the last hour, last four hours, last 24 hours
     - Separate curled output and the curl verbose information into two separate files
 
+2.3.9 (2018-08-03) -
+    - Added the "ALT_MAIL" directive; an alternate mail program can be specified
+    - Scripts defined by the "SCRIPT" parameter can now include arguments
+
 2.3.8 (2018-08-02) -
     - "--curl" is now synonymous with "--url"
     - Fixed a bug where shild processes were not dying when being told to
@@ -2781,7 +2810,7 @@ Future Versions -
     - Fixed a bug where wonky DNS resolvers could result in false negatives under circumstances where an IP was not specified
     - Changed all instances of "grep" to "egrep"
     - Custom messages can now be set in the master configuration file
-    - "CURL VERBOSE" now also outputs the curl command and all command line arguments as it was ran
+    - "CURL_VERBOSE" now also outputs the curl command and all command line arguments as it was ran
     - The commented out lines in child parameters files now include what the default value would have been
     - Reorganized the script so that default values were declared at the top of the script
     - Fixed a bug where intermittent failure emails did not have the correct text
