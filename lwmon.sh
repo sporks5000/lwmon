@@ -60,7 +60,7 @@ function fn_parse_server {
 	if [[ -n $1 && -z $v_SERVER ]]; then
 		v_SERVER="$1"
 	fi
-	if [[ $( echo "$v_SERVER" | egrep -ci "^HTTP" ) -eq 0 ]]; then
+	if [[ $( echo "$v_SERVER" | grep -E -ci "^HTTP" ) -eq 0 ]]; then
 	### If what's passed doesn't start with http or https, we can straight away assume that it's on port 80
 		v_DOMAINa="$v_SERVER"
 		v_CURL_URLa="$v_SERVER"
@@ -68,7 +68,7 @@ function fn_parse_server {
 	else
 		### For the domain, get rid of "http(s)" at the beginning
 		v_DOMAINa="$( echo "$v_SERVER" | sed -e "s/^[Hh][Tt][Tt][Pp][Ss]*:\/\///" )"
-		if [[ $( echo "$v_SERVER "| egrep -ci "^HTTPS" ) -eq 1 ]]; then
+		if [[ $( echo "$v_SERVER "| grep -E -ci "^HTTPS" ) -eq 1 ]]; then
 		### If it starts with https, assume port 443 and don't strip out the protocol from the URL
 			v_CURL_URLa="$v_SERVER"
 			v_SERVER_PORTa="443"
@@ -84,28 +84,28 @@ function fn_parse_server {
 	v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/^\([^/]*\).*$/\1/' )"
 	v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/[\xef\xbb\xbf]//g' )" ### <- Apparently billing is sometimes throwing special characters when you copy.
 	### If the domain contains a closing square bracket followed by a colon, then numbers, then the end of the string, it's likely an ipv6 address with a port on the end
-	if [[ $( echo "$v_DOMAINa" | egrep -c "]:[0-9]+$" ) -ne 0 ]]; then
+	if [[ $( echo "$v_DOMAINa" | grep -E -c "]:[0-9]+$" ) -ne 0 ]]; then
 		v_SERVER_PORTa="$( echo "$v_DOMAINa" | sed "s/^.*]:\([0-9][0-9]*\)$/\1/" )"
 		v_DOMAINa="$( echo "$v_DOMAINa" | sed "s/^\[*\(.*\)]:[0-9][0-9]*$/\1/" )"
 	### Note: the regex here only covers IPv6 addresses.
-	elif [[ $( echo "$v_DOMAINa" | egrep -c ":[0-9]+$" ) -ne 0 && $( echo "$v_DOMAINa" | egrep -c "^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$" ) -eq 0 ]]; then
+	elif [[ $( echo "$v_DOMAINa" | grep -E -c ":[0-9]+$" ) -ne 0 && $( echo "$v_DOMAINa" | grep -E -c "^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$" ) -eq 0 ]]; then
 	### If it doesn't match the above but it contains a colon, then numbers, then the end of the string, but is not a valid IPv6 address...
 		v_SERVER_PORTa="$( echo "$v_DOMAINa" | sed "s/^.*:\([0-9][0-9]*\)$/\1/" )"
 		v_DOMAINa="$( echo "$v_DOMAINa" | sed "s/^\(.*\):[0-9][0-9]*$/\1/" )"
 	fi
 	### check if it's an IP. The following should match all IPv4 and IPv6 addresses
-	if [[ $( echo "$v_DOMAINa" | egrep -c "^((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$" ) -eq 0 ]]; then
+	if [[ $( echo "$v_DOMAINa" | grep -E -c "^((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$" ) -eq 0 ]]; then
 	### If it doesn't look like an IP address, let's find out what the IP address REALLY is
 		### Let's start by checking the hosts file
 		v_DOMAINa_EGREP_SAFE="$( echo "$v_DOMAINa" | sed 's/[]\.|$(){}?+*^]/\\&/g' )"
-		if [[ $( sed "s/#.*$//" /etc/hosts | egrep -c "[[:blank:]]$v_DOMAINa_EGREP_SAFE([[:blank:]]|$)" ) -gt 0 ]]; then
-			v_IP_ADDRESSa="$( sed "s/#.*$//" /etc/hosts | egrep "[[:blank:]]$v_DOMAINa_EGREP_SAFE([[:blank:]]|$)" | tail -n1 | awk '{print $1}' )"
+		if [[ $( sed "s/#.*$//" /etc/hosts | grep -E -c "[[:blank:]]$v_DOMAINa_EGREP_SAFE([[:blank:]]|$)" ) -gt 0 ]]; then
+			v_IP_ADDRESSa="$( sed "s/#.*$//" /etc/hosts | grep -E "[[:blank:]]$v_DOMAINa_EGREP_SAFE([[:blank:]]|$)" | tail -n1 | awk '{print $1}' )"
 		else
 		### If it's not there, we'll dig for it.
 			v_IP_ADDRESSa="$( dig +short "$v_DOMAINa" | sort -n | tail -n1 )"
 		fi
 		### If the result is empty, or doesn't match IPv4 or IPv6 addresses...
-		if [[ -z "$v_IP_ADDRESSa" || $( echo "$v_IP_ADDRESSa" | egrep -c "^((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$" ) -eq 0 ]]; then
+		if [[ -z "$v_IP_ADDRESSa" || $( echo "$v_IP_ADDRESSa" | grep -E -c "^((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$" ) -eq 0 ]]; then
 			v_IP_ADDRESSa=false
 		fi
 	else
@@ -425,7 +425,7 @@ function fn_child {
 	v_NUM_PARTIAL_SUCCESSES_EMAIL=0
 	v_NUM_FAILURES_EMAIL=0
 	v_LAST_HTML_RESPONSE_CODE="none"
-	if [[ $( egrep -c "^[[:blank:]]*JOB_TYPE[[:blank:]]*=" "$v_WORKINGDIR""$v_CHILD_PID""/params" ) -eq 1 ]]; then
+	if [[ $( grep -E -c "^[[:blank:]]*JOB_TYPE[[:blank:]]*=" "$v_WORKINGDIR""$v_CHILD_PID""/params" ) -eq 1 ]]; then
 		fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
 		v_JOB_CL_STRINGa="--$v_JOB_TYPE"
 		fn_read_conf ORIG_JOB_NAME child; v_ORIG_JOB_NAME="$v_RESULT"
@@ -478,7 +478,7 @@ function fn_child_vars {
 	fn_test_variable "$v_WAIT_SECONDS" true WAIT_SECONDS "$v_DEFAULT_WAIT_SECONDS"; v_WAIT_SECONDS="$v_RESULT"
 	fn_read_conf EMAIL_ADDRESS child; v_EMAIL_ADDRESS="$v_RESULT"
 	fn_test_variable "$v_EMAIL_ADDRESS" false EMAIL_ADDRESS ""; v_EMAIL_ADDRESS="$v_RESULT"
-	if [[ $( echo "$v_EMAIL_ADDRESS" | egrep -c "^[^@]+@[^.@]+\.[^@]+$" ) -eq 0 ]]; then
+	if [[ $( echo "$v_EMAIL_ADDRESS" | grep -E -c "^[^@]+@[^.@]+\.[^@]+$" ) -eq 0 ]]; then
 		v_EMAIL_ADDRESS=""
 	fi
 	fn_read_conf MAIL_DELAY child; v_MAIL_DELAY="$v_RESULT"
@@ -486,7 +486,7 @@ function fn_child_vars {
 	### Figure out where the verbosity is set
 	fn_read_conf VERBOSITY child; v_VERBOSITY="$v_RESULT"
 	fn_test_variable "$v_VERBOSITY" false VERBOSITY "$v_DEFAULT_VERBOSITY"; v_VERBOSITY="$v_RESULT"
-	if [[ $( echo "$v_VERBOSITY" | egrep -c "^(standard|none|more verbose|verbose|change)$" ) -eq 0 ]]; then
+	if [[ $( echo "$v_VERBOSITY" | grep -E -c "^(standard|none|more verbose|verbose|change)$" ) -eq 0 ]]; then
 		v_VERBOSITY="standard"
 	fi
 	fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
@@ -567,7 +567,7 @@ function fn_child_vars {
 		fn_read_conf USER_AGENT child; v_USER_AGENT="$v_RESULT"
 		fn_test_variable "$v_USER_AGENT" false USER_AGENT "$v_DEFAULT_USER_AGENT"; v_USER_AGENT="$v_RESULT"
 		### If there's an IP address, then the URL needs to have the domain replaced with the IP address and the port number.
-		if [[ $v_IP_ADDRESS != "false" && $( echo $v_CURL_URL | egrep -c "^(https?://)?$v_DOMAIN:[0-9]+" ) -eq 1 ]]; then
+		if [[ $v_IP_ADDRESS != "false" && $( echo $v_CURL_URL | grep -E -c "^(https?://)?$v_DOMAIN:[0-9]+" ) -eq 1 ]]; then
 			### If it's specified with a port in the URL, lets make sure that it's the right port (according to the params file).
 			v_CURL_URL="$( echo $v_CURL_URL | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/" )" #"
 		elif [[ $v_IP_ADDRESS != "false" ]]; then
@@ -621,7 +621,7 @@ function fn_child_vars {
 }
 
 ### Here's an example to test the logic being used for port numbers:
-### v_CURL_URL="https://sporks5000.com:4670/index.php"; v_DOMAIN="sporks5000.com"; v_SERVER_PORT=8080; v_IP_ADDRESS="10.30.6.88"; if [[ $( echo $v_CURL_URL | egrep -c "^(http://|https://)*$v_DOMAIN:[0-9][0-9]*" ) -eq 1 ]]; then echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/"; else echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/"; fi
+### v_CURL_URL="https://sporks5000.com:4670/index.php"; v_DOMAIN="sporks5000.com"; v_SERVER_PORT=8080; v_IP_ADDRESS="10.30.6.88"; if [[ $( echo $v_CURL_URL | grep -E -c "^(http://|https://)*$v_DOMAIN:[0-9][0-9]*" ) -eq 1 ]]; then echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/"; else echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/"; fi
 
 function fn_child_dates {
 	v_DATE3_LAST="$v_DATE3"
@@ -687,7 +687,7 @@ function fn_url_child {
 		fi
 		if [[ $v_CURL_VERBOSE == true && $v_LOG_HTTP_CODE == true ]]; then
 		### Capture the html response code, if so directed.
-			v_HTML_RESPONSE_CODE="$( cat "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt | egrep -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
+			v_HTML_RESPONSE_CODE="$( cat "$v_WORKINGDIR""$v_CHILD_PID"/current_verbose_output.txt | grep -E -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
 			if [[ -z $v_HTML_RESPONSE_CODE ]]; then
 				v_HTML_RESPONSE_CODE="No Code Reported"
 			fi
@@ -760,9 +760,9 @@ function fn_ping_child {
 	while [[ 1 == 1 ]]; do
 		fn_child_dates
 		v_CHECK_START=$( date +%s"."%N | head -c -6 )
-		v_PING_RESULT=$( ping -W2 -c1 $v_DOMAIN 2> /dev/null | egrep "icmp_[rs]eq" )
+		v_PING_RESULT=$( ping -W2 -c1 $v_DOMAIN 2> /dev/null | grep -E "icmp_[rs]eq" )
 		v_CHECK_END=$( date +%s"."%N | head -c -6 )
-		v_WATCH=$( echo $v_PING_RESULT | egrep -c "icmp_[rs]eq" )
+		v_WATCH=$( echo $v_PING_RESULT | grep -E -c "icmp_[rs]eq" )
 		if [[ $v_WATCH -ne 0 ]]; then
 			fn_report_status success
 		else
@@ -786,7 +786,7 @@ function fn_dns_child {
 		elif [[ -n $v_DNS_CHECK_RESULT ]]; then
 			v_QUERY_RESULT=$( dig +tries=1 +short $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | fgrep -c "$v_DNS_CHECK_RESULT" )
 		else
-			v_QUERY_RESULT=$( dig +tries=1 $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | egrep -c "ANSWER SECTION" )
+			v_QUERY_RESULT=$( dig +tries=1 $v_DNS_CHECK_DOMAIN @$v_DOMAIN 2> /dev/null | grep -F -c "ANSWER SECTION" )
 		fi
 		v_CHECK_END=$( date +%s"."%N | head -c -6 )
 		if [[ $v_QUERY_RESULT -ne 0 ]]; then
@@ -809,14 +809,14 @@ function fn_child_checks {
 	### fn_child_vars updates both the reload variables.
 		fn_child_vars
 	fi
-	if [[ $( ls -1 "$v_WORKINGDIR""$v_CHILD_PID"/ | egrep "^site_" | egrep -cv "current|previous" ) -gt $v_HTML_FILES_KEPT ]]; then
+	if [[ $( ls -1 "$v_WORKINGDIR""$v_CHILD_PID"/ | grep -E "^site_" | grep -E -cv "current|previous" ) -gt $v_HTML_FILES_KEPT ]]; then
 		### You'll notice that it's only removing one file. There should be no instances where more than one is generated per run, so removing one per run should always be sufficient.
-		rm -f "$v_WORKINGDIR""$v_CHILD_PID"/site_"$( ls -1t "$v_WORKINGDIR""$v_CHILD_PID"/ | egrep "^site_" | egrep -v "current|previous" | tail -n1 | sed "s/site_//" )"
+		rm -f "$v_WORKINGDIR""$v_CHILD_PID"/site_"$( ls -1t "$v_WORKINGDIR""$v_CHILD_PID"/ | grep -E "^site_" | grep -E -v "current|previous" | tail -n1 | sed "s/site_//" )"
 	fi
 	### If the domain or IP address shows up on the die list, this process can be killed.
-	if [[ $( egrep -c "^[[:blank:]]*($v_DOMAIN|$v_IP_ADDRESS)[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list ) -gt 0 ]]; then
-		echo "$v_DATE2 - [$v_CHILD_PID] - Process ended due to data on the remote list. The line reads \"$( egrep "^[[:blank:]]*($v_DOMAIN|$v_IP_ADDRESS)[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\"." >> "$v_LOG"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Process ended due to data on the remote list. The line reads \"$( egrep "^[[:blank:]]*($v_DOMAIN|$v_IP_ADDRESS)[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\"." >> "$v_WORKINGDIR""$v_CHILD_PID"/log
+	if [[ $( grep -E -c "^[[:blank:]]*($v_DOMAIN|$v_IP_ADDRESS)[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list ) -gt 0 ]]; then
+		echo "$v_DATE2 - [$v_CHILD_PID] - Process ended due to data on the remote list. The line reads \"$( grep -E "^[[:blank:]]*($v_DOMAIN|$v_IP_ADDRESS)[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\"." >> "$v_LOG"
+		echo "$v_DATE2 - [$v_CHILD_PID] - Process ended due to data on the remote list. The line reads \"$( grep -E "^[[:blank:]]*($v_DOMAIN|$v_IP_ADDRESS)[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\"." >> "$v_WORKINGDIR""$v_CHILD_PID"/log
 		touch "$v_WORKINGDIR""$v_CHILD_PID"/die
 	fi
 	### Wait until the next loop to die so that the full status will be recorded
@@ -1072,7 +1072,7 @@ function fn_report_status {
 	fi
 
 	### Check to see if the parent is still in place, and die if not.
-	if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | egrep -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 || -f "$v_WORKINGDIR""$v_CHILD_PID"/die ]]; then
+	if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 || -f "$v_WORKINGDIR""$v_CHILD_PID"/die ]]; then
 		v_DUMP_STATUS=true
 		v_DIE=true
 	fi
@@ -1219,7 +1219,7 @@ function fn_report_status {
 			a_RECENT_STATUSES=("${a_RECENT_STATUSES[@]:1}")
 		done
 		### If there are symptoms of intermittent failures, send an email regarding such.
-		if [[ $( echo "${a_RECENT_STATUSES[@]}" | egrep -o "failure|partial success" | wc -l ) -ge $v_NUM_STATUSES_NOT_SUCCESS && "$v_THIS_STATUS" == "success" ]]; then
+		if [[ $( echo "${a_RECENT_STATUSES[@]}" | grep -E -o "failure|partial success" | wc -l ) -ge $v_NUM_STATUSES_NOT_SUCCESS && "$v_THIS_STATUS" == "success" ]]; then
 			v_THIS_STATUS="intermittent failure"
 			fn_send_email
 		fi
@@ -1227,7 +1227,7 @@ function fn_report_status {
 }
 
 function fn_send_email {
-	v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n$( cat "$v_WORKINGDIR""$v_CHILD_PID"/log | egrep -v "\] - (The HTML response code|Status: (Check (failed|succeeded)|Partial success) - Duration)" )"
+	v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n$( cat "$v_WORKINGDIR""$v_CHILD_PID"/log | grep -E -v "\] - (The HTML response code|Status: (Check (failed|succeeded)|Partial success) - Duration)" )"
 	if [[ "$v_THIS_STATUS" == "intermittent failure" ]]; then
 		fn_intermittent_failure_email
 	elif [[ "$v_THIS_STATUS" == "success" ]]; then
@@ -1377,12 +1377,12 @@ function fn_master {
 		if [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
 			$v_CURL_BIN -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$v_WORKINGDIR"die_list 2> /dev/null
 		fi
-		v_REMOTE_VERSION="$( $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.sh 2> /dev/null | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+		v_REMOTE_VERSION="$( $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.sh 2> /dev/null | head -n 10 | grep -E "^v_VERSION" | cut -d "\"" -f2 )"
 	else
 		if [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
 			$v_WGET_BIN -q --timeout=10 -O "$v_WORKINGDIR"die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
 		fi
-		v_REMOTE_VERSION="$( $v_WGET_BIN -q --timeout=10 -O "/dev/stdout" http://lwmon.com/lwmon.sh 2> /dev/null | head -n 10 | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+		v_REMOTE_VERSION="$( $v_WGET_BIN -q --timeout=10 -O "/dev/stdout" http://lwmon.com/lwmon.sh 2> /dev/null | head -n 10 | grep -E "^v_VERSION" | cut -d "\"" -f2 )"
 	fi
 	fn_compare_version "http://wlmon.com/lwmon.sh" "color"
 	fn_create_mini_script
@@ -1407,8 +1407,8 @@ function fn_master {
 				v_LOCAL_IP="Not_Found"
 			fi
 			### Also, let's do getting rid of old processes here - there's no reason to do that every two seconds, and this already runs every half hour, so there's no need to create a separate timer for that.
-			for v_OLD_CHILD in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "^old_[0-9]+_[0-9]+$" ); do
-				if [[ $( echo $v_OLD_CHILD | egrep -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
+			for v_OLD_CHILD in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^old_[0-9]+_[0-9]+$" ); do
+				if [[ $( echo $v_OLD_CHILD | grep -E -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
 					if [[ $(( $( date +%s ) - $( echo $v_OLD_CHILD | cut -d "_" -f3 ) )) -gt 604800 ]]; then
 						### 604800 seconds = seven days.
 						fn_read_conf JOB_TYPE "$v_WORKINGDIR""$v_OLD_CHILD""/params"; v_JOB_TYPE="$v_RESULT"
@@ -1428,15 +1428,15 @@ function fn_master {
 			elif [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
 				$v_WGET_BIN -q --timeout=10 -O "$v_WORKINGDIR"die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
 			fi
-			if [[ $( egrep -c "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list ) -gt 0 ]]; then
+			if [[ $( grep -E -c "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list ) -gt 0 ]]; then
 				touch "$v_WORKINGDIR"die
 				touch "$v_WORKINGDIR"save
-				echo "$( date +%F" "%T" "%Z ) - [$$] - Local IP found on remote list. The line reads \"$( egrep "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\". Process ended." >> "$v_LOG"
+				echo "$( date +%F" "%T" "%Z ) - [$$] - Local IP found on remote list. The line reads \"$( grep -E "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$v_WORKINGDIR"die_list | head -n1 )\". Process ended." >> "$v_LOG"
 				fn_master_exit 1
 			fi
 			### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
-			for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "^[0-9]+$" ); do
-				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | egrep -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 ]]; then
+			for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^[0-9]+$" ); do
+				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$v_PROGRAMNAME[[:blank:]]" ) -eq 0 ]]; then
 					### If it hasn't been marked to die, restart it.
 					if [[ ! -f "$v_WORKINGDIR""$v_CHILD_PID/die" ]]; then
 						fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
@@ -1500,22 +1500,22 @@ function fn_compare_version {
 	if [[ ! -f "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check" || $(( $(date +%s) - $( stat --format=%Y "${HOME:-$v_PROGRAMDIR}/.$v_PROGRAMNAME"".version_check" ) )) -gt 7200 ]]; then
 		if [[ "$2" == "run" && "$( type -t timeout )" == "file" ]]; then
 			timeout 5 wget -q -o /dev/null --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL"
-			v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
+			v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | grep -E "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
 		elif [[ "$( type -t timeout )" == "file" ]]; then
-			v_REMOTE_VERSION="$( timeout 5 wget -q -o /dev/null --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
+			v_REMOTE_VERSION="$( timeout 5 wget -q -o /dev/null --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | grep -E "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
 		elif [[ "$2" == "run" && "$( type -t fn_timeout )" == "function" ]]; then
 			fn_timeout 5 wget -q -o /dev/null --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL" 
-			v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
+			v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | grep -E "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
 		elif [[ "$( type -t fn_timeout )" == "function" ]]; then
-			v_REMOTE_VERSION="$( fn_timeout 5 wget -q -o /dev/null --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
+			v_REMOTE_VERSION="$( fn_timeout 5 wget -q -o /dev/null --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | grep -E "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
 		elif [[ "$2" == "run" ]]; then
 			wget -q -o /dev/null --timeout=3 -O "$v_PROGRAMDIR""$v_PROGRAMNAME"1 "$v_SCRIPT_URL" 
-			v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
+			v_REMOTE_VERSION="$( head -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | grep -E "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
 		else
-			v_REMOTE_VERSION="$( wget -q -o /dev/null --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | egrep "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
+			v_REMOTE_VERSION="$( wget -q -o /dev/null --timeout=3 -O "/dev/stdout" "$v_SCRIPT_URL" | head -n 10 | grep -E "^(my .)*v_VERSION" | cut -d "\"" -f2 )"
 		fi
 		if [[ -n "$v_REMOTE_VERSION" ]]; then
-			if [[ ( "$2" == "run" && $( tail -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | egrep -c "^### End of Script" ) -eq 1 ) || "$2" != "run" ]]; then
+			if [[ ( "$2" == "run" && $( tail -n 10 "$v_PROGRAMDIR""$v_PROGRAMNAME"1 2> /dev/null | grep -E -c "^### End of Script" ) -eq 1 ) || "$2" != "run" ]]; then
 			### If the version number is present and the last line of the script is present...
 				if [[ $( echo "$v_REMOTE_VERSION" | cut -d "." -f1 ) -gt $( echo "$v_VERSION" | cut -d "." -f1 ) ]]; then
 					v_UPDATE=true
@@ -1558,7 +1558,7 @@ function fn_timeout { (
 ### Function Version 1.0.0
 ### This function expects $1 to be a number of seconds. Optionally $2 can be "--verbose" for verbose output.
 	v_VERBOSE=false
-	if [[ $( echo "$1" | egrep -c "^[0-9]+$" ) -eq 1 ]]; then
+	if [[ $( echo "$1" | grep -E -c "^[0-9]+$" ) -eq 1 ]]; then
 		v_SECONDS="$1"
 		shift
 	else
@@ -1576,7 +1576,7 @@ function fn_timeout { (
 		v_TIMESTAMP1=$( date +%s )
 		v_TIMESTAMP2=$( date +%N )
 		if [[ -n $v_PID ]]; then
-			while [[ -e /proc/$v_PID/cmdline && -z $( egrep -v "^${a_CL_ARGUMENTS[0]}" /proc/$v_PID/cmdline > /dev/null 2>&1 ) ]]; do
+			while [[ -e /proc/$v_PID/cmdline && -z $( grep -E -v "^${a_CL_ARGUMENTS[0]}" /proc/$v_PID/cmdline > /dev/null 2>&1 ) ]]; do
 				if [[ "$(( $v_TIMESTAMP1 + $v_SECONDS ))$v_TIMESTAMP2" -lt "$( date +%s )$( date +%N )" ]]; then
 					if [[ $v_VERBOSE == true ]]; then
 						echo "killing"
@@ -1598,7 +1598,7 @@ function fn_timeout { (
 ) }
 
 function fn_create_mini_script {
-	v_MINI_VERSION="$( head -n 10 $v_MINI_SCRIPT 2> /dev/null | egrep "^v_VERSION" | cut -d "\"" -f2 )"
+	v_MINI_VERSION="$( head -n 10 $v_MINI_SCRIPT 2> /dev/null | grep -E "^v_VERSION" | cut -d "\"" -f2 )"
 	if [[ $v_VERSION != $v_MINI_VERSION || $v_TESTING == true ]]; then
 		echo "#! /bin/bash" > "$v_MINI_SCRIPT"
 		echo "v_VERSION=\"$v_VERSION\"" >> "$v_MINI_SCRIPT"
@@ -1655,7 +1655,7 @@ function fn_master_exit {
 	### these steps are run after the master process has recieved a signal that it needs to die. "$1" is the exit code that should be passed.
 	v_EXIT_CODE="$1"
 	echo "$( date +%F" "%T" "%Z ) - [$$] - Ending the Master Process" >> "$v_LOG"
-	if [[ ! -f "$v_WORKINGDIR"die && $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "." | egrep -vc "[^0-9]" ) -gt 0 ]]; then
+	if [[ ! -f "$v_WORKINGDIR"die && $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -vc "[^0-9]" ) -gt 0 ]]; then
 		### If the "die" file is not present, it was CTRL-C'd from the command line. Check if there are child processes, then prompt if they should be saved.
 		### Create a no_output file
 		touch "$v_WORKINGDIR"no_output
@@ -1667,9 +1667,9 @@ function fn_master_exit {
 		read -t 15 -ep "How would you like to proceed? " v_OPTION_NUM
 		# If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
 		if [[ $v_OPTION_NUM == "1" ]]; then
-			for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "." | egrep -v "[^0-9]" ); do
+			for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 				v_CHILD_PID=$( basename $i )
-				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | egrep -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
+				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
 					touch "$v_WORKINGDIR""$v_CHILD_PID/die"
 				fi
 			done
@@ -1677,9 +1677,9 @@ function fn_master_exit {
 			echo
 		fi
 	elif [[ -f "$v_WORKINGDIR"die && ! -f "$v_WORKINGDIR"save ]]; then
-		for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "." | egrep -v "[^0-9]" ); do
+		for i in $( find $v_WORKINGDIR -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 			v_CHILD_PID=$( basename $i )
-			if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | egrep -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
+			if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
 				touch "$v_WORKINGDIR""$v_CHILD_PID/die"
 			fi
 		done
@@ -1703,7 +1703,7 @@ function fn_list {
 	echo "  1) [$( cat "$v_WORKINGDIR"lwmon.pid )] - Master Process (and lwmon in general)" #"
 	v_CHILD_NUMBER=2
 	a_CHILD_PID=()
-	for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "." | egrep -v "[^0-9]" ); do
+	for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		fn_read_conf JOB_NAME "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_NAME="$v_RESULT"
 		fn_read_conf JOB_TYPE "$v_WORKINGDIR""$v_CHILD_PID/params"; v_JOB_TYPE="$v_RESULT"
@@ -1787,7 +1787,7 @@ function fn_modify_old_jobs {
 	echo
 	v_CHILD_NUMBER=1
 	a_CHILD_PID=()
-	for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | egrep "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
+	for v_CHILD_PID in $( find "$v_WORKINGDIR" -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
 		v_ENDED_DATE="$( echo "$v_CHILD_PID" | cut -d "_" -f3 )"
 		v_ENDED_DATE="$( date --date="@$v_ENDED_DATE" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
@@ -1804,7 +1804,7 @@ function fn_modify_old_jobs {
 	fi
 	echo
 	read -ep "Which process do you want to modify? " v_CHILD_NUMBER
-	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | egrep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
+	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
 		echo "Invalid Option. Exiting."
 		exit 1
 	fi
@@ -1860,8 +1860,8 @@ function fn_modify_html {
 	echo
 	v_HTML_NUMBER=1
 	a_HTML_LIST=()
-	for v_HTML_NAME in $( find "$v_WORKINGDIR""$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | egrep "(success|fail)\.html$" | awk -F_ '{print $2"_"$3"_"$1}' | sort -n | awk -F_ '{print $3"_"$1"_"$2}' ); do
-		v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | egrep -o "[0-9]+_[psf]" | cut -d "_" -f1 )"
+	for v_HTML_NAME in $( find "$v_WORKINGDIR""$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | grep -E "(success|fail)\.html$" | awk -F_ '{print $2"_"$3"_"$1}' | sort -n | awk -F_ '{print $3"_"$1"_"$2}' ); do
+		v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | grep -E -o "[0-9]+_[psf]" | cut -d "_" -f1 )"
 		v_HTML_TIMESTAMP="$( date --date="@$v_HTML_TIMESTAMP" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		echo "  $v_HTML_NUMBER) $v_HTML_TIMESTAMP - $v_HTML_NAME"
@@ -1874,7 +1874,7 @@ function fn_modify_html {
 		exit 1
 	fi
 	read -ep "Which html file do you want options on? " v_HTML_NUMBER
-	if [[ "$v_HTML_NUMBER" == "0" || $( echo "$v_HTML_NUMBER" | egrep -vc "[^0-9]" ) -eq 0 || "$v_HTML_NUMBER" -ge $(( ${#a_HTML_LIST[@]} + 1 )) ]]; then
+	if [[ "$v_HTML_NUMBER" == "0" || $( echo "$v_HTML_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_HTML_NUMBER" -ge $(( ${#a_HTML_LIST[@]} + 1 )) ]]; then
 		echo "Invalid Option. Exiting."
 		exit 1
 	fi
@@ -1907,7 +1907,7 @@ function fn_modify {
 	fn_list
 	echo
 	read -ep "Which process do you want to modify? " v_CHILD_NUMBER
-	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | egrep -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
+	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
 		echo "Invalid Option. Exiting."
 		exit 1
 	fi
@@ -1988,37 +1988,37 @@ function fn_read_conf {
 		if [[ "$( stat --format=%Y "$v_WORKINGDIR""$v_CHILD_PID/params" )" -gt "$v_CHILD_CONF_STAT" ]]; then
 		### Only re-read the conf file if there have been changes to it.
 			v_CHILD_CONF_STAT="$( stat --format=%Y "$v_WORKINGDIR""$v_CHILD_PID/params" )"
-			v_CHILD_CONF="$( egrep -v "^[[:blank:]]*(#|$)" "$v_WORKINGDIR""$v_CHILD_PID/params" | xxd -p | tr -d '\n' )"
+			v_CHILD_CONF="$( grep -E -v "^[[:blank:]]*(#|$)" "$v_WORKINGDIR""$v_CHILD_PID/params" | xxd -p | tr -d '\n' )"
 		fi
 		if [[ $4 == "multi" ]]; then
-			i=0; while [[ $i -lt $( echo -n "$v_CHILD_CONF" | xxd -r -p | egrep -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" ) ]]; do
-				a_RESULT[$i]="$( echo -n "$v_CHILD_CONF" | xxd -r -p | egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | sed -n "$(( $i + 1 )) p" | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			i=0; while [[ $i -lt $( echo -n "$v_CHILD_CONF" | xxd -r -p | grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" ) ]]; do
+				a_RESULT[$i]="$( echo -n "$v_CHILD_CONF" | xxd -r -p | grep -E "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | sed -n "$(( $i + 1 )) p" | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
 				i=$(( $i + 1 ))
 			done
 		else
-			v_RESULT="$( echo -n "$v_CHILD_CONF" | xxd -r -p | egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			v_RESULT="$( echo -n "$v_CHILD_CONF" | xxd -r -p | grep -E "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
 		fi
 	elif [[ $2 == "master" && -f "$v_WORKINGDIR""lwmon.conf" ]]; then
 		if [[ "$( stat --format=%Y "$v_WORKINGDIR""lwmon.conf" )" -gt "$v_MASTER_CONF_STAT" ]]; then
 		### Only re-read the conf file if there have been changes to it.
 			v_MASTER_CONF_STAT="$( stat --format=%Y "$v_WORKINGDIR""lwmon.conf" )"
-			v_MASTER_CONF="$( egrep -v "^[[:blank:]]*(#|$)" "$v_WORKINGDIR""lwmon.conf" | xxd -p | tr -d '\n' )"
+			v_MASTER_CONF="$( grep -E -v "^[[:blank:]]*(#|$)" "$v_WORKINGDIR""lwmon.conf" | xxd -p | tr -d '\n' )"
 		fi
 		if [[ $4 == "multi" ]]; then
-			i=0; while [[ $i -lt $( echo -n "$v_MASTER_CONF" | xxd -r -p | egrep -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" ) ]]; do
-				a_RESULT[$i]="$( echo -n "$v_MASTER_CONF" | xxd -r -p | egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | sed -n "$(( $i + 1 )) p" | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			i=0; while [[ $i -lt $( echo -n "$v_MASTER_CONF" | xxd -r -p | grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" ) ]]; do
+				a_RESULT[$i]="$( echo -n "$v_MASTER_CONF" | xxd -r -p | grep -E "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | sed -n "$(( $i + 1 )) p" | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
 				i=$(( $i + 1 ))
 			done
 		else
-			v_RESULT="$( echo -n "$v_MASTER_CONF" | xxd -r -p | egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
+			v_RESULT="$( echo -n "$v_MASTER_CONF" | xxd -r -p | grep -E "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
 		fi
 	elif [[ -f $2 && $4 == "multi" ]]; then
-		i=0; while [[ $i -lt $( egrep -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" "$2" 2> /dev/null) ]]; do
-			a_RESULT[$i]="$( egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" "$2" 2> /dev/null) | sed -n "$(( $i + 1 )) p" | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		i=0; while [[ $i -lt $( grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" "$2" 2> /dev/null) ]]; do
+			a_RESULT[$i]="$( grep -E "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" "$2" 2> /dev/null) | sed -n "$(( $i + 1 )) p" | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
 			i=$(( $i + 1 ))
 		done
 	elif [[ -f $2 ]]; then
-		v_RESULT="$( egrep "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" "$2" 2> /dev/null | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
+		v_RESULT="$( grep -E "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*[^[:blank:]][^[:blank:]]*" "$2" 2> /dev/null | tail -n1 | sed "s/^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*//;s/[[:blank:]]*$//" )"
 	fi
 	if [[ -z ${a_RESULT[@]} && -n $3 && $4 == "multi" ]]; then
 		a_RESULT[0]="$3"
@@ -2039,11 +2039,11 @@ function fn_update_conf {
 	if [[ -f "$v_CONF_FILE" ]]; then
 		### We're about to run $2 through sed, so it needs to have all of its slashes escaped.
 		v_MODIFIED_2="$( echo "$2" | sed -e 's/[\/&]/\\&/g' )"
-		if [[ $( egrep -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
-			sed -i "$( egrep -n "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/\(^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
-		elif [[ $( egrep -c "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*$" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
+		if [[ $( grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
+			sed -i "$( grep -E -n "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/\(^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
+		elif [[ $( grep -E -c "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*$" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
 		### If there's a commended-out line, but it doesn't have a value afterward...
-			sed -i "$( egrep -n "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/^[[:blank:]]*##*\([[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
+			sed -i "$( grep -E -n "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/^[[:blank:]]*##*\([[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
 		else
 			echo "$1 = $v_MODIFIED_2" >> "$v_CONF_FILE"
 		fi
@@ -2053,12 +2053,12 @@ function fn_update_conf {
 function fn_test_variable {
 	### This function assumes that $1 is the variable in question $2 is "true" or "false" whether it needs to be a number, $3 is "false" if the variable cannot be pulled from the main config, and the directive name within the main config if it can be pulled from the main config, and $4 is what it should be set to if a setting is not found.
 	unset v_RESULT
-	if [[ $3 != "false" && ( -z $1 || $1 == "default" || ( $2 == true && $( echo $1 | egrep -c "[^0-9.]" ) -gt 0 ) ) ]]; then
+	if [[ $3 != "false" && ( -z $1 || $1 == "default" || ( $2 == true && $( echo $1 | grep -E -c "[^0-9.]" ) -gt 0 ) ) ]]; then
 		fn_read_conf "$3" master; v_RESULT="$v_RESULT"
 	else
 		v_RESULT="$1"
 	fi
-	if [[ -z $v_RESULT || $v_RESULT == "default" || ( $2 == true && $( echo $1 | egrep -c "[^0-9.]" ) -gt 0 ) ]]; then
+	if [[ -z $v_RESULT || $v_RESULT == "default" || ( $2 == true && $( echo $1 | grep -E -c "[^0-9.]" ) -gt 0 ) ]]; then
 		v_RESULT="$4"
 	fi
 }
@@ -2115,7 +2115,7 @@ function fn_parse_cl_argument {
 	### If there is no equal sign, the next argument is the modifier for the flag
 		if [[ -n "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" && ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
 		### If the next argument doesn't begin with a dash.
-			if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
+			if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | grep -E -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
 			### If it's not bool, or if it is bool, but the next argument is neither true nor false
 				c=$(( $c + 1 ))
 				v_RESULT="${a_CL_ARGUMENTS[$c]}"
@@ -2141,7 +2141,7 @@ function fn_parse_cl_argument {
 	elif [[ -n "$3" && "$v_ARGUMENT" =~ ^$3$ && "$2" != "none" ]]; then
 	### If there is no equal sign, the next argument is the modifier for the alternate flag
 		if [[ -n "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" && ! "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" =~ ^- ]]; then
-			if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
+			if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" | grep -E -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
 				c=$(( $c + 1 ))
 				v_RESULT="${a_CL_ARGUMENTS[$c]}"
 			fi
@@ -2212,7 +2212,7 @@ function fn_parse_cl_argument {
 			v_RESULT="$v_RESULT/"
 		fi
 	elif [[ $2 == "bool" ]]; then
-		if [[ $( echo "$v_RESULT" | egrep -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 0 ]]; then
+		if [[ $( echo "$v_RESULT" | grep -E -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 0 ]]; then
 			if [[ -z "$4" || "$4" == "exit" ]]; then
 				echo "The flag \"$1\" needs to be followed by \"true\" or \"false\". Exiting."
 				exit 1
@@ -2221,9 +2221,9 @@ function fn_parse_cl_argument {
 			else
 				v_RESULT="true"
 			fi
-		elif [[ $( echo "$v_RESULT" | egrep -c "^[Tt]([Rr][Uu][Ee])*$" ) -eq 1 ]]; then
+		elif [[ $( echo "$v_RESULT" | grep -E -c "^[Tt]([Rr][Uu][Ee])*$" ) -eq 1 ]]; then
 			v_RESULT="true"
-		elif [[ $( echo "$v_RESULT" | egrep -c "^[Ff]([Aa][Ll][Ss][Ee])*$" ) -eq 1 ]]; then
+		elif [[ $( echo "$v_RESULT" | grep -E -c "^[Ff]([Aa][Ll][Ss][Ee])*$" ) -eq 1 ]]; then
 			v_RESULT="false"
 		fi
 	fi
@@ -2832,6 +2832,7 @@ Future Versions -
     - Scripts defined by the "SCRIPT" parameter can now include arguments
     - Separated the curl result from the verbose output
     - Saved html files now have the timestamp before the status, so alphabetical order will also be chronological order
+    - Changed all instances of "egrep" to "grep -E"
 
 2.3.8 (2018-08-02) -
     - "--curl" is now synonymous with "--url"
@@ -2928,7 +2929,7 @@ function fn_start_script {
 	### find the newst version of curl
 	### /usr/bin/curl is the standard installation of curl
 	### /opt/curlssl/bin/curl is where cPanel keeps the version of curl that PHP works with, which is usually the most up to date
-	v_CURL_BIN=$( echo -e "$( /opt/curlssl/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /opt/curlssl/bin/curl\n$( /usr/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /usr/bin/curl\n$( $( which curl ) --version 2> /dev/null | head -n1 | awk '{print $2}' ) $( which curl )" | sort -n | egrep "^[0-9]+\.[0-9]+" | tail -n1 | awk '{print $2}' )
+	v_CURL_BIN=$( echo -e "$( /opt/curlssl/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /opt/curlssl/bin/curl\n$( /usr/bin/curl --version 2> /dev/null | head -n1 | awk '{print $2}' ) /usr/bin/curl\n$( $( which curl ) --version 2> /dev/null | head -n1 | awk '{print $2}' ) $( which curl )" | sort -n | grep -E "^[0-9]+\.[0-9]+" | tail -n1 | awk '{print $2}' )
 	fn_read_conf USE_WGET master "$v_DEFAULT_USE_WGET"; v_USE_WGET="$v_RESULT"
 	if [[ -z "$v_CURL_BIN" || $v_USE_WGET == "true" ]]; then
 		fn_use_wget
@@ -2967,7 +2968,7 @@ for i in dig ping stat ssh; do
 done
 
 ### Determine the running state
-if [[ -f "$v_WORKINGDIR"lwmon.pid && $( cat /proc/$( cat "$v_WORKINGDIR"lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | egrep -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
+if [[ -f "$v_WORKINGDIR"lwmon.pid && $( cat /proc/$( cat "$v_WORKINGDIR"lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$v_PROGRAMNAME[[:blank:]]" ) -gt 0 ]]; then
 	if [[ $PPID == $( cat "$v_WORKINGDIR"lwmon.pid ) ]]; then
 		### Child processes monitor one thing only they are spawned only by the master process and when the master process is no longer present, they die.
 		v_RUNNING_STATE="child"
@@ -2999,7 +3000,7 @@ v_CURL_STRING_COUNT=0
 ### For each command line argument, determine what needs to be done.
 for (( c=0; c<=$(( $# - 1 )); c++ )); do
 	v_ARGUMENT="${a_CL_ARGUMENTS[$c]}"
-	if [[ $( echo $v_ARGUMENT | egrep -c "^(--((c?url|dns|ping|kill|(ssh-)*load)(=.*)*|list|master|version|help|help-flags|help-process-types|help-params-file|help-files|modify)|[^-]*-[hmpudl])$" ) -gt 0 ]]; then
+	if [[ $( echo $v_ARGUMENT | grep -E -c "^(--((c?url|dns|ping|kill|(ssh-)*load)(=.*)*|list|master|version|help|help-flags|help-process-types|help-params-file|help-files|modify)|[^-]*-[hmpudl])$" ) -gt 0 ]]; then
 		### These flags indicate a specific action for the script to take. Two actinos cannot be taken at once.
 		if [[ -n $v_RUN_TYPE ]]; then
 			### If another of these actions has already been specified, end.
@@ -3007,20 +3008,20 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
 			exit 1
 		fi
 		v_RUN_TYPE="$( echo "$v_ARGUMENT" | cut -d "=" -f1 )"
-		if [[ $( echo "$v_ARGUMENT" | egrep -c "^-(u|-c?url)($|=)" ) -eq 1 ]]; then
+		if [[ $( echo "$v_ARGUMENT" | grep -E -c "^-(u|-c?url)($|=)" ) -eq 1 ]]; then
 			fn_parse_cl_argument "$v_RUN_TYPE" "string" "-u"; v_CURL_URL="$v_RESULT"
 			v_RUN_TYPE="--url"
-		elif [[ $( echo "$v_ARGUMENT" | egrep -c "^-(d|-dns)($|=)" ) -eq 1 ]]; then
+		elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^-(d|-dns)($|=)" ) -eq 1 ]]; then
 			fn_parse_cl_argument "--dns" "string" "-d"; v_DOMAIN="$v_RESULT"
 			v_RUN_TYPE="--dns"
-		elif [[ $( echo "$v_ARGUMENT" | egrep -c "^-(p|-ping)($|=)" ) -eq 1 ]]; then
+		elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^-(p|-ping)($|=)" ) -eq 1 ]]; then
 			fn_parse_cl_argument "--ping" "string" "-p"; v_DOMAIN="$v_RESULT"
 			v_RUN_TYPE="--ping"
-		elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ssh-)*load($|=)" ) -eq 1 ]]; then
+		elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(ssh-)*load($|=)" ) -eq 1 ]]; then
 			fn_parse_cl_argument "--ssh-load" "string" "--load"; v_DOMAIN="$v_RESULT"
 			v_RUN_TYPE="--ssh-load"
-		elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--kill($|=)" ) -eq 1 ]]; then
-			if [[ $( echo "$v_ARGUMENT" | egrep -c "^--kill=" ) -eq 1 || ( -n ${a_CL_ARGUMENTS[$(( $c + 1 ))]} && $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | egrep -c "^-" ) -eq 0 ) ]]; then
+		elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--kill($|=)" ) -eq 1 ]]; then
+			if [[ $( echo "$v_ARGUMENT" | grep -E -c "^--kill=" ) -eq 1 || ( -n ${a_CL_ARGUMENTS[$(( $c + 1 ))]} && $( echo ${a_CL_ARGUMENTS[$(( $c + 1 ))]} | grep -E -c "^-" ) -eq 0 ) ]]; then
 				fn_parse_cl_argument "--kill" "num"; v_CHILD_PID="$v_RESULT"
 			fi
 		fi
@@ -3032,59 +3033,59 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
 	elif [[ $v_ARGUMENT == "--testing" ]]; then
 		v_TESTING=true
 		v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS - 1 ))
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--user-agent($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--user-agent($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--user-agent" "bool" "--user-agent" "true"; v_USER_AGENT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ldd|log-duration-data)($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(ldd|log-duration-data)($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--ldd" "bool" "--log-duration-data" "true"; v_LOG_DURATION_DATA="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--wget($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--wget($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--wget" "bool" "--wget" "false"; v_USE_WGET="$v_RESULT"
 		if [[ $v_USE_WGET == "true" ]]; then
 			fn_use_wget
 		fi
 		v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS - 1 ))
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(e)*mail($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(e)*mail($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--mail" "string" "--email"; v_EMAIL_ADDRESS="$v_RESULT"
-		if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | egrep -c "^[^@]+@[^.@]+\.[^@]+$" ) -lt 1 ]]; then
+		if [[ -z $v_EMAIL_ADDRESS || $( echo $v_EMAIL_ADDRESS | grep -E -c "^[^@]+@[^.@]+\.[^@]+$" ) -lt 1 ]]; then
 			echo "The flag \"--mail\" needs to be followed by an e-mail address. Exiting."
 			exit 1
 		fi
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--seconds($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--seconds($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--seconds" "float"; v_WAIT_SECONDS="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--ctps($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--ctps($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--ctps" "float"; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--check-timeout($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--check-timeout($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--check-timeout" "float"; v_CHECK_TIMEOUT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--mail-delay($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--mail-delay($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--mail-delay" "num"; v_MAIL_DELAY="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--load-ps($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--load-ps($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--load-ps" "float"; v_MIN_LOAD_PARTIAL_SUCCESS="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--load-fail($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--load-fail($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--load-fail" "float"; v_MIN_LOAD_FAILURE="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--port($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--port($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--port" "num"; v_CL_PORT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ndr|num-durations-recent)($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(ndr|num-durations-recent)($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--ndr" "num" "--num-durations-recent"; v_NUM_DURATIONS_RECENT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(nsr|num-statuses-recent)($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(nsr|num-statuses-recent)($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--nsr" "num" "--num-statuses-recent"; v_NUM_STATUSES_RECENT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(nsns|num-statuses-not-success)($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(nsns|num-statuses-not-success)($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--nsns" "num" "--num-statuses-not-success"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ident|ticket)($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(ident|ticket)($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--ident" "num" "--ticket"; v_IDENT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--ip(-address)*($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--ip(-address)*($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--ip" "string" "--ip-address"; v_IP_ADDRESS="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--string($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--string($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--string" "string"; a_CURL_STRING[${#a_CURL_STRING[@]}]="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(check-)*domain($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(check-)*domain($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--domain" "string" "--check-domain"; v_DNS_CHECK_DOMAIN="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--check-result($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--check-result($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--check-result" "string"; v_DNS_CHECK_RESULT="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--record-type($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--record-type($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--record-type" "string"; v_DNS_RECORD_TYPE="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--(ssh-)*user($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--(ssh-)*user($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--user" "string" "--ssh-user"; v_SSH_USER="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--job-name($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--job-name($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--job-name" "string"; v_JOB_NAME="$v_RESULT"
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--verbos(e|ity)($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--verbos(e|ity)($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--verbosity" "string" "--verbose"; v_VERBOSITY="$v_RESULT"
 		if [[ $v_VERBOSITY == "more" && "${a_CL_ARGUMENTS[$(( $c + 1 ))]}" == "verbose" ]]; then
 			c=$(( $c + 1 ))
@@ -3092,11 +3093,11 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
 		elif [[ $v_VERBOSITY == "more" ]]; then
 			v_VERBOSITY="more verbose"
 		fi
-		if [[ $( echo "$v_VERBOSITY" | egrep -c "^(verbose|more verbose|standard|change|none)$" ) -eq 0 ]]; then
+		if [[ $( echo "$v_VERBOSITY" | grep -E -c "^(verbose|more verbose|standard|change|none)$" ) -eq 0 ]]; then
 			echo "The flag \"--verbosity\" needs to be followed by either \"verbose\", \"more verbose\", \"standard\", \"change\", or \"none\". Exiting."
 			exit 1
 		fi
-	elif [[ $( echo "$v_ARGUMENT" | egrep -c "^--out(put-)*file($|=)" ) -eq 1 ]]; then
+	elif [[ $( echo "$v_ARGUMENT" | grep -E -c "^--out(put-)*file($|=)" ) -eq 1 ]]; then
 		fn_parse_cl_argument "--outfile" "string" "--output-file"; v_OUTPUT_FILE="$v_RESULT"
 		fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
 		if [[ -z "$v_OUTPUT_FILE" ]]; then
@@ -3104,7 +3105,7 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
 			exit 1
 		fi
 	else
-		if [[ $( echo "$v_ARGUMENT "| egrep -c "^-" ) -eq 1 ]]; then
+		if [[ $( echo "$v_ARGUMENT "| grep -E -c "^-" ) -eq 1 ]]; then
 			echo "There is no such flag \"$v_ARGUMENT\". Exiting."
 		else
 			echo "I don't understand what flag the argument \"$v_ARGUMENT\" is supposed to be associated with. Exiting."
