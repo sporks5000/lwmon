@@ -1,0 +1,224 @@
+
+FLAGS FOR MONITORING JOB TYPES:
+
+--dns [HOSTNAME or IP] --domain [DOMAIN NAME]
+    - This flag is used to start a new monitoring job for DNS services on a remote server. 
+    - The following optional flags can be used:
+        - "--check-result"
+        - "--control"
+        - "--ident"
+        - "--job-name"
+        - "--ldd"
+        - "--mail"
+        - "--mail-delay"
+        - "--ndr"
+        - "--nds"
+        - "--nsns"
+        - "--outfile"
+        - "--record-type"
+        - "--seconds"
+        - "--verbosity"
+
+--ping [HOSTNAME or IP]
+    - This flag is used to start a new monitoring job to watch whether or not a server is pinging.
+    - The following optional flags can be used:
+        - "--control"
+        - "--ident"
+        - "--job-name"
+        - "--ldd"
+        - "--mail"
+        - "--mail-delay"
+        - "--ndr"
+        - "--nds"
+        - "--nsns"
+        - "--outfile"
+        - "--seconds"
+        - "--verbosity"
+
+--ssh-load [HOSTNAME or IP] --user [USERNAME]
+--load [HOSTNAME or IP] --user [USERNAME]
+    - This flag is used to start a new monitoring job to watch a remote server's load.
+    - This requires the presence of an SSH control socket (You will be told how to fix this if you try running a job without one).
+    - The user must also provide the user name that they're connecting to the remote server with
+    - The following optional flags can be used:
+        - "--check-timeout"
+        - "--control"
+        - "--ctps"
+        - "--ident"
+        - "--job-name"
+        - "--ldd"
+        - "--load-ps"
+        - "--load-fail"
+        - "--mail"
+        - "--mail-delay"
+        - "--ndr"
+        - "--nds"
+        - "--nsns"
+        - "--outfile"
+        - "--port"
+        - "--seconds"
+        - "--verbosity"
+
+--url [URL] --string [TEXT STRING]
+--curl [URL] --string [TEXT STRING]
+    - This flag is used to start a new monitoring job to confirm that a URL is loading as expected.
+    - The user must provide a string of text to locate within the response from the server in order to verify that the site is loading as expected.
+    - The following optional flags can be used:
+        - "--check-timeout"
+        - "--control"
+        - "--ctps"
+        - "--ident"
+        - "--ip"
+        - "--job-name"
+        - "--ldd"
+        - "--mail"
+        - "--mail-delay"
+        - "--ndr"
+        - "--nds"
+        - "--nsns"
+        - "--outfile"
+        - "--seconds"
+        - "--user-agent"
+        - "--verbosity"
+        - "--wget"
+
+
+FLAGS FOR ADDITIONAL SPECIFICATIONS FOR MONITORING JOBS
+
+--check-result [STRING]
+    - This flag allows the user to specify a string of text that must be present in the "dig +short" result of a DNS check.
+
+--check-timeout [NUMBER (with or without decimal places)]
+    - This flag specifies how long a check should wait before giving up. The default here is 10 seconds, but this can be modified in the main config file.
+
+--control
+    - Designates the process as a control process - I.E. it just lays out the specifics of a child process and puts them in place for the master process to spawn, but even if there is not currently a master process, it does not designate itself master and spawn the process that's been specified.
+    - Run `./lwmon.sh --help process-types` for more information on master, control, and child processes.
+
+--ctps [NUMBER (with or without decimal places)]
+    - Allows the user to specify a minimum number of seconds before a url or ssh-load job is considered a partial success. That is, should the result that's returned be considered a success in every other way, the amount of time that it took for the result to be returned should still be conveyed as a cause of concern to the user.
+
+--domain [DOMAIN NAME]
+--check-domain [DOMAIN NAME]
+    - For DNS Jobs, specifies the domain name that you're querying the DNS server for. 
+
+--ident [INTEGER]
+--ticket [INTEGER]
+    - Allows the user to specify an identifying string of numbers that can be added to the job name. This can, for example, be an account number or ticket number
+    - If the --job-name flag isn't used, this string is added to the end of the job name. 
+
+--ip [IP ADDRESS]
+--ip-address [IP ADDRESS]
+    - Used for "--url" jobs. This flag is used to specify the IP address of the server that you're running the check against.
+    - Without this flag, a DNS query is used to determine what IP the site needs to be pulled from.
+    - Usage of this flag is perfect for situations where multiple load balanced servers need to be monitored at once, or where the customer's DNS A record is pointing at cloudflare, and you're trying to determine whether connectivity issues are server specific, or cloudflare specific.
+
+--job-name [STRING OF TEXT]
+    - Allows the user to specify an identifying job name at the command line.
+
+--ldd [EITHER "true" OR "false"]
+--log-duration-data [EITHER "true" OR "false"]
+    - Tells the job whether or not to add the time it takes for each check to complete to the child process's log file.
+
+--load-fail [NUMBER (with or without decimal places)]
+    - For an ssh-load job, this is the flag used to specify the minimum load at which the check returns as a failure rather than as a success or partial success.
+
+--load-ps [NUMBER (with or without decimal places)]
+    - For an ssh-load job, this is the flag used to specify the minimum load at which the check returns as a partial success rather than as a success.
+
+--mail [EMAIL ADDRESS]
+--email [EMAIL ADDRESS]
+    - Specifies the e-mail address to which alerts regarding changes in status should be sent.
+
+--mail-delay [INTEGER]
+    - Specifies the number of failed or successful chacks that need to occur in a row before an e-mail message is sent.
+    - The default is to send a message after 2 checks that have had a different result than the previous ones. This default can be changed in the configuration file.
+    - Setting this to "0" prevents e-mail allerts from being sent.
+
+--ndr [INTEGER]
+--num-durations-recent [INTEGER]
+    - The script keeps track of the average amount of time it takes to perform a check over X number of checks. This defaults to 10 checks, but this default can be changed within the configuration file.
+
+--nsns [INTEGER]
+--num-statuses-not-success [INTEGER]
+    - The "--nsns" and "--nsr" flags can be used together to determine if an email alert needs to be sent regarding a job that keeps fluctuating between success and failure, but has succeeded enough that an email would not otherwise be sent.
+    - If the ststus of a job is not successful X out of Y times, an email will be sent. "--nsns" allows the user to set X; "--nsr" allows the user to set Y.
+
+--nsr [INTEGER]
+--num-statuses-recent [INTEGER]
+    - The "--nsns" and "--nsr" flags can be used together to determine if an email alert needs to be sent regarding a job that keeps fluctuating between success and failure, but has succeeded enough that an email would not otherwise be sent.
+    - If the ststus of a job is not successful X out of Y times, an email will be sent. "--nsns" allows the user to set X; "--nsr" allows the user to set Y.
+    - After an email has been sent indicating intermittent failures, there must be a number of successful checks equal to the number specified by "--nsr" before another success message will be sent
+
+--outfile [PATH TO FILE]
+--output-file [PATH TO FILE]
+    - By default, child processes output the results of their checks to the standard out (/dev/stdout) of the master process. This flag allows that output to be redirected to a file.
+
+--port [PORT NUMBER]
+    - Specify a port number to connect to for ssh-load jobs.
+
+--record-type
+    - This flag allows the user to specify the type of DNS record that is being requested in a DNS job.
+
+--seconds [NUMBER (with or without decimal places)]
+    - Specifies the number of seconds after a check has completed to begin a new check. The default is 30 seconds, but this default can be changed in the configuration file.
+
+--string [STRING OF TEXT]
+    - Used with "--url". This specifies the string that the contents of the curl'd page will be searched for in order to confirm that it is loading correctly. Under optimal circumstances, this string should be something generated via php code that pulls information from a database - thus no matter if it's apache, mysql, or php that's failing, a change in status will be detected.
+    - This string cannot contain new line characters and should not begin with whitespace.
+    - This string is searched for using "fgrep", so no regex will be interpreted.
+    - This flag can be used more than once for a job. If so, a full success will be reported only if all strings are present in the response.
+
+--user [USERNAME]
+--ssh-user [USERNAME]
+    - For an ssh-load job, this flag is used to specify the user that we are connecting to the server with.
+
+--user-agent [EITHER "true" OR "false"]
+    - When used with "--url", this will cause the curl command to be run in such a way that the chrome 67 user agent is imitated.
+    - This is useful in situations where a site is refusing connections from the standard user agent.
+
+--verbosity [ONE OF THE FOLLOWING: "standard", "verbose", "more verbose", "change", "none"]
+--verbose [ONE OF THE FOLLOWING: "standard", "verbose", "more verbose", "change", "none"]
+    - Allows the user to specify the verbosity level of the output of a child processes.
+        - "standard": Outputs for every check whether it has succeeded or failed.
+        - "verbose": In addition to the information given from the standard output, also indicates how long checks for that job have been running, how many have been run, and the percentage of successful checks.
+        - "more verbose": Outputs multiple lines with the data from verbose, as well as data on how long the checks are taking.
+        - "change": Only outputs text on the first failure after any number of successes, or the first success after any number of failures.
+        - "none": output no text.
+
+--wget [EITHER "true" OR "false"]
+    - Forces the script to use wget rather than curl. Curl is typically preferred as its behavior is slightly more predictable and its error output is slightly more specific.
+
+
+OTHER FLAGS:
+
+-h
+--help
+    - Displays the basic help information.
+    - If followed by one of the following keywords, provides additional details regarding that topic: "flags", "params-file", "process-types", "notes", "files"
+
+--kill
+    - Used to terminate the master LWmon process, which in turn prompts any child processes to exit as well.
+    - If followed by the "--safe" flag, prompts LWmon to save all of the current running child processes before exiting so that they will be restarted automaticaly when LWmon is next launched.
+
+-l
+--list
+    - Lists the current LWmon child processes, then exits.
+     
+--master
+    - Immediately designates itself as the master process. If any prompts are waiting, it spawns child processes as they describe, it then checks periodically for new prompts and spawns processes accordingly.
+    - If the master process ends, all child processes it has spawned will recognize that it has ended, and end as well.
+    - Run `./lwmon.sh --help process-types` for more information on master, control, and child processes.
+
+-m
+--modify
+    - Prompts you with a list of currently running child processes and allows you to modify how they function and what they're checking against, or kill them off if they're no longer desired.
+
+--testing
+##### I need to fix this functionality
+    - Requires that the minified version of the script be rebuilt for every new child process. This flag only has function when used to spawn the master process.
+
+--version
+    - Outputs the current verson number.
+    - If followed by the "--full" flag, outputs the full changelog.
+

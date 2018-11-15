@@ -1,0 +1,271 @@
+#! /bin/bash
+
+function fn_url_cl {
+	### Verify that the correct information was given at the command line
+	if [[ -z "$v_CURL_URL" || -z "${a_CURL_STRING[0]}" ]]; then
+		echo "For url jobs, both the \"--url\" and \"--string\" flags require arguments."
+		exit 1
+	elif [[ $( echo -n "${v_DNS_CHECK_DOMAIN}${v_DNS_CHECK_RESULT}${v_DNS_RECORD_TYPE}${v_SSH_USER}${v_MIN_LOAD_PARTIAL_SUCCESS}${v_MIN_LOAD_FAILURE}${v_CL_PORT}" | wc -c ) -gt 0 ]]; then
+		echo "The only flags that can be used with url jobs are the following:"
+		echo "--url, --string, --user-agent, --ip, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --wget, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
+		exit 1
+	fi
+	### If there is an IP address, check to make sure that it's really an IP address, or can be translated into one.
+	if [[ -n "$v_IP_ADDRESS" ]]; then
+		fn_parse_server "$v_IP_ADDRESS"
+		if [[ "$v_IP_ADDRESSa" == false ]]; then
+			echo "The IP address provided with the \"--ip\" flag is not a valid IP address. Exiting."
+			exit 1
+		fi
+		v_IP_ADDRESS="$v_IP_ADDRESSa"
+	fi
+	fn_parse_server "$v_CURL_URL"
+	v_CURL_URL="$v_CURL_URLa"
+	### If there isn't an IP address, we don't need to specify it in the job name.
+	if [[ -z "$v_IP_ADDRESS" || "$v_IP_ADDRESS" == "false" ]]; then
+		v_IP_ADDRESS=false
+		v_ORIG_JOB_NAME="$v_CURL_URL"
+	else
+		v_ORIG_JOB_NAME="$v_CURL_URL at $v_IP_ADDRESS"
+	fi 
+	### Start inputting the values into the params file
+	v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+	echo "JOB_TYPE = url" > "$d_WORKING"/"$v_NEW_JOB"
+
+	echo "CURL_URL = $v_CURL_URL" >> "$d_WORKING"/"$v_NEW_JOB"
+	i=0; while [[ $i -le $(( ${#a_CURL_STRING[@]} -1 )) ]]; do
+		### The sed at the end of this line should make the string egrep safe (which is good, because egrepping with it is exactly what we're going to do).
+		echo "CURL_STRING = ${a_CURL_STRING[$i]}" >> "$d_WORKING"/"$v_NEW_JOB"
+		i=$(( $i + 1 ))
+	done
+	if [[ -z "$v_USER_AGENT" ]]; then
+		echo "USER_AGENT = false" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "USER_AGENT = $v_USER_AGENT" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$d_WORKING"/"$v_NEW_JOB"
+	if [[ -n "$v_USE_WGET" ]]; then
+		echo "USE_WGET = $v_USE_WGET" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ "$v_USE_WGET" == "true" ]]; then
+		v_CURL_VERBOSE="false"
+		v_LOG_HTTP_CODE="false"
+	else
+		fn_read_conf CURL_VERBOSE master "$v_DEFAULT_CURL_VERBOSE"; v_CURL_VERBOSE="$v_RESULT"
+		fn_read_conf LOG_HTTP_CODE master "$v_DEFAULT_LOG_HTTP_CODE"; v_LOG_HTTP_CODE="$v_RESULT"
+	fi
+	echo "#CURL_VERBOSE = $v_CURL_VERBOSE" >> "$d_WORKING"/"$v_NEW_JOB"
+	echo "#LOG_HTTP_CODE = $v_LOG_HTTP_CODE" >> "$d_WORKING"/"$v_NEW_JOB"
+
+	fn_mutual_cl
+}
+
+function fn_ping_cl {
+	### Verify that the correct information was given at the command line
+	if [[ -z "$v_DOMAIN" ]]; then
+		echo "For ping jobs, the \"--ping\" flag requires an argument."
+		exit 1
+	elif [[ $( echo -n "${v_DNS_CHECK_DOMAIN}${v_DNS_CHECK_RESULT}${v_DNS_RECORD_TYPE}${v_CURL_URL}${a_CURL_STRING[0]}${v_USER_AGENT}${v_CHECK_TIMEOUT}${v_IP_ADDRESS}${v_CHECK_TIME_PARTIAL_SUCCESS}${v_SSH_USER}${v_MIN_LOAD_PARTIAL_SUCCESS}${v_MIN_LOAD_FAILURE}${v_CL_PORT}" | wc -c ) -gt 0 ]]; then
+		echo "The only flags that can be used with ping jobs are the following:"
+		echo "--ping, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
+		exit 1
+	fi
+	fn_parse_server "$v_DOMAIN"
+	if [[ "$v_IP_ADDRESSa" == false ]]; then
+		echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
+		exit 1
+	fi
+	v_ORIG_JOB_NAME="$v_DOMAINa"
+	v_DOMAIN=$v_DOMAINa
+	v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+	echo "JOB_TYPE = ping" > "$d_WORKING"/"$v_NEW_JOB"
+
+	fn_mutual_cl
+}
+
+function fn_dns_cl {
+	### Verify that the correct information was given at the command line
+	if [[ -z "$v_DOMAIN" || -z "$v_DNS_CHECK_DOMAIN" ]]; then
+		echo "For dns jobs, both the \"--dns\" and \"--domain\" flags require arguments."
+		exit 1
+	elif [[ $( echo -n "${v_CURL_URL}${a_CURL_STRING[0]}${v_USER_AGENT}${v_CHECK_TIMEOUT}${v_IP_ADDRESS}${v_CHECK_TIME_PARTIAL_SUCCESS}${v_SSH_USER}${v_MIN_LOAD_PARTIAL_SUCCESS}${v_MIN_LOAD_FAILURE}${v_CL_PORT}" | wc -c ) -gt 0 ]]; then
+		echo "The only flags that can be used with dns jobs are the following:"
+		echo "--dns, --domain, --check-result, --record-type, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
+		exit 1
+	fi
+	### Make sure that the domain resolves and is properly formatted
+	fn_parse_server "$v_DOMAIN"
+	if [[ "$v_IP_ADDRESSa" == false ]]; then
+		echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
+		exit 1
+	fi
+	v_DOMAIN="$v_DOMAINa"
+	### Make sure that the domain we're digging is properly formatted as well
+	fn_parse_server "$v_DNS_CHECK_DOMAIN"
+	v_DNS_CHECK_DOMAIN="$v_DOMAINa"
+	v_ORIG_JOB_NAME="$v_DNS_CHECK_DOMAIN @$v_DOMAIN"
+	v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+	echo "JOB_TYPE = dns" > "$d_WORKING"/"$v_NEW_JOB"
+	echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$d_WORKING"/"$v_NEW_JOB"
+	if [[ -n "$v_DNS_CHECK_RESULT" ]]; then
+		echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "#DNS_CHECK_RESULT = " >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -n $v_DNS_RECORD_TYPE ]]; then
+		echo "DNS_RECORD_TYPE = $v_DNS_RECORD_TYPE" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "#DNS_RECORD_TYPE = $v_DEFAULT_DNS_RECORD_TYPE" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+
+	fn_mutual_cl
+}
+
+function fn_load_cl {
+	### Verify that the correct information was given at the command line
+	### We're not going to check for the user here - we'll cover that below once we confirm that the job isn't for localhost
+	if [[ -z "$v_DOMAIN" ]]; then
+		echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
+		exit 1
+	elif [[ $( echo -n "${v_DNS_CHECK_DOMAIN}${v_DNS_CHECK_RESULT}${v_DNS_RECORD_TYPE}${v_CURL_URL}${a_CURL_STRING[0]}${v_USER_AGENT}${v_IP_ADDRESS}" | wc -c ) -gt 0 ]]; then
+		echo "The only flags that can be used with ssh-load jobs are the following:"
+		echo "--ssh-load, --load-ps, --load-fail, --user, --port, --check-timeout, --ctps, --mail, --mail-delay, --outfile, --seconds, --verbosity, --ident, --job-name, --control, --ldd, --ndr, --nsns, --nds"
+		exit 1
+	fi
+	fn_parse_server "$v_DOMAIN"
+	if [[ "$v_IP_ADDRESSa" == false ]]; then
+		echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
+		exit 1
+	elif [[ "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" && -z "$v_SSH_USER" ]]; then
+	### If it's not for localhost and there is no user, warn and exit.
+		echo "For ssh-load jobs, both the \"--ssh-load\" and \"--user\" flags require arguments."
+		exit 1
+	fi
+	v_ORIG_JOB_NAME="$v_DOMAINa"
+	v_DOMAIN="$v_DOMAINa"
+	if [[ -z "$v_CL_PORT" && "$v_SERVER_PORTa" == "22" ]]; then
+		v_SERVER_PORT=22
+	elif [[ -n "$v_CL_PORT" ]]; then
+		v_SERVER_PORT="$v_CL_PORT"
+	elif [[ "$v_SERVER_PORT" != "22" ]]; then
+		v_SERVER_PORT="$v_SERVER_PORTa"
+	fi
+	fn_read_conf SSH_CONTROL_PATH master "$v_DEFAULT_SSH_CONTROL_PATH"; v_SSH_CONTROL_PATH="$v_RESULT"
+	fn_test_file "$v_SSH_CONTROL_PATH" false false; v_SSH_CONTROL_PATH2="$v_RESULT"
+	if [[ ! -e "$( echo "$v_SSH_CONTROL_PATH2" | sed "s/%h/$v_DOMAIN/;s/%p/$v_SERVER_PORT/;s/%r/$v_SSH_USER/" )" && "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" ]]; then
+		echo
+		echo "There doesn't appear to be an SSH control socket open for this server. Use the following command to SSH into this server (you'll probably want to do this in another window, or a screen), and then try starting the job again:"
+		echo
+		echo "ssh -o ControlMaster=auto -o ControlPath=\"$v_SSH_CONTROL_PATH\" -p $v_SERVER_PORT $v_SSH_USER@$v_DOMAIN"
+		echo
+		echo "Be sure to exit out of the master ssh process when you're done monitoring the remote server."
+		echo
+		exit 1
+	fi
+	v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+	echo "JOB_TYPE = ssh-load" > "$d_WORKING"/"$v_NEW_JOB"
+	echo "SERVER_PORT = $v_SERVER_PORT" >> "$d_WORKING"/"$v_NEW_JOB"
+	echo "SSH_USER = $v_SSH_USER" >> "$d_WORKING"/"$v_NEW_JOB"
+	echo "MIN_LOAD_PARTIAL_SUCCESS = $v_MIN_LOAD_PARTIAL_SUCCESS" >> "$d_WORKING"/"$v_NEW_JOB"
+	echo "MIN_LOAD_FAILURE = $v_MIN_LOAD_FAILURE" >> "$d_WORKING"/"$v_NEW_JOB"
+
+	fn_mutual_cl
+}
+
+function fn_mutual_cl {
+	if [[ -n "$v_IDENT" ]]; then
+		v_ORIG_JOB_NAME="$v_ORIG_JOB_NAME $v_IDENT"
+	fi
+	if [[ -z "$v_JOB_NAME" ]]; then
+		v_JOB_NAME="$v_ORIG_JOB_NAME"
+	fi
+	echo "JOB_NAME = $v_JOB_NAME" >> "$d_WORKING"/"$v_NEW_JOB"
+	echo "ORIG_JOB_NAME = $v_ORIG_JOB_NAME" >> "$d_WORKING"/"$v_NEW_JOB"
+	if [[ "$v_RUN_TYPE" == "--url" || "$v_RUN_TYPE" == "-u" || "$v_RUN_TYPE" == "--ssh-load" ]]; then
+		if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS" ]]; then
+			fn_read_conf CHECK_TIME_PARTIAL_SUCCESS master; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
+			fn_test_variable "$v_CHECK_TIME_PARTIAL_SUCCESS" true "false" "$v_DEFAULT_CHECK_TIME_PARTIAL_SUCCESS"; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
+			echo "#CHECK_TIME_PARTIAL_SUCCESS = $v_CHECK_TIME_PARTIAL_SUCCESS" >> "$d_WORKING"/"$v_NEW_JOB"
+		else
+			echo "CHECK_TIME_PARTIAL_SUCCESS = $v_CHECK_TIME_PARTIAL_SUCCESS" >> "$d_WORKING"/"$v_NEW_JOB"
+		fi
+		if [[ -z "$v_CHECK_TIMEOUT" ]]; then
+			fn_read_conf CHECK_TIMEOUT master; v_CHECK_TIMEOUT="$v_RESULT"
+			fn_test_variable "$v_CHECK_TIMEOUT" true "false" "$v_DEFAULT_CHECK_TIMEOUT"; v_CHECK_TIMEOUT="$v_RESULT"
+			echo "#CHECK_TIMEOUT = $v_CHECK_TIMEOUT" >> "$d_WORKING"/"$v_NEW_JOB"
+		else
+			echo "CHECK_TIMEOUT = $v_CHECK_TIMEOUT" >> "$d_WORKING"/"$v_NEW_JOB"
+		fi
+	fi
+	if [[ "$v_RUN_TYPE" == "--ping" || "$v_RUN_TYPE" == "--dns" || "$v_RUN_TYPE" == "-p" || "$v_RUN_TYPE" == "-d" || "$v_RUN_TYPE" == "--ssh-load" ]]; then
+		echo "DOMAIN = $v_DOMAIN" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_WAIT_SECONDS" ]]; then
+		fn_read_conf WAIT_SECONDS master; v_WAIT_SECONDS="$v_RESULT"
+		fn_test_variable "$v_WAIT_SECONDS" true "false" "$v_DEFAULT_WAIT_SECONDS"; v_WAIT_SECONDS="$v_RESULT"
+		echo "#WAIT_SECONDS = $v_WAIT_SECONDS" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "WAIT_SECONDS = $v_WAIT_SECONDS" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_EMAIL_ADDRESS" ]]; then
+		fn_read_conf EMAIL_ADDRESS master ""; v_EMAIL_ADDRESS="$v_RESULT"
+		echo "#EMAIL_ADDRESS = $v_EMAIL_ADDRESS" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "EMAIL_ADDRESS = $v_EMAIL_ADDRESS" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_MAIL_DELAY" ]]; then
+		fn_read_conf MAIL_DELAY master; v_MAIL_DELAY="$v_RESULT"
+		fn_test_variable "$v_MAIL_DELAY" true "false" "$v_DEFAULT_MAIL_DELAY"; v_MAIL_DELAY="$v_RESULT"
+		echo "#MAIL_DELAY = $v_MAIL_DELAY" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "MAIL_DELAY = $v_MAIL_DELAY" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_VERBOSITY" ]]; then
+		fn_read_conf VERBOSITY master "$v_DEFAULT_VERBOSITY"; v_VERBOSITY="$v_RESULT"
+		echo "#VERBOSITY = $v_VERBOSITY" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "VERBOSITY = $v_VERBOSITY" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_OUTPUT_FILE" ]]; then
+		fn_read_conf OUTPUT_FILE master "$v_DEFAULT_OUTPUT_FILE"; v_OUTPUT_FILE2="$v_RESULT"
+		echo "#OUTPUT_FILE = $v_OUTPUT_FILE2" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "OUTPUT_FILE = $v_OUTPUT_FILE" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	fn_read_conf CUSTOM_MESSAGE master ""; v_CUSTOM_MESSAGE="$v_RESULT"
+	echo "#CUSTOM_MESSAGE = $v_CUSTOM_MESSAGE" >> "$d_WORKING"/"$v_NEW_JOB"
+	if [[ -z "$v_LOG_DURATION_DATA" ]]; then
+		fn_read_conf LOG_DURATION_DATA master "$v_DEFAULT_LOG_DURATION_DATA"; v_LOG_DURATION_DATA="$v_RESULT"
+		echo "#LOG_DURATION_DATA = $v_LOG_DURATION_DATA" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "LOG_DURATION_DATA = $v_LOG_DURATION_DATA" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_NUM_DURATIONS_RECENT" ]]; then
+		fn_read_conf NUM_DURATIONS_RECENT master; v_NUM_DURATIONS_RECENT="$v_RESULT"
+		fn_test_variable "$v_NUM_DURATIONS_RECENT" true "false" "$v_DEFAULT_NUM_DURATIONS_RECENT"; v_NUM_DURATIONS_RECENT="$v_RESULT"
+		echo "#NUM_DURATIONS_RECENT = $v_NUM_DURATIONS_RECENT" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "NUM_DURATIONS_RECENT = $v_NUM_DURATIONS_RECENT" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_NUM_STATUSES_RECENT" ]]; then
+		fn_read_conf NUM_STATUSES_RECENT master; v_NUM_STATUSES_RECENT="$v_RESULT"
+		fn_test_variable "$v_NUM_STATUSES_RECENT" true "false" "$v_DEFAULT_NUM_STATUSES_RECENT"; v_NUM_STATUSES_RECENT="$v_RESULT"
+		echo "#NUM_STATUSES_RECENT = $v_NUM_STATUSES_RECENT" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "NUM_STATUSES_RECENT = $v_NUM_STATUSES_RECENT" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	if [[ -z "$v_NUM_STATUSES_NOT_SUCCESS" ]]; then
+		fn_read_conf NUM_STATUSES_NOT_SUCCESS master; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
+		fn_test_variable "$v_NUM_STATUSES_NOT_SUCCESS" true "false" "$v_DEFAULT_NUM_STATUSES_NOT_SUCCESS"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
+		echo "#NUM_STATUSES_NOT_SUCCESS = $v_NUM_STATUSES_NOT_SUCCESS" >> "$d_WORKING"/"$v_NEW_JOB"
+	else
+		echo "NUM_STATUSES_NOT_SUCCESS = $v_NUM_STATUSES_NOT_SUCCESS" >> "$d_WORKING"/"$v_NEW_JOB"
+	fi
+	echo "#SCRIPT = " >> "$d_WORKING"/"$v_NEW_JOB"
+	mv -f "$d_WORKING"/"$v_NEW_JOB" "$d_WORKING"/"new/$v_NEW_JOB"
+	### If this instance is running as master, go on to begin spawning child processes, etc.
+	if [[ "$v_RUNNING_STATE" == "master" ]]; then
+		source "$d_PROGRAM"/includes/master.shf
+		fn_master
+	fi
+}

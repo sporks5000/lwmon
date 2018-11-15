@@ -1,0 +1,121 @@
+
+PARAMETERS FILE (located at ".lwmon/[CHILD PID]/params")
+
+The "params" file contains the specifics of an LWmon job. Any lwmon.sh job that is currently running can be changed mid-run by editing the params file - this file can be accessed manually, or by using the "--modify" flag. The purpose of this document is to explain each variable in the params file and what it does. 
+
+"CHECK_TIME_PARTIAL_SUCCESS"
+    - For "--url" and "--ssh-load" jobs, an amount of seconds beyond which the check is considered a partial success.
+    - The point of this designation is to alert the user that there's something amiss, even though portions of the process seem to indicate that everything's okay.
+
+"CHECK_TIMEOUT"
+    - For "--url" and "--ssh-load" jobs, this is the amount of time before the check times out and automatically fails.
+
+"CURL_STRING"
+    - For "--url" jobs, this is the string that's being checked against in the result of curl process.
+    - This directive can be used multiple times.
+    - "fgrep" is used to check whether there's a match or not.
+
+"CURL_URL"
+    - For "--url" jobs, this is the URL that's being curl'd.
+
+"CURL_VERBOSE"
+    - For "--url" jobs, when using curl and not wget: when this is set to "true" the script will capture the verbose output and append it to the end of the html file.
+
+"CUSTOM_MESSAGE"
+    - Anything here will be added to email messages as a first paragraph. The string "\n" will be interpreted as a new line.
+
+"DNS_CHECK_DOMAIN"
+    - For a "--dns" job, when it sends a dig request to the remote server, this is the domain that it sends that request for.
+
+"DNS_CHECK_RESULT"
+    - For a "--dns" job, this is some or all of the text that's expected in the result of the "dig +short" response.
+    - "fgrep" is used to check whether there's a match or not.
+
+"DNS_RECORD_TYPE"
+    - For a "--dns" job, this specifies the record type that should be checked for. 
+
+"DOMAIN" 
+    - For "--dns" jobs, this is the domain associated with the zone file on the server that we're checking against.
+    - For "--ping" jobs, this is the domain or IP address that we're pinging.
+    - For "--ssh-load" jobs, this is the domain that we're connecting to via ssh.
+
+"EMAIL_ADDRESS"
+    - This is the email address that messages regarding failed or successful checks will be sent to.
+
+"IP_ADDRESS"
+    - For "--url" jobs, this will be "false" if an IP address has not been specified. Otherwise, it will contain the IP address that we're connecting to before telling the remote server the domain we're trying sending a request to.
+    - With this as "false", a DNS query is used to determine what IP the site needs to be pulled from.
+    - This directive is perfect for situations where multiple load balanced servers need to be monitored at once, or where the customer's A record is pointing at cloudflare, and you're trying to determine whether connectivity issues are server specific, or cloudflare specific.
+
+"JOB_NAME"
+    - This is the identifier for the job. It will be output in the terminal window where the master process is being run (Or to where ever the "OUTPUT_FILE" directive indicates). This will also be referenced in emails.
+
+"JOB_TYPE" 
+    - This directive specifies what kind of job is being run ("url", "dns", "ssh-load", or "ping"). It's used to identify the job type initially.
+    - Making changes to it after the job has been initiated will not have any impact on the job while it runs, but would prevent the job from restarting correctly.
+
+"LOG_DURATION_DATA"
+    - If this is set to "true", the duration of each check will be output to the log file in the child directory.
+
+"LOG_HTTP_CODE"
+    - For "--url" jobs, when curl is being used and not wget, if this is set to "true" the http return code will be logged in the log file for the child process.
+
+"MAIL_DELAY" 
+    - The number of successful or failed checks that need to occur before an email is sent. If this is set to zero, no email messages will be sent.
+
+"MIN_LOAD_FAILURE"
+    - For an "--ssh-load" job, this is the minimum load that will be considered a failure, rather than a success or partial success.
+
+"MIN_LOAD_PARTIAL_SUCCESS"
+    - For an "--ssh-load" job, this is the minimum load that will be considered a partial success, rather than a complete success.
+
+"NUM_DURATIONS_RECENT"
+    - One of the stats that are output in "more verbose" mode is how long the average recent check took - "recent" being within the last X checks.
+    - By default this number is 10, but that can be changed with the "NUM_DURATIONS_RECENT" directive.
+
+"NUM_STATUSES_NOT_SUCCESS"
+"NUM_STATUSES_RECENT"
+    - The "NUM_STATUSES_RECENT" and "NUM_STATUSES_NOT_SUCCESS" directives allow the user to configure the script to send email alerts when out of the X most recent statuses, Y of them are not a success. X being the value set for "NUM_STATUSES_RECENT" and Y being the value set for "NUM_STATUSES_NOT_SUCCESS".
+    - After an email has been sent indicating intermittent failures, there must be a number of successful checks equal to the number specified by "NUM_STATUSES_RECENT" before another success message will be sent
+
+"ORIG_JOB_NAME"
+    - This is the original identifier for the job. It's used for logging purposes, as well as referenced in emails. In many instances, this will be the same as the "JOB_NAME" directive.
+
+"OUTPUT_FILE"
+    - The default for this value is "/dev/stdout", however rather than being output to the terminal where the master process is running, the output of a child process can be redirected to a file.
+    - This file HAS TO BE referenced by its full path.
+
+"SCRIPT"
+    - You can specify a script to be run at any time that an email would be sent (minus the requirements for having the "mail" binary present and having the "EMAIL_ADDRESS" parameter defined)
+    - You can include any arguments or flags that you would like the script to be run with. The final argument passed to the script specified will be one of the following arguments (depending on the type of email that would be sent):
+        - "success"
+        - "psuccess"
+        - "intermittent"
+        - "failure"
+    - The full path to the script must be used, and the script itself must be executable. If the path to the script contains any spaces, it's path will need to be quoted.
+
+"SERVER_PORT"
+    - For "--ssh-load" jobs, this is the port that's being connected to.
+
+"SSH_USER"
+    - For an "--ssh-load" job, this is the user that LWmon will be accessing the server as.
+
+"USE_WGET"
+    - For "--url" jobs, this forces the child process to use wget rather than curl.
+
+"USER_AGENT"
+    - For "--url" jobs, this is a true or false value that dictates whether or not the curl for the site will be run with curl as the user agent (false) or with a user agent that makes it look as if it's Google Chrome (true).
+    - If the value here is neither "true" nor "false", the value will be used as the user agent string.
+
+"VERBOSITY"
+    - Changes the verbosity level of the output of the child process.
+          - "standard": Outputs for every check whether it has succeeded or failed.
+          - "verbose": In addition to the information given from the standard output, also indicates how long checks for that job have been running, how many have been run, and the percentage of successful checks.
+          - "more verbose": Outputs multiple lines with the data from verbose, as well as data on how long the checks are taking.
+          - "change": Only outputs text on the first failure after any number of successes, or the first success after any number of failures.
+          - "none": Child processes output no text.
+    - NOTE: this overrides any verbosity setting in the main configuration file.
+
+"WAIT_SECONDS"
+    - This is the number of seconds that pass between iterative checks. This number does not take into account how long the check itself took, so for example, if it takes five seconds to curl a URL, and "WAIT_SECONDS" is set to 10, it will be roughly 15 seconds between the start of the first check and the start of the next check.
+

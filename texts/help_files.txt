@@ -1,0 +1,99 @@
+
+LWMON FILES AND DIRECTORIES
+
+./lwmon.conf
+    - This is the main configuration file for LWmon
+
+./lwmon.log
+    - The log file for the master process. Child processes also log some details to this file
+
+./lwmon.sh
+    - The main lwmon.sh script
+
+./.lwmon/
+    - LWmon's working directory
+
+./.lwmon/[CHILD PID]/
+    - The working directory for a specific LWmon child process
+
+./.lwmon/die
+    - Creating this file tells the LWmon master process to exit out cleanly
+
+./.lwmon/die_list
+##### I want to remove this functionality
+    - The most recent pull of the remote die list
+
+./.lwmon/lwmon.pid
+    - This is the process ID of the current LWmon master process
+
+./.lwmon/new/
+    - This directory is where LWmon control processes will place new jobs so that they can wait for the master process to start them up.
+
+./.lwmon/no_output
+    - When this file is present, the child processes will not output status information for the checks that they perform
+
+./.lwmon/old_[CHILD PID]_[EPOCH TIMESTAMP]
+    - This is the working directory of an old LWmon child process, archived temporarily in case data from it is needed.
+
+./.lwmon/save
+    - Having this file present while the LWmon master process is exiting tells it to save all child processes so that they will start again next time a master process is started
+
+
+FILES FOR LWMON CHILD PROCESSES
+
+./.lwmon/[CHILD PID]/
+    - The working directory for a specific LWmon child process
+
+./.lwmon/[CHILD PID]/#die
+    - An empty file, present to remind the end user that at any time they can rename it to "./.lwmon/[CHILD PID]/die" in order to clearly kill that child process
+
+./.lwmon/[CHILD PID]/#status
+    - This file is present to remind the end user that at any time they can rename it to "./.lwmon/[CHILD PID]/status" in order to have that LWmon child process output a full status
+    - If a full status has been run previously, this file will contain the text of the most recent full status
+
+./.lwmon/[CHILD PID]/cl
+    - The command line arguments to reproduce the child process
+
+./.lwmon/[CHILD PID]/current_verbose_output.txt
+    - This file captures the curl verbose output for "--url" monitoritoring job. 
+
+./.lwmon/[CHILD PID]/die
+    - If an LWmon child process sees this file present in its working directory, it will output a full status to "./.lwmon/[CHILD PID]/#status" and then exit
+
+./.lwmon/[CHILD PID]/force_failure
+    - Having this file present will cause an LWmon child process to interpret its next attempt as a failure, regardless of what it would have been otherwise
+
+./.lwmon/[CHILD PID]/force_partial
+    - Having this file present will cause an LWmon child process to interpret its next attempt as a partial success, regardless of what it would have been otherwise
+
+./.lwmon/[CHILD PID]/force_success
+    - Having this file present will cause an LWmon child process to interpret its next attempt as a success, regardless of what it would have been otherwise
+
+./.lwmon/[CHILD PID]/log
+    - This is the log file for a specific child process
+
+./.lwmon/[CHILD PID]/params
+    - These are the parameters for the child process. Editing this file will change the operation of the child process
+    - Run `./lwmon.sh --help params-file` for more details
+
+./.lwmon/[CHILD PID]/previous_verbose_output.txt
+    - When a new check for a "--url" monitoring job runs, the "./.lwmon/[CHILD PID]/current_verbose_output.txt" file is moved to this location in case the data is needed.
+
+./.lwmon/[CHILD PID]/site_current.html
+    - For a "--url" job, this file will contain the most recent curl of the site being monitored
+
+./.lwmon/[CHILD PID]/site_[EPOCH TIMESTAMP]_fail.html
+    - For a "--url" job, these files show the result of the first failure after any other status
+
+./.lwmon/[CHILD PID]/site_previous.html
+    - For a "--url" job, this file will contain the previous curl of the site.
+
+./.lwmon/[CHILD PID]/site_[EPOCH TIMESTAMP]_psuccess.html
+    - For a "--url" job, these files show the result of the first partial success after a success, or the last partial success before a failure
+
+./.lwmon/[CHILD PID]/site_[EPOCH TIMESTAMP]_success.html
+    - For a "--url" job, these files show the result of the last success before any other status
+
+./.lwmon/[CHILD PID]/status
+    - Creating this file will tell an LWmon child process to output the full status on its next check
+

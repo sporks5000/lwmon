@@ -1,0 +1,288 @@
+#! /bin/bash
+
+function fn_list {
+	### This just lists the lwmon master process and all child processes.
+	if [[ "$v_RUNNING_STATE" == "master" ]]; then
+		echo "No current lwmon processes. Exiting."
+		exit 1
+	fi
+	echo "List of currently running lwmon processes:"
+	echo
+	echo "  1) [$( cat "$d_WORKING"/lwmon.pid )] - Master Process (and lwmon in general)" #"
+	v_CHILD_NUMBER=2
+	a_CHILD_PID=()
+	for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
+		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
+		fn_read_conf JOB_NAME "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_NAME="$v_RESULT"
+		fn_read_conf JOB_TYPE "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_TYPE="$v_RESULT"
+		echo "  $v_CHILD_NUMBER) [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME"
+		a_CHILD_PID[$(( $v_CHILD_NUMBER - 2 ))]="$v_CHILD_PID"
+		v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
+	done
+}
+
+function fn_modify_master {
+### Options for the master process
+	echo -e "Options:\n"
+	echo "  1) Exit out of the master process without backing up the child processes."
+	echo "  2) First back-up the child processes so that they'll run immediately when lwmon is next started, then exit out of the master process."
+	echo "  3) Edit the configuration file."
+	echo "  4) View the log file."
+	echo "  5) Old monotoring jobs."
+	echo "  6) Exit out of this menu."
+	echo
+	read -ep "Choose an option from the above list: " v_OPTION_NUM
+	if [[ "$v_OPTION_NUM" == "1" ]]; then
+		touch "$d_WORKING"/die
+	elif [[ "$v_OPTION_NUM" == "2" ]]; then
+		touch "$d_WORKING"/save
+		touch "$d_WORKING"/die
+	elif [[ "$v_OPTION_NUM" == "3" ]]; then
+		if [[ -n $EDITOR ]]; then
+			$EDITOR "$f_CONF"
+		else
+			##### Maybe instead just output the file name and tell the user to edit it themself
+			vi "$f_CONF"
+		fi
+	elif [[ "$v_OPTION_NUM" == "4" ]]; then
+		echo "Viewing the log at $v_LOG"
+		less +G "$v_LOG"
+	elif [[ "$v_OPTION_NUM" == "5" ]]; then
+		fn_modify_old_jobs
+	else
+		echo "Exiting."
+	fi
+	exit 0
+}
+
+function fn_modify_no_master {
+### Options if there is no master process
+	echo -e "Options:\n"
+	echo "  1) Output general help information (same as with \"--help\" flag)."
+	echo "  2) Output help information specific to flags (same as with \"--help-flags\" flag)."
+	echo "  3) Edit the configuration file."
+	echo "  4) View the log file."
+	echo "  5) Launch a master process (same as with \"--master\" flag)."
+	echo "  6) Old monotoring jobs."
+	echo "  7) Exit out of this menu."
+	echo
+	read -ep "Choose an option from the above list: " v_OPTION_NUM
+	if [[ "$v_OPTION_NUM" == "1" ]]; then
+		fn_help
+	elif [[ "$v_OPTION_NUM" == "2" ]]; then
+		fn_help_flags
+	elif [[ "$v_OPTION_NUM" == "3" ]]; then
+		if [[ -n "$EDITOR" ]]; then
+			"$EDITOR" "$f_CONF"
+		else
+			##### Maybe instead just output the file name and tell the user to edit it themself
+			vi "$f_CONF"
+		fi
+	elif [[ "$v_OPTION_NUM" == "4" ]]; then
+		echo "Viewing the log at $v_LOG"
+		less +G "$v_LOG"
+	elif [[ "$v_OPTION_NUM" == "5" ]]; then
+		source "$d_PROGRAM"/includes/master.shf
+		fn_master
+	elif [[ "$v_OPTION_NUM" == "6" ]]; then
+		fn_modify_old_jobs
+	else
+		echo "Exiting."
+	fi
+	exit 0
+}
+
+function fn_modify_old_jobs {
+	### This is the menu front-end for modifying old child processes.
+	echo "List of old lwmon jobs:"
+	echo
+	v_CHILD_NUMBER=1
+	a_CHILD_PID=()
+	for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
+		v_ENDED_DATE="$( echo "$v_CHILD_PID" | cut -d "_" -f3 )"
+		v_ENDED_DATE="$( date --date="@$v_ENDED_DATE" +%m"/"%d" "%H":"%M":"%S )"
+		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
+		fn_read_conf JOB_NAME "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_NAME="$v_RESULT"
+		fn_read_conf JOB_TYPE "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_TYPE="$v_RESULT"
+		echo "  $v_CHILD_NUMBER) $v_JOB_TYPE $v_JOB_NAME (ended $v_ENDED_DATE)"
+		a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]="$v_CHILD_PID"
+		v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
+	done
+	if [[ ${#a_CHILD_PID[@]} -eq 0 ]]; then
+		echo "There are no old jobs. Exiting."
+		echo
+		exit 1
+	fi
+	echo
+	read -ep "Which process do you want to modify? " v_CHILD_NUMBER
+	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 1 )) ]]; then
+		echo "Invalid Option. Exiting."
+		exit 1
+	fi
+	v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]}"
+	fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+	echo "$v_JOB_NAME:"
+	echo
+	echo "  1) Delete this monitoring job."
+	echo "  2) Output the command to go to the working directory for this monitoring job."
+	echo "  3) Restart this monitoring job"
+	echo "  4) View the log file associated with this monitoring job."
+	echo "  5) Output the commands to reproduce this job."
+	echo "  6) Change the end stamp on this job (stop it from being auto-deleted until 7 days from now)"
+	echo "  7) View associated html files (if any)."
+	echo "  8) Exit out of this menu."
+	echo
+	read -ep "Chose an option from the above list: " v_OPTION_NUM
+	if [[ "$v_OPTION_NUM" == "1" && -n "$d_WORKING"/ && -n "$v_CHILD_PID" ]]; then
+		rm -rf "$d_WORKING"/"$v_CHILD_PID"
+		echo "This job has been parmanently removed."
+	elif [[ "$v_OPTION_NUM" == "2" ]]; then
+		echo -en "\ncd $d_WORKING""$v_CHILD_PID/\n\n"
+	elif [[ "$v_OPTION_NUM" == "3" ]]; then
+		v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+		cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"new/$v_NEW_JOB.job"
+		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/log ]]; then
+			### If there's a log file, let's keep that too.
+			cp -a "$d_WORKING"/"$v_CHILD_PID"/log "$d_WORKING"/"new/$v_NEW_JOB".log
+		fi
+	elif [[ "$v_OPTION_NUM" == "4" ]]; then
+		echo "Viewing the log at $d_WORKING""$v_CHILD_PID/log"
+		less +G "$d_WORKING"/"$v_CHILD_PID/log"
+	elif [[ "$v_OPTION_NUM" == "5" ]]; then
+		echo
+		echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
+		echo "chmod +x ./lwmon.sh"
+		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
+		echo
+	elif [[ "$v_OPTION_NUM" == "6" && -n "$d_WORKING"/ && -n "$v_CHILD_PID" ]]; then
+		##### I'm pretty sure that $i here is not being populated by anything. Need to fix this
+		v_NEW_DIRECTORY="$( basename "$i" | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
+		mv -f "$d_WORKING"/"$v_CHILD_PID" "$d_WORKING"/"$v_NEW_DIRECTORY"
+	elif [[ "$v_OPTION_NUM" == "7" ]]; then
+		fn_modify_html
+	else
+		echo "Exiting."
+	fi
+	exit 0
+}
+
+function fn_modify_html {
+### Lists html files associated with a process and then gives options for them.
+	echo "List of html files associated with $v_JOB_NAME"
+	echo
+	v_HTML_NUMBER=1
+	a_HTML_LIST=()
+	for v_HTML_NAME in $( find "$d_WORKING"/"$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | grep -E "(success|fail)\.html$" | awk -F_ '{print $2"_"$3"_"$1}' | sort -n | awk -F_ '{print $3"_"$1"_"$2}' ); do
+		v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | grep -E -o "[0-9]+_[psf]" | cut -d "_" -f1 )"
+		v_HTML_TIMESTAMP="$( date --date="@$v_HTML_TIMESTAMP" +%m"/"%d" "%H":"%M":"%S )"
+		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
+		echo "  $v_HTML_NUMBER) $v_HTML_TIMESTAMP - $v_HTML_NAME"
+		a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]="$v_HTML_NAME"
+		v_HTML_NUMBER=$(( $v_HTML_NUMBER + 1 ))
+	done
+	echo
+	if [[ "${#a_HTML_LIST[@]}" -eq 0 ]]; then
+		echo "There are no html files associated with this job. Exiting."
+		exit 1
+	fi
+	read -ep "Which html file do you want options on? " v_HTML_NUMBER
+	if [[ "$v_HTML_NUMBER" == "0" || $( echo "$v_HTML_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_HTML_NUMBER" -ge $(( ${#a_HTML_LIST[@]} + 1 )) ]]; then
+		echo "Invalid Option. Exiting."
+		exit 1
+	fi
+	v_HTML_NAME="${a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]}"
+	echo "$v_HTML_NAME:"
+	echo
+	echo "  1) Delete this file."
+	echo "  2) Output the full file name."
+	echo "  3) Exit out of this menu."
+	echo
+	read -ep "Chose an option from the above list: " v_OPTION_NUM
+	if [[ "$v_OPTION_NUM" == "1" && -n "$d_WORKING"/ && -n "$v_CHILD_PID" && "$v_HTML_NAME" ]]; then
+		rm -f "$d_WORKING"/"$v_CHILD_PID"/"$v_HTML_NAME"
+		echo "The file has been deleted."
+	elif [[ "$v_OPTION_NUM" == "2" ]]; then
+		echo
+		echo "$d_WORKING"/"$v_CHILD_PID"/"$v_HTML_NAME"
+		echo
+	else
+		echo "Exiting."
+	fi
+	exit 0
+}
+
+function fn_modify {
+### lists the lwmon processes and then gives options for the currently running processes.
+	if [[ "$v_RUNNING_STATE" == "master" ]]; then
+		fn_modify_no_master
+	fi
+	fn_list
+	echo
+	read -ep "Which process do you want to modify? " v_CHILD_NUMBER
+	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
+		echo "Invalid Option. Exiting."
+		exit 1
+	fi
+	if [[ "$v_CHILD_NUMBER" -lt 2 ]]; then
+		fn_modify_master
+	fi
+	v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 2 ))]}"
+	fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+	echo "$v_JOB_NAME:"
+	echo
+	echo "  1) Kill this process."
+	echo "  2) Output the command to go to the working directory for this process."
+	echo "  3) Directly edit the parameters file (with your EDITOR - \"$EDITOR\")."
+	echo "  4) View the log file associated with this process."
+	echo "  5) Output the commands to reproduce this job."
+	echo "  6) Change the title of the job as it's reported by the child process. (Currently \"$v_JOB_NAME\")."
+	echo "  7) Show the most recent full status output for the job."
+	echo "  8) View associated html files (if any)."
+	echo "  9) Exit out of this menu."
+	echo
+	read -ep "Chose an option from the above list: " v_OPTION_NUM
+	if [[ "$v_OPTION_NUM" == "1" ]]; then
+		touch "$d_WORKING"/"$v_CHILD_PID/die"
+		echo "Process will exit out shortly."
+	elif [[ "$v_OPTION_NUM" == "2" ]]; then
+		echo -en "\ncd $d_WORKING""$v_CHILD_PID/\n\n"
+	elif [[ "$v_OPTION_NUM" == "3" ]]; then
+		cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"$v_CHILD_PID"/params.temp
+		if [[ -n "$EDITOR" ]]; then
+			"$EDITOR" "$d_WORKING"/"$v_CHILD_PID"/params
+		else
+			##### maybe just output where the file is and ask the user to edit it themselves
+			vi "$d_WORKING"/"$v_CHILD_PID"/params
+		fi
+		rm -f "$d_WORKING"/"$v_CHILD_PID/params.temp"
+	elif [[ "$v_OPTION_NUM" == "4" ]]; then
+		echo "Viewing the log at $d_WORKING""$v_CHILD_PID/log"
+		less +G "$d_WORKING"/"$v_CHILD_PID/log"
+	elif [[ "$v_OPTION_NUM" == "5" ]]; then
+		echo
+		echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
+		echo "chmod +x ./lwmon.sh"
+		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
+		echo
+	elif [[ "$v_OPTION_NUM" == "6" ]]; then
+		read -ep "Enter a new identifying string to associate with this check: " v_JOB_NAME
+		fn_update_conf JOB_NAME "$v_JOB_NAME" "$d_WORKING"/"$v_CHILD_PID"/params
+		echo "The job name has been updated."
+	elif [[ "$v_OPTION_NUM" == "7" ]]; then
+		if [[ ! -f "$d_WORKING"/"$v_CHILD_PID"/'#status' ]]; then
+			echo -e "\nData not yet available. Prompting for output."
+			touch "$d_WORKING"/"$v_CHILD_PID"/status
+			while [[ ! -f "$d_WORKING"/"$v_CHILD_PID"/'#status' ]]; do
+				sleep 1
+			done
+		fi
+		echo
+		cat "$d_WORKING"/"$v_CHILD_PID"/'#status'
+		echo
+	elif [[ "$v_OPTION_NUM" == "8" ]]; then
+		fn_modify_html
+	else
+		echo "Exiting."
+	fi
+	exit 0
+}

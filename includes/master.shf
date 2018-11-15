@@ -35,7 +35,7 @@ function fn_remove_unnecessary_functions {
 
 function fn_master {
 	### This is the loop for the master function.
-	if [[ $v_RUNNING_STATE != "master" ]]; then
+	if [[ "$v_RUNNING_STATE" != "master" ]]; then
 		echo "Master process already present. Exiting."
 		exit 1
 	fi
@@ -50,19 +50,19 @@ function fn_master {
 	v_TIMESTAMP_FIVE_MINUTES=0
 	v_TIMESTAMP_THIRTY_MINUTES=0
 	if [[ "$v_WGET_BIN" == "false" ]]; then
-		if [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
-			$v_CURL_BIN -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$d_WORKING"/die_list 2> /dev/null
+		if [[ -n "$v_DEFAULT_REMOTE_DIE_LIST" ]]; then
+			"$v_CURL_BIN" -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$d_WORKING"/die_list 2> /dev/null
 		fi
-		v_REMOTE_VERSION="$( $v_CURL_BIN -Lsm 10 http://lwmon.com/lwmon.sh 2> /dev/null | head -n 10 | grep -E "^v_VERSION" | cut -d "\"" -f2 )"
+		##### We used to check for the most up-to-date version here. need to re-impliment this
 	else
-		if [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
-			$v_WGET_BIN -q --timeout=10 -O "$d_WORKING"/die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
+		if [[ -n "$v_DEFAULT_REMOTE_DIE_LIST" ]]; then
+			"$v_WGET_BIN" -q --timeout=10 -O "$d_WORKING"/die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
 		fi
-		v_REMOTE_VERSION="$( $v_WGET_BIN -q --timeout=10 -O "/dev/stdout" http://lwmon.com/lwmon.sh 2> /dev/null | head -n 10 | grep -E "^v_VERSION" | cut -d "\"" -f2 )"
+		##### We used to check for the most up-to-date version here. need to re-impliment this
 	fi
 	##### I removed all of the old version checking routines, but I'll need to create new ones
 	fn_check_mail_binary
-	if [[ $v_SEND_MAIL == false ]]; then
+	if [[ "$v_SEND_MAIL" == false ]]; then
 		echo
 		echo -e "\e[1;31mThe \"mail\" binary needs to be installed for lwmon to perform some of its functions. Monitoring jobs will not be able to send email allerts regarding changes of status.\e[00m"
 		echo
@@ -71,20 +71,21 @@ function fn_master {
 	while [[ 1 == 1 ]]; do
 
 		### Every thirty minutes check to see what the current IP address is (thanks to VPN, this can change).
-		if [[ $(( $( date +%s ) - 1800 )) -gt $v_TIMESTAMP_THIRTY_MINUTES ]]; then
+		##### Why are we checking for the local IP? How does having this benefit us?
+		if [[ $(( $( date +%s ) - 1800 )) -gt "$v_TIMESTAMP_THIRTY_MINUTES" ]]; then
 			v_TIMESTAMP_THIRTY_MINUTES="$( date +%s )"
 			if [[ "$v_WGET_BIN" == "false" ]]; then
-				v_LOCAL_IP="$( $v_CURL_BIN -Lsm 10 http://ip.liquidweb.com/ 2> /dev/null )"
+				v_LOCAL_IP="$( "$v_CURL_BIN" -Lsm 10 http://ip.liquidweb.com/ 2> /dev/null )"
 			else
-				v_LOCAL_IP="$( $v_WGET_BIN -q --timeout=10 -O /dev/null http://ip.liquidweb.com/ 2> /dev/null )"
+				v_LOCAL_IP="$( "$v_WGET_BIN" -q --timeout=10 -O /dev/null http://ip.liquidweb.com/ 2> /dev/null )"
 			fi
-			if [[ -z $v_LOCAL_IP ]]; then
+			if [[ -z "$v_LOCAL_IP" ]]; then
 				v_LOCAL_IP="Not_Found"
 			fi
 			### Also, let's do getting rid of old processes here - there's no reason to do that every two seconds, and this already runs every half hour, so there's no need to create a separate timer for that.
 			for v_OLD_CHILD in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^old_[0-9]+_[0-9]+$" ); do
-				if [[ $( echo $v_OLD_CHILD | grep -E -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
-					if [[ $(( $( date +%s ) - $( echo $v_OLD_CHILD | cut -d "_" -f3 ) )) -gt 604800 ]]; then
+				if [[ $( echo "$v_OLD_CHILD" | grep -E -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
+					if [[ $(( $( date +%s ) - $( echo "$v_OLD_CHILD" | cut -d "_" -f3 ) )) -gt 604800 ]]; then
 						### 604800 seconds = seven days.
 						fn_read_conf JOB_TYPE "$d_WORKING"/"$v_OLD_CHILD""/params"; v_JOB_TYPE="$v_RESULT"
 						fn_read_conf JOB_NAME "$d_WORKING"/"$v_OLD_CHILD""/params"; v_JOB_NAME="$v_RESULT"
@@ -96,12 +97,13 @@ function fn_master {
 		fi
 
 		### Every five minutes, check a remote list to see if lwmon should be stopped, and check to see if old processes need to be backed up.
-		if [[ $(( $( date +%s ) - 300 )) -gt $v_TIMESTAMP_FIVE_MINUTES ]]; then
+		if [[ $(( $( date +%s ) - 300 )) -gt "$v_TIMESTAMP_FIVE_MINUTES" ]]; then
 			v_TIMESTAMP_FIVE_MINUTES="$( date +%s )"
-			if [[ -n $v_DEFAULT_REMOTE_DIE_LIST && "$v_WGET_BIN" == "false" ]]; then
-				$v_CURL_BIN -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$d_WORKING"/die_list 2> /dev/null
+			##### I need to get rid of the remote die list
+			if [[ -n "$v_DEFAULT_REMOTE_DIE_LIST" && "$v_WGET_BIN" == "false" ]]; then
+				"$v_CURL_BIN" -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$d_WORKING"/die_list 2> /dev/null
 			elif [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
-				$v_WGET_BIN -q --timeout=10 -O "$d_WORKING"/die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
+				"$v_WGET_BIN" -q --timeout=10 -O "$d_WORKING"/die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
 			fi
 			if [[ $( grep -E -c "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$d_WORKING"/die_list ) -gt 0 ]]; then
 				touch "$d_WORKING"/die
@@ -137,16 +139,16 @@ function fn_master {
 			v_LWMON_JOB="$( ls -1 "$d_WORKING"/new/*.job 2> /dev/null | head -n1 )"
 			fn_read_conf JOB_TYPE "$v_LWMON_JOB"; v_JOB_TYPE="$v_RESULT"
 			fn_read_conf JOB_NAME "$v_LWMON_JOB"; v_JOB_NAME="$v_RESULT"
-			if [[ $v_JOB_TYPE == "url" ]]; then
+			if [[ "$v_JOB_TYPE" == "url" ]]; then
 				v_JOB_NAME="URL $v_JOB_NAME"
 				fn_spawn_child_process
-			elif [[ $v_JOB_TYPE == "ping" ]]; then
+			elif [[ "$v_JOB_TYPE" == "ping" ]]; then
 				v_JOB_NAME="PING $v_JOB_NAME"
 				fn_spawn_child_process
-			elif [[ $v_JOB_TYPE == "dns" ]]; then
+			elif [[ "$v_JOB_TYPE" == "dns" ]]; then
 				v_JOB_NAME="DNS $v_JOB_NAME"
 				fn_spawn_child_process
-			elif [[ $v_JOB_TYPE == "ssh-load" ]]; then
+			elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
 				v_JOB_NAME="SSH-LOAD $v_JOB_NAME"
 				fn_spawn_child_process
 			fi
@@ -166,13 +168,13 @@ function fn_master {
 function fn_spawn_child_process {
 	### This function launches the child process and makes sure that it has it's own working directory.
 	### Launch the child process
-	"$v_CHILD_SCRIPT" $v_JOB_NAME &
+	"$v_CHILD_SCRIPT" "$v_JOB_NAME" &
 	### Note - the job name doesn't need to be present, but it makes ps more readable. Each child process starts out as generic. Once the master process creates a working directory for it (based on its PID) and then puts the params file in place for it, only then does it discover its purpose.
 	### create the child's wirectory and move the params file there.
 	v_CHILD_PID=$!
 	mkdir -p "$d_WORKING"/"$v_CHILD_PID"
 	touch "$d_WORKING"/"$v_CHILD_PID/#die"
-	mv "$v_LWMON_JOB" "$d_WORKING"/"$v_CHILD_PID""/params"
+	mv "$v_LWMON_JOB" "$d_WORKING"/"$v_CHILD_PID"/params
 	if [[ -f "${v_LWMON_JOB[@]%.job}".log ]]; then
 	### If there's a log file, let's move that log file into the appropriate directory as well.
 		mv "${v_LWMON_JOB[@]%.job}".log "$d_WORKING"/"$v_CHILD_PID""/log"
@@ -194,24 +196,24 @@ function fn_master_exit {
 		echo
 		read -t 15 -ep "How would you like to proceed? " v_OPTION_NUM
 		# If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
-		if [[ $v_OPTION_NUM == "1" ]]; then
+		if [[ "$v_OPTION_NUM" == "1" ]]; then
 			for i in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
-				v_CHILD_PID=$( basename $i )
+				v_CHILD_PID=$( basename "$i" )
 				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
 					touch "$d_WORKING"/"$v_CHILD_PID/die"
 				fi
 			done
-		elif [[ -z $v_OPTION_NUM ]]; then
+		elif [[ -z "$v_OPTION_NUM" ]]; then
 			echo
 		fi
 	elif [[ -f "$d_WORKING"/die && ! -f "$d_WORKING"/save ]]; then
 		for i in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
-			v_CHILD_PID=$( basename $i )
+			v_CHILD_PID=$( basename "$i" )
 			if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
 				touch "$d_WORKING"/"$v_CHILD_PID/die"
 			fi
 		done
 	fi
 	rm -f "$d_WORKING"/lwmon.pid "$d_WORKING"/die
-	exit $v_EXIT_CODE
+	exit "$v_EXIT_CODE"
 }

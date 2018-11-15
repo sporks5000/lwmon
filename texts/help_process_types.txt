@@ -1,0 +1,24 @@
+
+MASTER, CONTROL, AND CHILD PROCESSES
+
+Any action taken by LWmon falls into one of three process categories - master processes, control processes, or child processes.
+
+MASTER PROCESS -
+    - The master process is just one continuius loop. It primarily accomplishes three things:
+        - It checks to see if there is data for new child processes and spawns them accordingly.
+        - It checks existing processes, makes sure that they are still running, and if they are not it decides whether they need to be respawned, or if they can be set aside as disabled.
+        - If there is data from processes that has been set aside for more than seven days, it removes this data.
+    - Other than starting and stopping the master process, the user does not interact with it directly.
+
+CONTROL PROCESSES -
+    - Control processes are how the user primarily interacts with LWmon, and they accomplish three primary tasks:
+        - They gather data from the user regaring a new child process that the user wants to create, and then they put that data in a place where the master process will find it.
+        - They gather data from the user on how a currently running child process should be modified (or exited).
+        - They gather data from the user on how the master process should be modified (or exited).
+    - Control processes always exit after the data that they've collected has been put in place, except under the following circumstance: If there is no currently running master process, and the "--control" flag was not used, the control process will turn into the master process.
+
+CHILD PROCESSES -
+    - These processes are not interacted with by the user at all, except through control processes. They are spawned by the master process. They loop continuously, checking against conditions set by the user, and then reporting success or failure.
+    - If at any point in time, the detect that their "params" file has been updated, they re-read that file
+    - If at any point in time they detect that the associated master process has ended, they end as well.
+

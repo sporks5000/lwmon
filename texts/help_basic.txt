@@ -1,0 +1,43 @@
+
+BASIC USAGE:
+
+./lwmon.sh (Followed by no arguments or flags)
+    - Either prompts you on how you want to proceed, allowing you to choose from options similar to those presented by the descriptions below, or if there are no currently running jobs, outputs information on the flags that can be used to start a monitoring job.
+
+./lwmon.sh [--url (or -u)|--ping (or -p)|--dns (or -d)|--ssh-load] (followed by other flags)
+    - Leaves a prompt telling the master process to spawn a child process to either a) in the case of --url, check a site's contents for a string of characters b) in the case of --ping, ping a site and check for a response c) in the case of --dns, dig against a nameserver and check for a valid response, d) In the case of --ssh-load, use an existing ssh connection to check the server's load.
+    - If there is no currently running master process, it goes on to declare itself the master process and spawn child processes accordingly.
+    - NOTE: For more information on the additional arguments and flags that can be used here, run ./lwmon.sh --help-flags
+    - NOTE: For more information on Master, Child and Control processes, run ./lwmon.sh --help-process-types
+    - NOte: For more information on the various files that LWmon will create and use, run ./lwmon.sh --help-files
+
+./lwmon.sh --modify (or -m)
+    - Prompts you with a list of currently running child processes and allows you to change how frequently their checks occur and how they send e-mail allerts, or kill them off if they're no longer desired.
+
+./lwmon.sh --help or (-h)
+    - Displays this dialogue.
+
+./lwmon.sh --version
+    - Displays changes over the various versions.
+
+./lwmon.sh --kill (--save)
+    - Kills off the lwmon master process, which in turn prompts any child processes to exit as well. Optionally, you can use the "--save" flag in conjunction with "--kill" to save all of the current running child processes so that they will be restarted automaticaly when lwmon is next launched.
+
+
+MORE INFORMATION ON SPECIFIC TOPICS:
+
+./lwmon.sh --help flags
+    - Outputs further information on command line flags.
+
+./lwmon.sh --help process-types
+    - Outputs information on master, control, and child processes.
+
+./lwmon.sh --help params-file
+    - Outputs information on editing the parameters file for a child process.
+
+./lwmon.sh --help files
+    - Outputs information on the files and directories that LWmon will create and use
+
+./lwmon.sh --help notes
+    - Outputs additional notes regarding LWmon and its functionality
+

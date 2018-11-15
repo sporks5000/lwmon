@@ -1,0 +1,25 @@
+
+ADDITIONAL NOTES:
+
+Note: Regarding the configuration file!
+    - There's a configuration file! Assuming that ./ is the directory where lwmon.sh is located, the configuration file will be located at ./lwmon.conf.
+
+Note: Regarding e-mail alerts!
+    - LWmon sends e-mail messages using the "mail" binary (usually located in /usr/bin/mail). In order for this to work as expected, you will likely need to modify the ~/.mailrc file with credentials for a valid e-mail account, otherwise the messages that are sent will likely get rejected.
+
+Note: Regarding the log files!
+    - LWmon keeps a log file titled "lwmon.log" in the same directory in which lwmon.sh is located (This can be changed in the configuration). This file is used to log when checks are started and stopped, and when ever there is a change in status on any of the checks. In addition to this, there is another log file in the direcctory for each child process containing information only specific to that child process.
+
+Note: Regarding url checks and specifying an IP!
+    - LWmon allows you to specify an IP from which to pull a URL, rather than allowing DNS to resolve the domain name to an IP address. This is very useful in situations where you're attempting to monitor multiple servers within a load balanced setup, or if DNS for the site that you're monitoring isn't yet pointed to the server that it's on.
+
+Note: Regarding text color!
+    - By default, the text output is color coded as follows:
+          - Green - The first check that has succeeded after any number of failed checks.
+          - Red - The first check that has failed after any number of successful checks.
+          - Yellow - A check that has failed when the previous check was also a failure.
+          - Blue - The first instance of a check meeting some, but not all, of the specified success conditions.
+          - Purple - A check meeting some, but not all, of the specified success conditions, and the previous check also met some but not all success conditions
+          - White (Or what ever color is the default for your terminal) - A check that has succeeded after previous checks have succeeded
+    - These can be changed by making modifications to the "COLOR_" and "RETURN_" directives in the configuration file.
+
