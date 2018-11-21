@@ -1,8 +1,7 @@
 #! /bin/bash
 
-##### Eventually I want to hae a process in place where the config is read and regenerated like I'm doing for stat watch
-
 function fn_create_config {
+fn_debug "fn_create_config"
 cat << EOF > "$f_CONF"
 # LWmon configuration file
 
@@ -15,7 +14,7 @@ VERBOSITY = $v_DEFAULT_VERBOSITY
 # The "EMAIL_ADDRESS" directive sets a default email address to which notifications will be sent for new jobs. If no address is set, no notifications will be sent.
 # Note: This can also be set on a per-child basis
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
-EMAIL_ADDRESS = 
+EMAIL_ADDRESS = $v_DEFAULT_EMAIL_ADDRESS
 
 # The "MAIL_DELAY" directive sets a default for how many passes or failures have to occur in a row before an email is sent. This is useful in that it's typical for a single failure after a string of several succeses to be a false positive, rather than an actual indicator of an issue.
 # Note: This can also be set on a per-child basis

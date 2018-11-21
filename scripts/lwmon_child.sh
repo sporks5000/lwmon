@@ -1,6 +1,10 @@
 #! /bin/bash
 
+b_DEBUG=false
+b_DEBUG2=false
+
 function fn_locate {
+	if [[ "$b_DEBUG" == true ]]; then echo "$$ - $v_RUNNING_STATE: fn_locate" > /dev/stderr; fi
 	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
@@ -10,8 +14,10 @@ function fn_locate {
 }
 fn_locate
 source "$d_PROGRAM"/includes/mutual.shf
+source "$d_PROGRAM"/includes/variables.shf
 
 function fn_child {
+	fn_debug "fn_child"
 	### The opening part of a child process!
 	### Wait to make sure that the params file is in place.
 	sleep 1
@@ -37,9 +43,6 @@ function fn_child {
 	v_NUM_FAILURES_EMAIL=0
 	v_LAST_HTML_RESPONSE_CODE="none"
 	if [[ $( grep -E -c "^[[:blank:]]*JOB_TYPE[[:blank:]]*=" "$d_WORKING"/"$v_CHILD_PID"/params ) -eq 1 ]]; then
-		fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
-		v_JOB_CL_STRINGa="--$v_JOB_TYPE"
-		fn_read_conf ORIG_JOB_NAME child; v_ORIG_JOB_NAME="$v_RESULT"
 		fn_child_vars
 		if [[ "$v_JOB_TYPE" == "url" ]]; then
 			fn_url_child
@@ -60,186 +63,26 @@ function fn_child {
 }
 
 function fn_child_vars {
-	### Pull the necessary variables for the child process from the params file.
-	### This function is run at the beginning of a child process, as well as each time the mtime of the params file increases.
-	v_PARAMS_RELOAD="$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )" #"
-	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )" #"
+### Pull the necessary variables for the child process from the params file.
+### This function is run at the beginning of a child process, as well as each time the mtime of the params file increases.
+	fn_debug "fn_child_vars"
 	fn_check_mail_binary
-	### Check the conf to see how many copies of the html files to keep. This won't technicially be a variable in the params file, but why not allow it to be if the user desires - Almost certainly this will default to the master value.
-	fn_read_conf HTML_FILES_KEPT child; v_HTML_FILES_KEPT="$v_RESULT"
-	fn_test_variable "$v_HTML_FILES_KEPT" true HTML_FILES_KEPT "$v_DEFAULT_HTML_FILES_KEPT"; v_HTML_FILES_KEPT="$v_RESULT"
-	### If it's one of the job types that has a domain in the conf file, find the domain; else find the curl URL
-	if [[ "$v_JOB_TYPE" == "ping" || "$v_JOB_TYPE" == "dns" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		fn_read_conf DOMAIN child; v_DOMAIN="$v_RESULT"
-		fn_parse_server "$v_DOMAIN"; v_DOMAIN="$v_DOMAINa"
-		v_JOB_CL_STRING="$v_JOB_CL_STRINGa $v_DOMAIN"
-		if [[ "$v_JOB_TYPE" == "ssh-load" && ( "$v_IP_ADDRESSa" == "127.0.0.1" || $v_IP_ADDRESSa == "::1" ) ]]; then
-			v_DOMAIN="$v_IP_ADDRESSa"
-		fi
-	elif [[ "$v_JOB_TYPE" == "url" ]]; then
-		fn_read_conf CURL_URL child; v_CURL_URL="$v_RESULT"
-		fn_parse_server "$v_CURL_URL"
-		v_CURL_URL="$v_CURL_URLa"
-		v_DOMAIN="$v_DOMAINa"
-		v_SERVER_PORT="$v_SERVER_PORTa"
-		v_JOB_CL_STRING="$v_JOB_CL_STRINGa \"$v_CURL_URL\""
-	fi
-	### Directives
-	fn_read_conf WAIT_SECONDS child; v_WAIT_SECONDS="$v_RESULT"
-	fn_test_variable "$v_WAIT_SECONDS" true WAIT_SECONDS "$v_DEFAULT_WAIT_SECONDS"; v_WAIT_SECONDS="$v_RESULT"
-	fn_read_conf EMAIL_ADDRESS child; v_EMAIL_ADDRESS="$v_RESULT"
-	fn_test_variable "$v_EMAIL_ADDRESS" false EMAIL_ADDRESS ""; v_EMAIL_ADDRESS="$v_RESULT"
-	if [[ $( echo "$v_EMAIL_ADDRESS" | grep -E -c "^[^@]+@[^.@]+\.[^@]+$" ) -eq 0 ]]; then
-		v_EMAIL_ADDRESS=""
-	fi
-	fn_read_conf MAIL_DELAY child; v_MAIL_DELAY="$v_RESULT"
-	fn_test_variable "$v_MAIL_DELAY" true MAIL_DELAY "$v_DEFAULT_MAIL_DELAY"; v_MAIL_DELAY="$v_RESULT"
-	### Figure out where the verbosity is set
-	fn_read_conf VERBOSITY child; v_VERBOSITY="$v_RESULT"
-	fn_test_variable "$v_VERBOSITY" false VERBOSITY "$v_DEFAULT_VERBOSITY"; v_VERBOSITY="$v_RESULT"
-	if [[ $( echo "$v_VERBOSITY" | grep -E -c "^(standard|none|more verbose|verbose|change)$" ) -eq 0 ]]; then
-		v_VERBOSITY="standard"
-	fi
-	fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
-	fn_read_conf CUSTOM_MESSAGE child; v_CUSTOM_MESSAGE="$v_RESULT"
-	fn_test_variable "$v_CUSTOM_MESSAGE" false CUSTOM_MESSAGE ""; v_CUSTOM_MESSAGE="$v_RESULT"
-	fn_read_conf LOG_DURATION_DATA child; v_LOG_DURATION_DATA="$v_RESULT"
-	fn_test_variable "$v_LOG_DURATION_DATA" false LOG_DURATION_DATA "$v_DEFAULT_LOG_DURATION_DATA"; v_LOG_DURATION_DATA="$v_RESULT"
-	fn_read_conf NUM_DURATIONS_RECENT child; v_NUM_DURATIONS_RECENT="$v_RESULT"
-	fn_test_variable "$v_NUM_DURATIONS_RECENT" true NUM_DURATIONS_RECENT "$v_DEFAULT_NUM_DURATIONS_RECENT"; v_NUM_DURATIONS_RECENT="$v_RESULT"
-	fn_read_conf NUM_STATUSES_RECENT child; v_NUM_STATUSES_RECENT="$v_RESULT"
-	fn_test_variable "$v_NUM_STATUSES_RECENT" true NUM_STATUSES_RECENT "$v_DEFAULT_NUM_STATUSES_RECENT"; v_NUM_STATUSES_RECENT="$v_RESULT"
-	fn_read_conf NUM_STATUSES_NOT_SUCCESS child; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
-	fn_test_variable "$v_NUM_STATUSES_NOT_SUCCESS" true NUM_STATUSES_NOT_SUCCESS "$v_DEFAULT_NUM_STATUSES_NOT_SUCCESS"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
-	### If there's no output file, set it as standard out, then test to see where the output file is. IF it's different than what it was previously, log it.
-	if [[ -z "$v_OUTPUT_FILE" ]]; then
-		v_OUTPUT_FILE="/dev/stdout"
-	fi
-	fn_read_conf OUTPUT_FILE child; v_OUTPUT_FILE2="$v_RESULT"
-	fn_test_variable "$v_OUTPUT_FILE2" false OUTPUT_FILE "$v_DEFAULT_OUTPUT_FILE"; v_OUTPUT_FILE2="$v_RESULT"
-	fn_test_file "$v_OUTPUT_FILE2" false true; v_OUTPUT_FILE2="$v_RESULT"
-	a_SCRIPT=()
-	##### I'm sure that I've tested this, but it might just be better to do this with eval
-	fn_read_conf SCRIPT child; v_SCRIPT="$v_RESULT"
-	for word in $( echo $v_SCRIPT ); do
-		a_SCRIPT[${#a_SCRIPT[@]}]="$word"
-	done
-	unset v_SCRIPT
-	if [[ ${a_SCRIPT[0]:0:1} != "/" ]]; then
-		unset a_SCRIPT
-	fi
-	### If the designated output file looks good, and is different than it was previously, log it.
-	if [[ -n "$v_OUTPUT_FILE2" && "$v_OUTPUT_FILE2" != "$v_OUTPUT_FILE" ]]; then
-		echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - Output for child process $v_CHILD_PID is being directed to $v_OUTPUT_FILE2" >> "$v_LOG"
-		v_OUTPUT_FILE="$v_OUTPUT_FILE2"
-	elif [[ -z "$v_OUTPUT_FILE2" && -z "$v_OUTPUT_FILE" ]]; then
-		### If there is no designated output file, and there was none previously, stdout will be fine.
-		v_OUTPUT_FILE="/dev/stdout"
-	fi
-	if [[ "$v_JOB_TYPE" == "ping" ]]; then
-		if [[ $( echo "$v_WAIT_SECONDS" | cut -d "." -f1 ) -lt 2 ]]; then
-			v_WAIT_SECONDS=2
-		fi
-	else
-		if [[ $( echo "$v_WAIT_SECONDS" | cut -d "." -f1 ) -lt 5 ]]; then
-			v_WAIT_SECONDS=5
-		fi
-	fi
-	if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		fn_read_conf CHECK_TIMEOUT child; v_CHECK_TIMEOUT="$v_RESULT"
-		fn_test_variable "$v_CHECK_TIMEOUT" true CHECK_TIMEOUT "$v_DEFAULT_CHECK_TIMEOUT"; v_CHECK_TIMEOUT="$v_RESULT"
-		fn_read_conf CHECK_TIME_PARTIAL_SUCCESS child; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
-		fn_test_variable "$v_CHECK_TIME_PARTIAL_SUCCESS" true CHECK_TIME_PARTIAL_SUCCESS "$v_DEFAULT_CHECK_TIME_PARTIAL_SUCCESS"; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
-		v_JOB_CL_STRING="$v_JOB_CL_STRING --check-timeout $v_CHECK_TIMEOUT --ctps $v_CHECK_TIME_PARTIAL_SUCCESS"
-		v_CHECK_TIME_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_CHECK_TIME_PARTIAL_SUCCESS} * 100}" )"
-	fi
-	if [[ "$v_JOB_TYPE" == "url" ]]; then
-		fn_read_conf IP_ADDRESS child; v_IP_ADDRESS="$v_RESULT"
-		fn_parse_server "$v_IP_ADDRESS"; v_IP_ADDRESS="$v_IP_ADDRESSa"
-		if [[ "$v_IP_ADDRESS" != "false" ]]; then
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --ip $v_IP_ADDRESS"
-		fi
-		fn_read_conf CURL_STRING child "" "multi" ; a_CURL_STRING=("${a_RESULT[@]}")
-		i=0; while [[ "$i" -lt "${#a_CURL_STRING[@]}" ]]; do
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --string \"${a_CURL_STRING[$i]}\""
-			i=$(( $i + 1 ))
-		done
-		fn_read_conf USE_WGET child; v_USE_WGET="$v_RESULT"
-		fn_test_variable "$v_USE_WGET" false USE_WGET "$v_DEFAULT_USE_WGET"; v_USE_WGET="$v_RESULT"
-		if [[ "$v_USE_WGET" == "true" ]]; then
-			fn_use_wget
-			v_CURL_VERBOSE="false"
-			v_LOG_HTTP_CODE="false"
-		else
-			fn_read_conf CURL_VERBOSE child; v_CURL_VERBOSE="$v_RESULT"
-			fn_test_variable "$v_CURL_VERBOSE" false CURL_VERBOSE "$v_DEFAULT_CURL_VERBOSE"; v_CURL_VERBOSE="$v_RESULT"
-			fn_read_conf LOG_HTTP_CODE child; v_LOG_HTTP_CODE="$v_RESULT"
-			fn_test_variable "$v_LOG_HTTP_CODE" false LOG_HTTP_CODE "$v_DEFAULT_LOG_HTTP_CODE"; v_LOG_HTTP_CODE="$v_RESULT"
-		fi
-		fn_read_conf USER_AGENT child; v_USER_AGENT="$v_RESULT"
-		fn_test_variable "$v_USER_AGENT" false USER_AGENT "$v_DEFAULT_USER_AGENT"; v_USER_AGENT="$v_RESULT"
-		### If there's an IP address, then the URL needs to have the domain replaced with the IP address and the port number.
-		if [[ "$v_IP_ADDRESS" != "false" && $( echo "$v_CURL_URL" | grep -E -c "^(https?://)?$v_DOMAIN:[0-9]+" ) -eq 1 ]]; then
-			### If it's specified with a port in the URL, lets make sure that it's the right port (according to the params file).
-			v_CURL_URL="$( echo "$v_CURL_URL" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/" )" #"
-		elif [[ $v_IP_ADDRESS != "false" ]]; then
-			### If it's not specified with the port in the URL, lets add the port.
-			v_CURL_URL="$( echo "$v_CURL_URL" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/" )" #"
-		else
-			### If there's no IP address, lets throw the port on there as well.
-			v_CURL_URL="$( echo "$v_CURL_URL" | sed "s/$v_DOMAIN:*[0-9]*/$v_DOMAIN:$v_SERVER_PORT/" )" #"
-		fi
-		if [[ "$v_USER_AGENT" == true ]]; then
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent"
-			v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36'
-		elif [[ "$v_USER_AGENT" == false && "$v_WGET_BIN" == "false" ]]; then
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent false"
-			v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
-		elif [[ "$v_USER_AGENT" == false && "$v_WGET_BIN" != "false" ]]; then
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent false"
-			v_USER_AGENT='LWmon/'"$v_VERSION"' wget/'"$v_WGET_BIN_VERSION"
-		fi
-	fi
-	if [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
-		fn_read_conf SERVER_PORT child; v_SERVER_PORT="$v_RESULT"
-		fn_test_variable "$v_SERVER_PORT" true false "$v_DEFAULT_SERVER_PORT"; v_SERVER_PORT="$v_RESULT"
-		fn_read_conf MIN_LOAD_PARTIAL_SUCCESS child; v_MIN_LOAD_PARTIAL_SUCCESS="$v_RESULT"
-		fn_test_variable "$v_MIN_LOAD_PARTIAL_SUCCESS" true false "$v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS"; v_MIN_LOAD_PARTIAL_SUCCESS="$v_RESULT"
-		fn_read_conf MIN_LOAD_FAILURE child; v_MIN_LOAD_FAILURE="$v_RESULT"
-		fn_test_variable "$v_MIN_LOAD_FAILURE" true false "$v_DEFAULT_MIN_LOAD_FAILURE"; v_MIN_LOAD_FAILURE="$v_RESULT"
-		fn_read_conf SSH_USER child; v_SSH_USER="$v_RESULT"
-		v_JOB_CL_STRING="$v_JOB_CL_STRING --port $v_SERVER_PORT --load-ps $v_MIN_LOAD_PARTIAL_SUCCESS --load-fail $v_MIN_LOAD_FAILURE --user $v_SSH_USER"
-		v_MIN_LOAD_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_MIN_LOAD_PARTIAL_SUCCESS} * 100}" )"
-		v_MIN_LOAD_FAILURE="$( awk "BEGIN {printf \"%.0f\",${v_MIN_LOAD_FAILURE} * 100}" )"
-		fn_read_conf SSH_CONTROL_PATH child; v_SSH_CONTROL_PATH="$v_RESULT"
-		fn_test_variable "$v_SSH_CONTROL_PATH" false SSH_CONTROL_PATH "$v_DEFAULT_SSH_CONTROL_PATH"; v_SSH_CONTROL_PATH="$v_RESULT"
-		fn_test_file "$v_SSH_CONTROL_PATH" false false; v_SSH_CONTROL_PATH="$v_RESULT"
-	fi
-	if [[ "$v_JOB_TYPE" == "dns" ]]; then
-		fn_read_conf DNS_CHECK_DOMAIN child; v_DNS_CHECK_DOMAIN="$v_RESULT"
-		fn_parse_server "$v_DNS_CHECK_DOMAIN"; v_DNS_CHECK_DOMAIN="$v_DOMAINa"
-		fn_read_conf DNS_CHECK_RESULT child; v_DNS_CHECK_RESULT="$v_RESULT"
-		fn_read_conf DNS_RECORD_TYPE child; v_DNS_RECORD_TYPE="$v_RESULT"
-		v_JOB_CL_STRING="$v_JOB_CL_STRING --check-domain $v_DNS_CHECK_DOMAIN"
-		if [[ -n "$v_DNS_CHECK_RESULT" ]]; then
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --check-result \"$v_DNS_CHECK_RESULT\""
-		fi
-		if [[ -n "$v_DNS_RECORD_TYPE" ]]; then
-			v_JOB_CL_STRING="$v_JOB_CL_STRING --record-type $v_DNS_RECORD_TYPE"
-		fi
-	fi
-	v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY --verbosity \"$v_VERBOSITY\" --outfile \"$v_OUTPUT_FILE\" --seconds $v_WAIT_SECONDS --ldd $v_LOG_DURATION_DATA --ndr $v_NUM_DURATIONS_RECENT --nsns $v_NUM_STATUSES_NOT_SUCCESS --nsr $v_NUM_STATUSES_RECENT --job-name \"$v_JOB_NAME\""
-	echo "$v_JOB_CL_STRING" > "$d_WORKING"/"$v_CHILD_PID"/cl
+	fn_read_child_params "$d_WORKING"/"$v_CHILD_PID"/params
+	v_PARAMS_RELOAD="$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )"
+	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
 }
 
 function fn_child_dates {
+	fn_debug "fn_child_dates"
 	v_DATE3_LAST="$v_DATE3"
 	v_DATE="$( date +%m"/"%d" "%H":"%M":"%S )"
 	v_DATE2="$( date +%F" "%T" "%Z )"
 	v_DATE3="$( date +%s )"
 }
+
 function fn_url_child {
-	###The basic loop for a URL monitoring process.
+###The basic loop for a URL monitoring process.
+	fn_debug "fn_url_child"
 	v_URL_OR_PING="URL"
 	unset -f fn_load_child
 	unset -f fn_ping_child
@@ -331,6 +174,7 @@ function fn_url_child {
 }
 
 function fn_load_child {
+	fn_debug "fn_load_child"
 	v_URL_OR_PING="Load on"
 	unset -f fn_url_child
 	unset -f fn_ping_child
@@ -370,7 +214,8 @@ function fn_load_child {
 }
 
 function fn_ping_child {
-	### The basic loop for a ping monitoring process
+### The basic loop for a ping monitoring process
+	fn_debug "fn_ping_child"
 	v_URL_OR_PING="Ping of"
 	unset -f fn_url_child
 	unset -f fn_load_child
@@ -391,8 +236,9 @@ function fn_ping_child {
 }
 
 function fn_dns_child {
-	### The basic loop for a DNS monitoring process
-	### Note: the DNS monitoring feature is a throwback to 2012 and 2013 when DNS was the first thing that would stop reporting on a cPanel server if it was under load. While this is no longer the case, I don't see any point in removing this feature.
+### The basic loop for a DNS monitoring process
+### Note: the DNS monitoring feature is a throwback to 2012 and 2013 when DNS was the first thing that would stop reporting on a cPanel server if it was under load. While this is no longer the case, I don't see any point in removing this feature.
+	fn_debug "fn_dns_child"
 	v_URL_OR_PING="DNS for"
 	unset -f fn_url_child
 	unset -f fn_load_child
@@ -420,6 +266,7 @@ function fn_dns_child {
 }
 
 function fn_child_checks {
+	fn_debug "fn_child_checks"
 	### has the mtime of the params file increased?
 	if [[ "$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )" -gt "$v_PARAMS_RELOAD" ]]; then
 		fn_child_vars
@@ -428,6 +275,7 @@ function fn_child_checks {
 		echo "***Reloaded parameters for $v_URL_OR_PING $v_JOB_NAME.***"
 	elif [[ "$( stat --format=%Y "$f_CONF" )" -gt "$v_MASTER_RELOAD" ]]; then
 	### fn_child_vars updates both the reload variables.
+		fn_read_master_conf
 		fn_child_vars
 	fi
 	if [[ $( ls -1 "$d_WORKING"/"$v_CHILD_PID"/ | grep -E "^site_" | grep -E -cv "current|previous" ) -gt "$v_HTML_FILES_KEPT" ]]; then
@@ -450,6 +298,8 @@ function fn_child_checks {
 }
 
 function fn_child_exit {
+	fn_debug "fn_child_exit"
+
 	### When a child process exits, it needs to clean up after itself and log the fact that it has exited. "$1" is the exit code that should be output.
 	v_EXIT_CODE="$1"
 	if [[ "$v_TOTAL_CHECKS" -gt 0 ]]; then
@@ -468,7 +318,8 @@ function fn_child_exit {
 }
 
 function fn_report_status {
-	### $1 is the status. $2 is whether or not to try to save the file
+### $1 is the status. $2 is whether or not to try to save the file
+	fn_debug "fn_report_status"
 	v_THIS_STATUS="$1"
 	local v_SAVE="$2"
 
@@ -493,11 +344,11 @@ function fn_report_status {
 		v_DESCRIPTOR2="Check succeeded"
 		v_SUCCESS_CHECKS=$(( $v_SUCCESS_CHECKS + 1 ))
 		if [[ "$v_LAST_STATUS" == "success" ]]; then
-			fn_read_conf COLOR_SUCCESS master "$v_DEFAULT_COLOR_SUCCESS"; v_COLOR_START="$v_RESULT"
-			fn_read_conf RETURN_SUCCESS master "$v_DEFAULT_RETURN_SUCCESS"; v_COLOR_END="$v_RESULT"
+			v_COLOR_START="$v_COLOR_SUCCESS"
+			v_COLOR_END="$v_RETURN_SUCCESS"
 		else
-			fn_read_conf COLOR_FIRST_SUCCESS master "$v_DEFAULT_COLOR_FIRST_SUCCESS"; v_COLOR_START="$v_RESULT"
-			fn_read_conf RETURN_FIRST_SUCCESS master "$v_DEFAULT_RETURN_FIRST_SUCCESS"; v_COLOR_END="$v_RESULT"
+			v_COLOR_START="$v_COLOR_FIRST_SUCCESS"
+			v_COLOR_END="$v_RETURN_FIRST_SUCCESS"
 		fi
 	elif [[ "$v_THIS_STATUS" == "partial success" ]]; then
 		v_TOTAL_PARTIAL_SUCCESSES=$(( $v_TOTAL_PARTIAL_SUCCESSES + 1 ))
@@ -507,11 +358,11 @@ function fn_report_status {
 		v_DESCRIPTOR2="Partial success"
 		v_PARTIAL_SUCCESS_CHECKS=$(( $v_PARTIAL_SUCCESS_CHECKS + 1 ))
 		if [[ "$v_LAST_STATUS" == "partial success" ]]; then
-			fn_read_conf COLOR_PARTIAL_SUCCESS master "$v_DEFAULT_COLOR_PARTIAL_SUCCESS"; v_COLOR_START="$v_RESULT"
-			fn_read_conf RETURN_PARTIAL_SUCCESS master "$v_DEFAULT_RETURN_PARTIAL_SUCCESS"; v_COLOR_END="$v_RESULT"
+			v_COLOR_START="$v_COLOR_PARTIAL_SUCCESS"
+			v_COLOR_END="$v_RETURN_PARTIAL_SUCCESS"
 		else
-			fn_read_conf COLOR_FIRST_PARTIAL_SUCCESS master "$v_DEFAULT_COLOR_FIRST_PARTIAL_SUCCESS"; v_COLOR_START="$v_RESULT"
-			fn_read_conf RETURN_FIRST_PARTIAL_SUCCESS master "$v_DEFAULT_RETURN_FIRST_PARTIAL_SUCCESS"; v_COLOR_END="$v_RESULT"
+			v_COLOR_START="$v_COLOR_FIRST_PARTIAL_SUCCESS"
+			v_COLOR_END="$v_RETURN_FIRST_PARTIAL_SUCCESS"
 		fi
 	elif [[ "$v_THIS_STATUS" == "failure" ]]; then
 		v_TOTAL_FAILURES=$(( $v_TOTAL_FAILURES + 1 ))
@@ -521,11 +372,11 @@ function fn_report_status {
 		v_DESCRIPTOR2="Check failed"
 		v_FAILURE_CHECKS=$(( $v_FAILURE_CHECKS + 1 ))
 		if [[ "$v_LAST_STATUS" == "failure" ]]; then
-			fn_read_conf COLOR_FAILURE master "$v_DEFAULT_COLOR_FAILURE"; v_COLOR_START="$v_RESULT"
-			fn_read_conf RETURN_FAILURE master "$v_DEFAULT_RETURN_FAILURE"; v_COLOR_END="$v_RESULT"
+			v_COLOR_START="$v_COLOR_FAILURE"
+			v_COLOR_END="$v_RETURN_FAILURE"
 		else
-			fn_read_conf COLOR_FIRST_FAILURE master "$v_DEFAULT_COLOR_FIRST_FAILURE"; v_COLOR_START="$v_RESULT"
-			fn_read_conf RETURN_FIRST_FAILURE master "$v_DEFAULT_RETURN_FIRST_FAILURE"; v_COLOR_END="$v_RESULT"
+			v_COLOR_START="$v_COLOR_FIRST_FAILURE"
+			v_COLOR_END="$v_RETURN_FIRST_FAILURE"
 		fi
 	fi
 	if [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
@@ -843,6 +694,7 @@ function fn_report_status {
 }
 
 function fn_send_email {
+	fn_debug "fn_send_email"
 	v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n$( cat "$d_WORKING"/"$v_CHILD_PID"/log | grep -E -v "\] - (The HTML response code|Status: (Check (failed|succeeded)|Partial success) - Duration)" )"
 	if [[ "$v_THIS_STATUS" == "intermittent failure" ]]; then
 		fn_intermittent_failure_email
@@ -864,10 +716,11 @@ function fn_send_email {
 }
 
 function fn_success_email {
-	### Determines if a success e-mail needs to be sent and, if so, sends that e-mail.
-	### In order for mail to be sent here
-		### If the last message was an intermittent fail, we need to have seen exactly $v_NUM_STATUSES_RECENT consecutive successes
-		### Otherwise, we only need to have seen exactly $v_MAIL_DELAY consecutive successes
+### Determines if a success e-mail needs to be sent and, if so, sends that e-mail.
+### In order for mail to be sent here
+	### If the last message was an intermittent fail, we need to have seen exactly $v_NUM_STATUSES_RECENT consecutive successes
+	### Otherwise, we only need to have seen exactly $v_MAIL_DELAY consecutive successes
+	fn_debug "fn_success_email"
 	if [[ "$v_TOTAL_CHECKS" != "$v_MAIL_DELAY" && "$v_LAST_EMAIL_SENT" != "success" ]]; then
 		v_GO=false
 		if [[ "$v_SUCCESS_CHECKS" -eq "$v_MAIL_DELAY" && "$v_LAST_EMAIL_SENT" != "intermittent" ]]; then
@@ -890,7 +743,8 @@ function fn_success_email {
 }
 
 function fn_partial_success_email {
-	### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
+### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
+	fn_debug "fn_partial_success_email"
 	if [[ "$v_PARTIAL_SUCCESS_CHECKS" -eq "$v_MAIL_DELAY" && "$v_TOTAL_CHECKS" != "$v_MAIL_DELAY" && "$v_LAST_EMAIL_SENT" != "partial success" ]]; then
 		if [[ "$v_SEND_MAIL" == true && -n "$v_EMAIL_ADDRESS" ]]; then
 			echo -e "$( if [[ -n "$v_CUSTOM_MESSAGE" ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be succeeding in some regards but failing in others.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have only been partially successful, $v_MUTUAL_EMAIL" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Partial success" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Partial Success e-mail sent" >> "$v_LOG" &
@@ -904,14 +758,15 @@ function fn_partial_success_email {
 }
 
 function fn_intermittent_failure_email {
-	### Determines if a internittent failure e-mail needs to be sent and, if so, sends that e-mail.
-	### In order for an email to be sent here:
-		### The last email has to have been declaring a success (Or there have been no emails yet)
-		### At least $v_NUM_STATUSES_RECENT checks have to have occurred since the last success email (or since the start)
-		### At least $v_NUM_STATUSES_NOT_SUCCESS of them have to have not been successes
-		### $v_NUM_STATUSES_NOT_SUCCESS has to be greater than zero
-		### There has to be an email address declared
-		### The mail binary has to be present
+### Determines if a internittent failure e-mail needs to be sent and, if so, sends that e-mail.
+### In order for an email to be sent here:
+	### The last email has to have been declaring a success (Or there have been no emails yet)
+	### At least $v_NUM_STATUSES_RECENT checks have to have occurred since the last success email (or since the start)
+	### At least $v_NUM_STATUSES_NOT_SUCCESS of them have to have not been successes
+	### $v_NUM_STATUSES_NOT_SUCCESS has to be greater than zero
+	### There has to be an email address declared
+	### The mail binary has to be present
+	fn_debug "fn_intermittent_failure_email"
 	if [[ "$v_LAST_EMAIL_SENT" == "success" && "$v_NUM_STATUSES_NOT_SUCCESS" -gt 0 ]]; then
 		if [[ "$v_SEND_MAIL" == true && -n "$v_EMAIL_ADDRESS" ]]; then
 			echo -e "$( if [[ -n "$v_CUSTOM_MESSAGE" ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be failing intermittently.\n\nYou're recieving this message to inform you that $v_NUM_STATUSES_NOT_SUCCESS out of the last $v_NUM_STATUSES_RECENT checks against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have not been fully successful, $v_MUTUAL_EMAIL\n\n" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check failing intermittently!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Failure e-mail sent" >> "$v_LOG" &
@@ -925,7 +780,8 @@ function fn_intermittent_failure_email {
 }
 
 function fn_failure_email {
-	### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
+### Determines if a failure e-mail needs to be sent and, if so, sends that e-mail.
+	fn_debug "fn_failure_email"
 	if [[ "$v_FAILURE_CHECKS" -eq "$v_MAIL_DELAY" && "$v_TOTAL_CHECKS" != "$v_MAIL_DELAY" && "$v_LAST_EMAIL_SENT" != "failure" ]]; then
 		if [[ "$v_SEND_MAIL" == true && -n "$v_EMAIL_ADDRESS" ]]; then
 			echo -e "$( if [[ -n "$v_CUSTOM_MESSAGE" ]]; then echo "$v_CUSTOM_MESSAGE\n\n"; fi )$v_DATE2 - LWmon - $v_URL_OR_PING $v_JOB_NAME - Status changed: Appears to be failing.\n\nYou're recieving this message to inform you that $v_MAIL_DELAY consecutive check(s) against $v_URL_OR_PING $( if [[ "$v_JOB_NAME" == "$v_ORIG_JOB_NAME" ]]; then echo "$v_JOB_NAME"; else echo "$v_JOB_NAME ($v_ORIG_JOB_NAME)"; fi ) have failed, $v_MUTUAL_EMAIL" | "${a_MAIL_BIN[@]}" -s "LWmon - $v_URL_OR_PING $v_JOB_NAME - Check FAILED!" $v_EMAIL_ADDRESS && echo "$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_ORIG_JOB_NAME: Failure e-mail sent" >> "$v_LOG" &

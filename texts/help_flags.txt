@@ -12,8 +12,8 @@ FLAGS FOR MONITORING JOB TYPES:
         - "--mail"
         - "--mail-delay"
         - "--ndr"
-        - "--nds"
         - "--nsns"
+        - "--nsr"
         - "--outfile"
         - "--record-type"
         - "--seconds"
@@ -29,8 +29,8 @@ FLAGS FOR MONITORING JOB TYPES:
         - "--mail"
         - "--mail-delay"
         - "--ndr"
-        - "--nds"
         - "--nsns"
+        - "--nsr"
         - "--outfile"
         - "--seconds"
         - "--verbosity"
@@ -52,8 +52,8 @@ FLAGS FOR MONITORING JOB TYPES:
         - "--mail"
         - "--mail-delay"
         - "--ndr"
-        - "--nds"
         - "--nsns"
+        - "--nsr"
         - "--outfile"
         - "--port"
         - "--seconds"
@@ -74,8 +74,8 @@ FLAGS FOR MONITORING JOB TYPES:
         - "--mail"
         - "--mail-delay"
         - "--ndr"
-        - "--nds"
         - "--nsns"
+        - "--nsr"
         - "--outfile"
         - "--seconds"
         - "--user-agent"
@@ -96,6 +96,7 @@ FLAGS FOR ADDITIONAL SPECIFICATIONS FOR MONITORING JOBS
     - Run `./lwmon.sh --help process-types` for more information on master, control, and child processes.
 
 --ctps [NUMBER (with or without decimal places)]
+--check-time-partial-success
     - Allows the user to specify a minimum number of seconds before a url or ssh-load job is considered a partial success. That is, should the result that's returned be considered a success in every other way, the amount of time that it took for the result to be returned should still be conveyed as a cause of concern to the user.
 
 --domain [DOMAIN NAME]

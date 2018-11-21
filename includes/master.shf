@@ -2,39 +2,51 @@
 
 function fn_remove_unnecessary_functions {
 ### The only functions we need to keep are fn_read_conf, fn_check_mail_binary
-	unset -f fn_set_defaults
-	unset -f fn_test_variable
+	fn_debug "fn_remove_unnecessary_functions"
+	### Functions from ,aster.shf
+	unset -f fn_remove_unnecessary_functions
+
+	### Functions from ./lwmon.sh
+	unset -f fn_locate
+	unset -f fn_assign_run_type
+	unset -f fn_process_args
+	unset -f fn_test_string
+	unset -f fn_test_integer
+	unset -f fn_test_float
+	unset -f fn_test_child_pid
+	unset -f fn_test_email
+	unset -f fn_test_ip
+	unset -f fn_test_flag_with_run
+
+	### Functions from mutual.shf
+	### "fn_read_conf" and "fn_check_mail_binary" need to be kept
+	unset -f fn_fix_home
+	unset -f fn_update_conf
 	unset -f fn_test_file
 	unset -f fn_convert_seconds
 	unset -f fn_start_script
 	unset -f fn_use_wget
 	unset -f fn_parse_server
-	unset -f fn_locate
+	unset -f fn_make_params
+
+	### functions from variables.shf
+	### Functions we keep: fn_set_defaults fn_is_integer fn_is_float fn_is_boolean fn_is_file_path fn_is_email fn_is_verbosity fn_is_string fn_read_master_conf fn_read_child_params_lite
+	unset -f fn_read_child_params
+
+	### Functions from create.shf
 	unset -f fn_url_cl
 	unset -f fn_ping_cl
 	unset -f fn_dns_cl
 	unset -f fn_load_cl
 	unset -f fn_mutual_cl
-	unset -f fn_list
-	unset -f fn_modify_master
-	unset -f fn_modify_no_master
-	unset -f fn_modify_old_jobs
-	unset -f fn_modify_html
-	unset -f fn_modify
-	unset -f fn_update_conf
-	unset -f fn_parse_cl_argument
+
+	### functions from create_config.shf
 	unset -f fn_create_config
-	unset -f fn_help
-	unset -f fn_help_flags
-	unset -f fn_help_process_types
-	unset -f fn_help_params_file
-	unset -f fn_help_files
-	unset -f fn_version
-	unset -f fn_remove_unnecessary_functions
 }
 
 function fn_master {
 	### This is the loop for the master function.
+	fn_debug "fn_master"
 	if [[ "$v_RUNNING_STATE" != "master" ]]; then
 		echo "Master process already present. Exiting."
 		exit 1
@@ -42,7 +54,7 @@ function fn_master {
 	### try to prevent the master process from exiting unexpectedly.
 	trap fn_master_exit SIGINT SIGTERM SIGKILL
 	fn_remove_unnecessary_functions
-	fn_read_conf VERBOSITY master "$v_DEFAULT_VERBOSITY"; v_VERBOSITY="$v_RESULT"
+	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
 	### Get rid of the save file (if there is one).
 	if [[ -f "$d_WORKING"/save ]]; then
 		rm -f "$d_WORKING"/save
@@ -69,9 +81,14 @@ function fn_master {
 	fi
 	echo "$( date +%F" "%T" "%Z ) - [$$] - Starting the Master Process" >> "$v_LOG"
 	while [[ 1 == 1 ]]; do
+		### Every two seconds, check if we need to re-read the master conf
+		if [[ -z "$v_MASTER_RELOAD" || "$( stat --format=%Y "$f_CONF" )" -gt "$v_MASTER_RELOAD" ]]; then
+			v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
+			fn_read_master_conf master
+		fi
 
 		### Every thirty minutes check to see what the current IP address is (thanks to VPN, this can change).
-		##### Why are we checking for the local IP? How does having this benefit us?
+		##### Checking for the local IP is necessary for the die list. Let's get rid of all of that
 		if [[ $(( $( date +%s ) - 1800 )) -gt "$v_TIMESTAMP_THIRTY_MINUTES" ]]; then
 			v_TIMESTAMP_THIRTY_MINUTES="$( date +%s )"
 			if [[ "$v_WGET_BIN" == "false" ]]; then
@@ -87,8 +104,7 @@ function fn_master {
 				if [[ $( echo "$v_OLD_CHILD" | grep -E -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
 					if [[ $(( $( date +%s ) - $( echo "$v_OLD_CHILD" | cut -d "_" -f3 ) )) -gt 604800 ]]; then
 						### 604800 seconds = seven days.
-						fn_read_conf JOB_TYPE "$d_WORKING"/"$v_OLD_CHILD""/params"; v_JOB_TYPE="$v_RESULT"
-						fn_read_conf JOB_NAME "$d_WORKING"/"$v_OLD_CHILD""/params"; v_JOB_NAME="$v_RESULT"
+						fn_read_child_params_lite "$d_WORKING"/"$v_OLD_CHILD"/params
 						echo "$( date +%F" "%T" "%Z ) - [$( echo "$v_OLD_CHILD" | cut -d "_" -f2)] - $v_JOB_TYPE $v_JOB_NAME - Child process dead for seven days. Deleting backed up data." >> "$v_LOG"
 						rm -rf "$d_WORKING"/"$v_OLD_CHILD"
 					fi
@@ -113,11 +129,10 @@ function fn_master {
 			fi
 			### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
 			for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^[0-9]+$" ); do
-				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -eq 0 ]]; then
+				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon_child.sh[[:blank:]]" ) -eq 0 ]]; then
 					### If it hasn't been marked to die, restart it.
 					if [[ ! -f "$d_WORKING"/"$v_CHILD_PID/die" ]]; then
-						fn_read_conf JOB_TYPE child; v_JOB_TYPE="$v_RESULT"
-						fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+						fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 						echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME - Child process was found dead. Restarting with new PID." >> "$v_LOG"
 						v_NEW_JOB="$( date +%s )""_$RANDOM.job"
 						cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"new/$v_NEW_JOB.job"
@@ -137,8 +152,7 @@ function fn_master {
 		if [[ $( ls -1 "$d_WORKING"/new/*.job 2> /dev/null | wc -l ) -gt 0 ]]; then
 		### If there are any at all, take the first one and start a job from it. The next one can wait for the next loop.
 			v_LWMON_JOB="$( ls -1 "$d_WORKING"/new/*.job 2> /dev/null | head -n1 )"
-			fn_read_conf JOB_TYPE "$v_LWMON_JOB"; v_JOB_TYPE="$v_RESULT"
-			fn_read_conf JOB_NAME "$v_LWMON_JOB"; v_JOB_NAME="$v_RESULT"
+			fn_read_child_params_lite "$v_LWMON_JOB"
 			if [[ "$v_JOB_TYPE" == "url" ]]; then
 				v_JOB_NAME="URL $v_JOB_NAME"
 				fn_spawn_child_process
@@ -157,6 +171,7 @@ function fn_master {
 				rm -f "$d_WORKING"/new/*
 			fi
 		fi
+
 		### Is there a file named "die" in the working directory? If so, end the master process.
 		if [[ -f "$d_WORKING"/die ]]; then
 			fn_master_exit 0
@@ -168,6 +183,7 @@ function fn_master {
 function fn_spawn_child_process {
 	### This function launches the child process and makes sure that it has it's own working directory.
 	### Launch the child process
+	fn_debug "fn_spawn_child_process"
 	"$v_CHILD_SCRIPT" "$v_JOB_NAME" &
 	### Note - the job name doesn't need to be present, but it makes ps more readable. Each child process starts out as generic. Once the master process creates a working directory for it (based on its PID) and then puts the params file in place for it, only then does it discover its purpose.
 	### create the child's wirectory and move the params file there.
@@ -183,7 +199,11 @@ function fn_spawn_child_process {
 
 function fn_master_exit {
 	### these steps are run after the master process has recieved a signal that it needs to die. "$1" is the exit code that should be passed.
+	fn_debug "fn_master_exit"
 	v_EXIT_CODE="$1"
+	if [[ -z "$v_EXIT_CODE" ]]; then
+		v_EXIT_CODE="0"
+	fi
 	echo "$( date +%F" "%T" "%Z ) - [$$] - Ending the Master Process" >> "$v_LOG"
 	if [[ ! -f "$d_WORKING"/die && $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -vc "[^0-9]" ) -gt 0 ]]; then
 		### If the "die" file is not present, it was CTRL-C'd from the command line. Check if there are child processes, then prompt if they should be saved.
@@ -199,7 +219,7 @@ function fn_master_exit {
 		if [[ "$v_OPTION_NUM" == "1" ]]; then
 			for i in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 				v_CHILD_PID=$( basename "$i" )
-				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
+				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon_child.sh[[:blank:]]" ) -gt 0 ]]; then
 					touch "$d_WORKING"/"$v_CHILD_PID/die"
 				fi
 			done
@@ -209,7 +229,7 @@ function fn_master_exit {
 	elif [[ -f "$d_WORKING"/die && ! -f "$d_WORKING"/save ]]; then
 		for i in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 			v_CHILD_PID=$( basename "$i" )
-			if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
+			if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon_child.sh[[:blank:]]" ) -gt 0 ]]; then
 				touch "$d_WORKING"/"$v_CHILD_PID/die"
 			fi
 		done

@@ -1,0 +1,482 @@
+#! /bin/bash
+
+function fn_set_defaults {
+	fn_debug "fn_set_defaults"
+	### Variables that can be set in the main config
+	v_DEFAULT_VERBOSITY="standard"
+	v_DEFAULT_EMAIL_ADDRESS=""
+	v_DEFAULT_MAIL_DELAY="2"
+	v_DEFAULT_WAIT_SECONDS="30"
+	v_DEFAULT_CHECK_TIMEOUT="10"
+	v_DEFAULT_OUTPUT_FILE="/dev/stdout"
+	v_DEFAULT_USER_AGENT="false"
+	v_DEFAULT_HTML_FILES_KEPT="100"
+	v_DEFAULT_NUM_DURATIONS_RECENT="10"
+	v_DEFAULT_NUM_STATUSES_RECENT="12"
+	v_DEFAULT_NUM_STATUSES_NOT_SUCCESS="3"
+	v_DEFAULT_CHECK_TIME_PARTIAL_SUCCESS="7"
+	v_DEFAULT_LOG_DURATION_DATA="true"
+	v_DEFAULT_CURL_VERBOSE="true"
+	v_DEFAULT_LOG_HTTP_CODE="true"
+	v_DEFAULT_USE_WGET="false"
+	v_DEFAULT_LOG="$d_PROGRAM"/"lwmon.log"
+	v_DEFAULT_ALT_MAIL=""
+	v_DEFAULT_SSH_CONTROL_PATH="~/.ssh/control:%h:%p:%r"
+	v_DEFAULT_CUSTOM_MESSAGE=""
+	v_DEFAULT_COLOR_SUCCESS=""
+	v_DEFAULT_COLOR_FIRST_SUCCESS="\e[1;32m"
+	v_DEFAULT_COLOR_FAILURE="\e[1;33m"
+	v_DEFAULT_COLOR_FIRST_FAILURE="\e[1;31m"
+	v_DEFAULT_COLOR_PARTIAL_SUCCESS="\e[1;34m"
+	v_DEFAULT_COLOR_FIRST_PARTIAL_SUCCESS="\e[1;34m"
+	v_DEFAULT_RETURN_SUCCESS=""
+	v_DEFAULT_RETURN_FIRST_SUCCESS="\e[00m"
+	v_DEFAULT_RETURN_FAILURE="\e[00m"
+	v_DEFAULT_RETURN_FIRST_FAILURE="\e[00m"
+	v_DEFAULT_RETURN_PARTIAL_SUCCESS="\e[00m"
+	v_DEFAULT_RETURN_FIRST_PARTIAL_SUCCESS="\e[00m"
+
+	### Variables that cannot be set in the main config
+	v_DEFAULT_DNS_RECORD_TYPE="A"
+	v_DEFAULT_SERVER_PORT="22"
+	v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS="4"
+	v_DEFAULT_MIN_LOAD_FAILURE="8"
+	##### I want to get rid of this
+	v_DEFAULT_REMOTE_DIE_LIST="http://lwmon.com/die_list.txt"
+}
+
+function fn_is_integer {
+### Given a variable that should be a number ($1) and a variable that's the default ($2), return a number, or "0"
+	fn_debug "fn_is_integer"
+	if [[ $( echo "$1" | grep -E -c "^[0-9.]+$" ) -gt 0 ]]; then
+		echo "$1" | cut -d "." -f1
+	else
+		echo "$2"
+	fi
+}
+
+function fn_is_float {
+### Given a variable that should be a number ($1) and a variable that's the default ($2), return a number, or "0"
+	fn_debug "fn_is_float"
+	if [[ $( echo "$1" | grep -E -c "^[0-9.]+$" ) -gt 0 ]]; then
+		echo "$1"
+	else
+		echo "$2"
+	fi
+}
+
+function fn_is_boolean {
+### If a value should be only true or false, return only true or false
+	fn_debug "fn_is_boolean"
+	local v_VAL="$( echo "$1" | tr '[:upper:]' '[:lower:]' )"
+	if [[ "$v_VAL" == "true" || "$v_VAL" == "false" ]]; then
+		echo "$v_VAL"
+	else
+		echo "$2"
+	fi
+}
+
+function fn_is_file_path {
+### If a value should be a path to a file, test to ensure that it starts with a "/"
+	fn_debug "fn_is_file_path"
+	local v_VAL="$( fn_fix_home "$1" )"
+	if [[ "${v_VAL:0:1}" == "/" ]]; then
+		echo "$v_VAL"
+	else
+		v_VAL="$( fn_fix_home "$2" )"
+		echo "$v_VAL"
+	fi
+}
+
+function fn_is_email {
+	fn_debug "fn_is_email"
+	if [[ $( echo "$1" | grep -E -c "^[^@ ]+@[^.@ ]+\.[^@ ]+$" ) -gt 0 ]]; then
+		echo "$1"
+	else
+		echo "$2"
+	fi
+}
+
+function fn_is_verbosity {
+	fn_debug "fn_is_verbosity"
+	if [[ $( echo "$1" | grep -E -c "^(verbose|more([ -]?verbose)?|standard|change|none)$" ) -gt 0 ]]; then
+		echo "$1"
+	else
+		echo "$2"
+	fi
+}
+
+function fn_is_string {
+	fn_debug "fn_is_string"
+	if [[ -n "$1" ]]; then
+		echo "$1"
+	else
+		echo "$2"
+	fi
+}
+
+function fn_read_master_conf {
+### Read all of the variables in the master config
+### If it's the master process reading these, $1 should be "master"
+	fn_debug "fn_read_master_conf"
+	fn_set_defaults
+
+	if [[ ! -f "$f_CONF" ]]; then
+		source "$d_PROGRAM"/includes/create_config.shf
+		fn_create_config
+	fi
+
+	### Read the configuration
+	unset v_MASTER_VERBOSITY v_MASTER_EMAIL_ADDRESS v_MASTER_MAIL_DELAY v_MASTER_WAIT_SECONDS v_MASTER_CHECK_TIMEOUT v_MASTER_OUTPUT_FILE v_MASTER_USER_AGENT v_MASTER_HTML_FILES_KEPT v_MASTER_NUM_DURATIONS_RECENT v_MASTER_NUM_STATUSES_RECENT v_MASTER_NUM_STATUSES_NOT_SUCCESS v_MASTER_CHECK_TIME_PARTIAL_SUCCESS v_MASTER_LOG_DURATION_DATA v_MASTER_CURL_VERBOSE v_MASTER_LOG_HTTP_CODE v_MASTER_USE_WGET v_MASTER_CUSTOM_MESSAGE v_MASTER_DEBUG v_MASTER_LOG v_MASTER_ALT_MAIL v_MASTER_SSH_CONTROL_PATH v_MASTER_COLOR_SUCCESS v_MASTER_COLOR_FIRST_SUCCESS v_MASTER_COLOR_FAILURE v_MASTER_COLOR_FIRST_FAILURE v_MASTER_COLOR_PARTIAL_SUCCESS v_CMASTER_OLOR_FIRST_PARTIAL_SUCCESS v_MASTER_RETURN_SUCCESS v_MASTER_RETURN_FIRST_SUCCESS v_MASTER_RETURN_FAILURE v_MASTER_RETURN_FIRST_FAILURE v_MASTER_RETURN_PARTIAL_SUCCESS v_MASTER_RETURN_FIRST_PARTIAL_SUCCESS v_MASTER_DNS_RECORD_TYPE v_MASTER_SERVER_PORT v_MASTER_MIN_LOAD_PARTIAL_SUCCESS v_MASTER_MIN_LOAD_FAILURE
+	source <( cat "$f_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_MASTER_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_MASTER_(VERBOSITY|EMAIL_ADDRESS|MAIL_DELAY|WAIT_SECONDS|OUTPUT_FILE|USE(R_AGENT|_WGET)|HTML_FILES_KEPT|NUM_((STATUSES|DURATIONS)_RECENT|STATUSES_NOT_SUCCESS)|CHECK_TIME(OUT|_PARTIAL_SUCCESS)|LOG(_DURATION_DATA|_HTTP_CODE)?|(COLOR|RETURN)_(FIRST_)?(PARTIAL_)?(SUCCESS|FAILURE)|CURL_VERBOSE|ALT_MAIL|SSH_CONTROL_PATH|DEBUG)='.*'$" ) 2> /dev/null
+
+	### Replace values with defaults if necessary
+	v_MASTER_VERBOSITY="$( fn_is_verbosity "$v_MASTER_VERBOSITY" "$v_DEFAULT_VERBOSITY" )"
+	v_MASTER_EMAIL_ADDRESS="$( fn_is_email "$v_MASTER_EMAIL_ADDRESS" "$v_DEFAULT_EMAIL_ADDRESS" )"
+	v_MASTER_MAIL_DELAY="$( fn_is_integer "$v_MASTER_MAIL_DELAY" "$v_DEFAULT_MAIL_DELAY" )"
+	v_MASTER_WAIT_SECONDS="$( fn_is_float "$v_MASTER_WAIT_SECONDS" "$v_DEFAULT_WAIT_SECONDS" )"
+	v_MASTER_CHECK_TIMEOUT="$( fn_is_integer "$v_MASTER_CHECK_TIMEOUT" "$v_DEFAULT_CHECK_TIMEOUT" )"
+	v_MASTER_OUTPUT_FILE="$( fn_is_file_path "$v_MASTER_OUTPUT_FILE" "$v_DEFAULT_OUTPUT_FILE" )"
+	v_MASTER_USER_AGENT="$( fn_is_boolean "$v_MASTER_USER_AGENT" "$v_DEFAULT_USER_AGENT" )"
+	v_MASTER_HTML_FILES_KEPT="$( fn_is_integer "$v_MASTER_HTML_FILES_KEPT" "$v_DEFAULT_HTML_FILES_KEPT" )"
+	v_MASTER_NUM_DURATIONS_RECENT="$( fn_is_integer "$v_MASTER_NUM_DURATIONS_RECENT" "$v_DEFAULT_NUM_DURATIONS_RECENT" )"
+	v_MASTER_NUM_STATUSES_RECENT="$( fn_is_integer "$v_MASTER_NUM_STATUSES_RECENT" "$v_DEFAULT_NUM_STATUSES_RECENT" )"
+	v_MASTER_NUM_STATUSES_NOT_SUCCESS="$( fn_is_integer "$v_MASTER_NUM_STATUSES_NOT_SUCCESS" "$v_DEFAULT_NUM_STATUSES_NOT_SUCCESS" )"
+	v_MASTER_CHECK_TIME_PARTIAL_SUCCESS="$( fn_is_float "$v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" "$v_DEFAULT_CHECK_TIME_PARTIAL_SUCCESS" )"
+	v_MASTER_LOG_DURATION_DATA="$( fn_is_boolean "$v_MASTER_LOG_DURATION_DATA" "$v_DEFAULT_LOG_DURATION_DATA" )"
+	v_MASTER_CURL_VERBOSE="$( fn_is_boolean "$v_MASTER_CURL_VERBOSE" "$v_DEFAULT_CURL_VERBOSE" )"
+	v_MASTER_LOG_HTTP_CODE="$( fn_is_boolean "$v_MASTER_LOG_HTTP_CODE" "$v_DEFAULT_LOG_HTTP_CODE" )"
+	v_MASTER_USE_WGET="$( fn_is_boolean "$v_MASTER_USE_WGET" "$v_DEFAULT_USE_WGET" )"
+	##### This was not an option previously; I'll have to add it in other places
+	v_MASTER_CUSTOM_MESSAGE="$( fn_is_string "$v_MASTER_CUSTOM_MESSAGE" "$v_DEFAULT_CUSTOM_MESSAGE" )"
+
+	### Items that can only be set in the master conf
+	if [[ -n "$v_MASTER_DEBUG" ]]; then
+		b_DEBUG="$v_MASTER_DEBUG"
+	fi
+	v_LOG="$( fn_is_file_path "$v_MASTER_LOG" "$v_DEFAULT_LOG" )"
+	v_ALT_MAIL="$( fn_is_string "$v_MASTER_ALT_MAIL" "$v_DEFAULT_ALT_MAIL" )"
+	v_SSH_CONTROL_PATH="$( fn_is_file_path "$v_MASTER_SSH_CONTROL_PATH" "$v_DEFAULT_SSH_CONTROL_PATH" )"
+	v_COLOR_SUCCESS="$( fn_is_string "$v_MASTER_COLOR_SUCCESS" "$v_DEFAULT_COLOR_SUCCESS" )"
+	v_COLOR_FIRST_SUCCESS="$( fn_is_string "$v_MASTER_COLOR_FIRST_SUCCESS" "$v_DEFAULT_COLOR_FIRST_SUCCESS" )"
+	v_COLOR_FAILURE="$( fn_is_string "$v_MASTER_COLOR_FAILURE" "$v_DEFAULT_COLOR_FAILURE" )"
+	v_COLOR_FIRST_FAILURE="$( fn_is_string "$v_MASTER_COLOR_FIRST_FAILURE" "$v_DEFAULT_COLOR_FIRST_FAILURE" )"
+	v_COLOR_PARTIAL_SUCCESS="$( fn_is_string "$v_MASTER_COLOR_PARTIAL_SUCCESS" "$v_DEFAULT_COLOR_PARTIAL_SUCCESS" )"
+	v_COLOR_FIRST_PARTIAL_SUCCESS="$( fn_is_string "$v_CMASTER_OLOR_FIRST_PARTIAL_SUCCESS" "$v_DEFAULT_COLOR_FIRST_PARTIAL_SUCCESS" )"
+	v_RETURN_SUCCESS="$( fn_is_string "$v_MASTER_RETURN_SUCCESS" "$v_DEFAULT_RETURN_SUCCESS" )"
+	v_RETURN_FIRST_SUCCESS="$( fn_is_string "$v_MASTER_RETURN_FIRST_SUCCESS" "$v_DEFAULT_RETURN_FIRST_SUCCESS" )"
+	v_RETURN_FAILURE="$( fn_is_string "$v_MASTER_RETURN_FAILURE" "$v_DEFAULT_RETURN_FAILURE" )"
+	v_RETURN_FIRST_FAILURE="$( fn_is_string "$v_MASTER_RETURN_FIRST_FAILURE" "$v_DEFAULT_RETURN_FIRST_FAILURE" )"
+	v_RETURN_PARTIAL_SUCCESS="$( fn_is_string "$v_MASTER_RETURN_PARTIAL_SUCCESS" "$v_DEFAULT_RETURN_PARTIAL_SUCCESS" )"
+	v_RETURN_FIRST_PARTIAL_SUCCESS="$( fn_is_string "$v_MASTER_RETURN_FIRST_PARTIAL_SUCCESS" "$v_DEFAULT_RETURN_FIRST_PARTIAL_SUCCESS" )"
+
+	### Items not in the config
+	v_MASTER_DNS_RECORD_TYPE="$( fn_is_string "$v_MASTER_DNS_RECORD_TYPE" "$v_DEFAULT_DNS_RECORD_TYPE" )"
+	v_MASTER_SERVER_PORT="$( fn_is_integer "$v_MASTER_SERVER_PORT" "$v_DEFAULT_SERVER_PORT" )"
+	v_MASTER_MIN_LOAD_PARTIAL_SUCCESS="$( fn_is_float "$v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" "$v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS" )"
+	v_MASTER_MIN_LOAD_FAILURE="$( fn_is_float "$v_MASTER_MIN_LOAD_FAILURE" "$v_DEFAULT_MIN_LOAD_FAILURE" )"
+
+	### unset unneeded master variables
+	unset v_MASTER_LOG v_MASTER_ALT_MAIL v_MASTER_SSH_CONTROL_PATH v_MASTER_COLOR_SUCCESS v_MASTER_COLOR_FIRST_SUCCESS v_MASTER_COLOR_FAILURE v_MASTER_COLOR_FIRST_FAILURE v_MASTER_COLOR_PARTIAL_SUCCESS v_CMASTER_OLOR_FIRST_PARTIAL_SUCCESS v_MASTER_RETURN_SUCCESS _MASTER_RETURN_FIRST_SUCCESS v_MASTER_RETURN_FAILURE v_MASTER_RETURN_FIRST_FAILURE v_MASTER_RETURN_PARTIAL_SUCCESS v_MASTER_RETURN_FIRST_PARTIAL_SUCCESS v_MASTER_DEBUG
+
+	if [[ "$1" == "master" ]]; then
+	### Rename all of the variables for the master process, then unset the variables that we don't need.
+		v_VERBOSITY="$v_MASTER_VERBOSITY"
+		v_EMAIL_ADDRESS="$v_MASTER_EMAIL_ADDRESS"
+		v_MAIL_DELAY="$v_MASTER_MAIL_DELAY"
+		v_WAIT_SECONDS="$v_MASTER_WAIT_SECONDS"
+		v_CHECK_TIMEOUT="$v_MASTER_CHECK_TIMEOUT"
+		v_OUTPUT_FILE="$v_MASTER_OUTPUT_FILE"
+		v_USER_AGENT="$v_MASTER_USER_AGENT"
+		v_HTML_FILES_KEPT="$v_MASTER_HTML_FILES_KEPT"
+		v_NUM_DURATIONS_RECENT="$v_MASTER_NUM_DURATIONS_RECENT"
+		v_NUM_STATUSES_RECENT="$v_MASTER_NUM_STATUSES_RECENT"
+		v_NUM_STATUSES_NOT_SUCCESS="$v_MASTER_NUM_STATUSES_NOT_SUCCESS"
+		v_CHECK_TIME_PARTIAL_SUCCESS="$v_MASTER_CHECK_TIME_PARTIAL_SUCCESS"
+		v_LOG_DURATION_DATA="$v_MASTER_LOG_DURATION_DATA"
+		v_CURL_VERBOSE="$v_MASTER_CURL_VERBOSE"
+		v_LOG_HTTP_CODE="$v_MASTER_LOG_HTTP_CODE"
+		v_USE_WGET="$v_MASTER_USE_WGET"
+		v_CUSTOM_MESSAGE="$v_MASTER_CUSTOM_MESSAGE"
+		v_DNS_RECORD_TYPE="$v_MASTER_DNS_RECORD_TYPE"
+		v_SERVER_PORT="$v_MASTER_SERVER_PORT"
+		v_MIN_LOAD_PARTIAL_SUCCESS="$v_MASTER_MIN_LOAD_PARTIAL_SUCCESS"
+		v_MIN_LOAD_FAILURE="$v_MASTER_MIN_LOAD_FAILURE"
+
+		unset v_MASTER_VERBOSITY v_MASTER_EMAIL_ADDRESS v_MASTER_MAIL_DELAY v_MASTER_WAIT_SECONDS v_MASTER_CHECK_TIMEOUT v_MASTER_OUTPUT_FILE v_MASTER_USER_AGENT v_MASTER_HTML_FILES_KEPT v_MASTER_NUM_DURATIONS_RECENT v_MASTER_NUM_STATUSES_RECENT v_MASTER_NUM_STATUSES_NOT_SUCCESS v_MASTER_CHECK_TIME_PARTIAL_SUCCESS v_MASTER_LOG_DURATION_DATA v_MASTER_CURL_VERBOSE v_MASTER_LOG_HTTP_CODE v_MASTER_USE_WGET v_MASTER_CUSTOM_MESSAGE v_MASTER_DNS_RECORD_TYPE v_MASTER_SERVER_PORT v_MASTER_MIN_LOAD_PARTIAL_SUCCESS v_MASTER_MIN_LOAD_FAILURE
+	fi
+}
+
+function fn_read_child_params_lite {
+### Read the job name and type from the params file
+### $1 is the path to the file
+	fn_debug "fn_read_child_params_lite"
+
+	local f_JOB=
+	if [[ -n "$1" ]]; then
+		f_JOB="$1"
+	fi
+
+	### Read the child params file and get the variables from it
+	if [[ -n "$f_JOB" && -f "$f_JOB" ]]; then
+		### Unset all existing variables
+		unset v_JOB_TYPE v_ORIG_JOB_NAME v_JOB_NAME
+
+		source <( cat "$f_JOB" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_(ORIG_)?JOB_(NAME|TYPE)='.*'$" ) 2> /dev/null
+	fi
+}
+
+function fn_read_child_params {
+### scoop all of the variables out of a child parameters file
+### $1 is the path to the file
+	fn_debug "fn_read_child_params"
+
+	local f_JOB=
+	if [[ -n "$1" ]]; then
+		f_JOB="$1"
+	fi
+
+	### First, capture the current value of the variables that need to be preserved
+	local v_DEFAULT_CURL_STRING="${a_CURL_STRING[0]}"
+	local v_DEFAULT_CURL_URL="$v_CURL_URL_PREEDIT"
+	local v_DEFAULT_DNS_CHECK_DOMAIN="$v_DNS_CHECK_DOMAIN"
+	local v_DEFAULT_DOMAIN="$v_DOMAIN"
+	local v_DEFAULT_IP_ADDRESS="$v_IP_ADDRESS"
+	local v_DEFAULT_JOB_NAME="$v_JOB_NAME"
+	local v_DEFAULT_JOB_TYPE="$v_JOB_TYPE"
+	local v_DEFAULT_ORIG_JOB_NAME="$v_ORIG_JOB_NAME"
+	local v_DEFAULT_SSH_USER="$v_SSH_USER"
+
+	### Read the child params file and get the variables from it
+	if [[ -n "$f_JOB" && -f "$f_JOB" ]]; then
+		### Unset all existing variables
+		unset v_JOB_TYPE v_ORIG_JOB_NAME v_CHECK_TIME_PARTIAL_SUCCESS v_CHECK_TIMEOUT v_CURL_VERBOSE v_CUSTOM_MESSAGE v_EMAIL_ADDRESS v_HTML_FILES_KEPT v_LOG_DURATION_DATA _PORT v_CURL_URL v_DNS_CHECK_DOMAIN v_DOMAIN v_JOB_NAME v_SSH_USER v_DNS_CHECK_RESULT v_IP_ADDRESS v_SCRIPT v_DNS_RECORD_TYPE v_LOG_HTTP_CODE v_MAIL_DELAY v_MIN_LOAD_FAILURE v_MIN_LOAD_PARTIAL_SUCCESS v_NUM_DURATIONS_RECENT NUM_STATUSES_NOT_SUCCESS NUM_STATUSES_RECENT v_OUTPUT_FILE v_SERVER_PORT v_USE_WGET v_USER_AGENT v_VERBOSITY v_WAIT_SECONDS a_CURL_STRING
+
+		source <( cat "$f_JOB" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_(CHECK_TIME(_PARTIAL_SUCCESS|OUT)|CURL_(STRING|URL|VERBOSE)|CUSTOM_MESSAGE|DNS_(CHECK_(DOMAIN|RESULT)|RECORD_TYPE)|DOMAIN|(EMAIL|IP)_ADDRESS|(ORIG_)?JOB_(NAME|TYPE)|LOG_(DURATION_DATA|HTTP_CODE)|MAIL_DELAY|MIN_LOAD_(FAILURE|PARTIAL_SUCCESS)|NUM_(DURATIONS_RECENT|STATUSES_(NOT_SUCCESS|RECENT))|OUTPUT_FILE|SCRIPT|SERVER_PORT|SSH_USER|USE(_WGET|R_AGENT)|VERBOSITY|WAIT_SECONDS|HTML_FILES_KEPT)='.*'$" | grep -Ev "^v_CURL_STRING=''" | sed "s/^v_CURL_STRING=/a_CURL_STRING[\${#a_CURL_STRING[@]}]=/" ) 2> /dev/null
+	fi
+
+	### Child Parameters that should remain unchanged
+	if [[ -n "$v_DEFAULT_JOB_TYPE" ]]; then
+		v_JOB_TYPE="$v_DEFAULT_JOB_TYPE"
+	fi
+	if [[ -n "$v_DEFAULT_ORIG_JOB_NAME" ]]; then
+		v_ORIG_JOB_NAME="$v_DEFAULT_ORIG_JOB_NAME"
+	fi
+
+	### Child parameters that correlate to a master config entry
+	v_CHECK_TIME_PARTIAL_SUCCESS="$( fn_is_float "$v_CHECK_TIME_PARTIAL_SUCCESS" "" )"
+	v_CHECK_TIMEOUT="$( fn_is_integer "$v_CHECK_TIMEOUT" "" )"
+	v_CURL_VERBOSE="$( fn_is_boolean "$v_CURL_VERBOSE" "" )"
+	v_CUSTOM_MESSAGE="$( fn_is_string "$v_CUSTOM_MESSAGE" "" )"
+	v_EMAIL_ADDRESS="$( fn_is_email "$v_EMAIL_ADDRESS" "" )"
+	##### this was not present previously. I'll have to add it in other places
+	v_HTML_FILES_KEPT="$( fn_is_integer "$v_HTML_FILES_KEPT" "" )"
+	v_LOG_DURATION_DATA="$( fn_is_boolean "$v_LOG_DURATION_DATA" "" )"
+	v_LOG_HTTP_CODE="$( fn_is_boolean "$v_LOG_HTTP_CODE" "" )"
+	v_MAIL_DELAY="$( fn_is_integer "$v_MAIL_DELAY" "" )"
+	v_NUM_DURATIONS_RECENT="$( fn_is_integer "$v_NUM_DURATIONS_RECENT" "" )"
+	v_NUM_STATUSES_NOT_SUCCESS="$( fn_is_integer "$v_NUM_STATUSES_NOT_SUCCESS" "" )"
+	v_NUM_STATUSES_RECENT="$( fn_is_integer "$v_NUM_STATUSES_RECENT" "" )"
+	v_OUTPUT_FILE="$( fn_is_file_path "$v_OUTPUT_FILE" "" )"
+	v_USE_WGET="$( fn_is_boolean "$v_USE_WGET" "" )"
+	v_USER_AGENT="$( fn_is_string "$v_USER_AGENT" "" )"
+	v_VERBOSITY="$( fn_is_verbosity "$v_VERBOSITY" "" )"
+	v_WAIT_SECONDS="$( fn_is_float "$v_WAIT_SECONDS" "" )"
+
+	### Child Parameters that have a default, but are not in the master config
+	v_DNS_RECORD_TYPE="$( fn_is_string "$v_DNS_RECORD_TYPE" "" )"
+	v_MIN_LOAD_FAILURE="$( fn_is_float "$v_MIN_LOAD_FAILURE" "" )"
+	v_MIN_LOAD_PARTIAL_SUCCESS="$( fn_is_float "$v_MIN_LOAD_PARTIAL_SUCCESS" "" )"
+	v_SERVER_PORT="$( fn_is_integer "$v_SERVER_PORT" "" )"
+
+	### Child parameters that don't have a default
+	v_CURL_URL="$( fn_is_string "$v_CURL_URL" "$v_DEFAULT_CURL_URL" )"
+	v_DNS_CHECK_DOMAIN="$( fn_is_string "$v_DNS_CHECK_DOMAIN" "$v_DEFAULT_DNS_CHECK_DOMAIN" )"
+	v_DOMAIN="$( fn_is_string "$v_DOMAIN" "$v_DEFAULT_DOMAIN" )"
+	v_JOB_NAME="$( fn_is_string "$v_JOB_NAME" "$v_DEFAULT_JOB_NAME" )"
+	v_SSH_USER="$( fn_is_string "$v_SSH_USER" "$v_DEFAULT_SSH_USER" )"
+
+	### Child Parameters with special rules
+	if [[ -z "${a_CURL_STRING[0]}" ]]; then
+		a_CURL_STRING[0]="$v_DEFAULT_CURL_STRING"
+	fi
+	v_DNS_CHECK_RESULT="$( fn_is_string "$v_DNS_CHECK_RESULT" "" )"
+	if [[ "$v_JOB_TYPE" != "url" ]]; then
+		v_IP_ADDRESS="$( fn_is_string "$v_IP_ADDRESS" "$v_DEFAULT_IP_ADDRESS" )"
+	else
+		v_IP_ADDRESS="$( fn_is_string "$v_IP_ADDRESS" "" )"
+	fi
+	if [[ -n "$v_SCRIPT" && "${v_SCRIPT:0:1}" != "/" ]]; then
+		v_SCRIPT=""
+	fi
+
+	### Capture pre-edited versions of a few variables
+	v_CURL_URL_PREEDIT="$v_CURL_URL"
+	v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT="$v_CHECK_TIME_PARTIAL_SUCCESS"
+	v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT="$v_MIN_LOAD_PARTIAL_SUCCESS"
+	v_MIN_LOAD_FAILURE_PREEDIT="$v_MIN_LOAD_FAILURE"
+
+	### Start making sense of the values that we were given
+	local v_JOB_CL_STRING=
+	if [[ "$v_JOB_TYPE" == "ping" || "$v_JOB_TYPE" == "dns" || "$v_JOB_TYPE" == "ssh-load" ]]; then
+		fn_parse_server "$v_DOMAIN"; v_DOMAIN="$v_DOMAINa"
+		v_JOB_CL_STRING="--$v_JOB_TYPE '$v_DOMAIN'"
+		if [[ "$v_JOB_TYPE" == "ssh-load" && ( "$v_IP_ADDRESSa" == "127.0.0.1" || $v_IP_ADDRESSa == "::1" ) ]]; then
+			v_DOMAIN="$v_IP_ADDRESSa"
+		fi
+	elif [[ "$v_JOB_TYPE" == "url" ]]; then
+		fn_parse_server "$v_CURL_URL"
+		v_CURL_URL="$v_CURL_URLa"
+		v_DOMAIN="$v_DOMAINa"
+		v_SERVER_PORT="$v_SERVER_PORTa"
+		v_JOB_CL_STRING="--$v_JOB_TYPE '$v_CURL_URL'"
+	fi
+	if [[ -n "$v_WAIT_SECONDS" ]]; then
+		if [[ "$v_JOB_TYPE" == "ping" ]]; then
+			if [[ $( echo "$v_WAIT_SECONDS" | cut -d "." -f1 ) -lt 2 ]]; then
+				v_WAIT_SECONDS=2
+			fi
+		else
+			if [[ $( echo "$v_WAIT_SECONDS" | cut -d "." -f1 ) -lt 5 ]]; then
+				v_WAIT_SECONDS=5
+			fi
+		fi
+	fi
+	if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
+		if [[ -n "$v_CHECK_TIMEOUT" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --check-timeout $v_CHECK_TIMEOUT"
+		fi
+		if [[ -n "$v_CHECK_TIME_PARTIAL_SUCCESS" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --ctps $v_CHECK_TIME_PARTIAL_SUCCESS"
+			v_CHECK_TIME_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_CHECK_TIME_PARTIAL_SUCCESS} * 100}" )"
+		else
+			v_CHECK_TIME_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_MASTER_CHECK_TIME_PARTIAL_SUCCESS} * 100}" )"
+		fi
+
+	fi
+	if [[ "$v_JOB_TYPE" == "url" ]]; then
+		fn_parse_server "$v_IP_ADDRESS"; v_IP_ADDRESS="$v_IP_ADDRESSa"
+		if [[ "$v_IP_ADDRESS" != "false" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --ip $v_IP_ADDRESS"
+		fi
+		i=0; while [[ "$i" -lt "${#a_CURL_STRING[@]}" ]]; do
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --string '${a_CURL_STRING[$i]}'"
+			i=$(( $i + 1 ))
+		done
+		if [[ -n "$v_USE_WGET" && "$v_USE_WGET" == "true" || "$v_MASTER_USE_WGET" == "true" ]]; then
+			fn_use_wget
+			v_CURL_VERBOSE="false"
+			v_LOG_HTTP_CODE="false"
+		fi
+		### If there's an IP address, then the URL needs to have the domain replaced with the IP address and the port number.
+		if [[ "$v_IP_ADDRESS" != "false" && $( echo "$v_CURL_URL" | grep -E -c "^(https?://)?$v_DOMAIN:[0-9]+" ) -eq 1 ]]; then
+			### If it's specified with a port in the URL, lets make sure that it's the right port (according to the params file).
+			v_CURL_URL="$( echo "$v_CURL_URL" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/" )" #"
+		elif [[ $v_IP_ADDRESS != "false" ]]; then
+			### If it's not specified with the port in the URL, lets add the port.
+			v_CURL_URL="$( echo "$v_CURL_URL" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/" )" #"
+		else
+			### If there's no IP address, lets throw the port on there as well.
+			v_CURL_URL="$( echo "$v_CURL_URL" | sed "s/$v_DOMAIN:*[0-9]*/$v_DOMAIN:$v_SERVER_PORT/" )" #"
+		fi
+		if [[ "$v_USER_AGENT" == true ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --user-agent true"
+			v_USER_AGENT='Mozilla/5.0 (X11; Linux x86_64) LWmon/'"$v_VERSION"' AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36'
+		elif [[ "$v_USER_AGENT" == false && "$v_WGET_BIN" == "false" ]]; then
+			v_USER_AGENT='LWmon/'"$v_VERSION"' curl/'"$v_CURL_BIN_VERSION"
+		elif [[ "$v_USER_AGENT" == false && "$v_WGET_BIN" != "false" ]]; then
+			v_USER_AGENT='LWmon/'"$v_VERSION"' wget/'"$v_WGET_BIN_VERSION"
+		fi
+	elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
+		if [[ -n "$v_SERVER_PORT" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --port $v_SERVER_PORT"
+		fi
+		if [[ -n "$v_MIN_LOAD_PARTIAL_SUCCESS" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --load-ps $v_MIN_LOAD_PARTIAL_SUCCESS"
+			v_MIN_LOAD_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_MIN_LOAD_PARTIAL_SUCCESS} * 100}" )"
+		else
+			v_MIN_LOAD_PARTIAL_SUCCESS="$( awk "BEGIN {printf \"%.0f\",${v_MASTER_MIN_LOAD_PARTIAL_SUCCESS} * 100}" )"
+		fi
+		if [[ -n "$v_MIN_LOAD_FAILURE" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --load-fail $v_MIN_LOAD_FAILURE"
+			v_MIN_LOAD_FAILURE="$( awk "BEGIN {printf \"%.0f\",${v_MIN_LOAD_FAILURE} * 100}" )"
+		else
+			v_MIN_LOAD_FAILURE="$( awk "BEGIN {printf \"%.0f\",${v_MASTER_MIN_LOAD_FAILURE} * 100}" )"
+		fi
+		v_JOB_CL_STRING="$v_JOB_CL_STRING --user $v_SSH_USER"
+	elif [[ "$v_JOB_TYPE" == "dns" ]]; then
+		fn_parse_server "$v_DNS_CHECK_DOMAIN"; v_DNS_CHECK_DOMAIN="$v_DOMAINa"
+		v_JOB_CL_STRING="$v_JOB_CL_STRING --check-domain $v_DNS_CHECK_DOMAIN"
+		if [[ -n "$v_DNS_CHECK_RESULT" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --check-result '$v_DNS_CHECK_RESULT'"
+		fi
+		if [[ -n "$v_DNS_RECORD_TYPE" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --record-type '$v_DNS_RECORD_TYPE'"
+		fi
+	fi
+
+	if [[ -n "$v_CHILD_PID" ]]; then
+		### Finish putting together the command line string
+		if [[ -n "$v_MAIL_DELAY" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --mail-delay $v_MAIL_DELAY"
+		fi
+		if [[ -n "$v_VERBOSITY" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --verbosity '$v_VERBOSITY'"
+		fi
+		if [[ -n "$v_OUTPUT_FILE" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --outfile '$v_OUTPUT_FILE'"
+		fi
+		if [[ -n "$v_WAIT_SECONDS" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --seconds $v_WAIT_SECONDS"
+		fi
+		if [[ -n "$v_LOG_DURATION_DATA" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --ldd $v_LOG_DURATION_DATA"
+		fi
+		if [[ -n "$v_NUM_DURATIONS_RECENT" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --ndr $v_NUM_DURATIONS_RECENT"
+		fi
+		if [[ -n "$v_NUM_STATUSES_NOT_SUCCESS" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --nsns $v_NUM_STATUSES_NOT_SUCCESS"
+		fi
+		if [[ -n "$v_NUM_STATUSES_RECENT" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --nsr $v_NUM_STATUSES_RECENT"
+		fi
+		if [[ -n "$v_JOB_NAME" ]]; then
+			v_JOB_CL_STRING="$v_JOB_CL_STRING --job-name '$v_JOB_NAME'"
+		fi
+		echo -n "$v_JOB_CL_STRING" > "$d_WORKING"/"$v_CHILD_PID"/cl
+	fi
+	if [[ -n "$f_JOB" && ( -n "$v_PARAMS_RELOAD" && "$( stat --format=%Y "$f_JOB" )" -gt "$v_PARAMS_RELOAD" || ! -f "$f_JOB" ) ]]; then
+		### Overwrite the params file with a sanitized one
+		
+		fn_make_params "$f_JOB"_temp
+		mv -f "$f_JOB"_temp "$f_JOB"
+	fi
+
+	### If any of the variables are empty, fill them with the master values
+	### For all of these, we're just going to use fn_is_string, as we've already done any of the fancy bits that other things provide
+	v_CHECK_TIME_PARTIAL_SUCCESS="$( fn_is_string "$v_CHECK_TIME_PARTIAL_SUCCESS" "$v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" )"
+	v_CHECK_TIMEOUT="$( fn_is_string "$v_CHECK_TIMEOUT" "$v_MASTER_CHECK_TIMEOUT" )"
+	v_CURL_VERBOSE="$( fn_is_string "$v_CURL_VERBOSE" "$v_MASTER_CURL_VERBOSE" )"
+	v_CUSTOM_MESSAGE="$( fn_is_string "$v_CUSTOM_MESSAGE" "$v_MASTER_CUSTOM_MESSAGE" )"
+	v_EMAIL_ADDRESS="$( fn_is_string "$v_EMAIL_ADDRESS" "$v_MASTER_EMAIL_ADDRESS" )"
+	v_HTML_FILES_KEPT="$( fn_is_string "$v_HTML_FILES_KEPT" "$v_MASTER_HTML_FILES_KEPT" )"
+	v_LOG_DURATION_DATA="$( fn_is_string "$v_LOG_DURATION_DATA" "$v_MASTER_LOG_DURATION_DATA" )"
+	v_LOG_HTTP_CODE="$( fn_is_string "$v_LOG_HTTP_CODE" "$v_MASTER_LOG_HTTP_CODE" )"
+	v_MAIL_DELAY="$( fn_is_string "$v_MAIL_DELAY" "$v_MASTER_MAIL_DELAY" )"
+	v_NUM_DURATIONS_RECENT="$( fn_is_string "$v_NUM_DURATIONS_RECENT" "$v_MASTER_NUM_DURATIONS_RECENT" )"
+	v_NUM_STATUSES_NOT_SUCCESS="$( fn_is_string "$v_NUM_STATUSES_NOT_SUCCESS" "$v_MASTER_NUM_STATUSES_NOT_SUCCESS" )"
+	v_NUM_STATUSES_RECENT="$( fn_is_string "$v_NUM_STATUSES_RECENT" "$v_MASTER_NUM_STATUSES_RECENT" )"
+	v_OUTPUT_FILE="$( fn_is_string "$v_OUTPUT_FILE" "$v_MASTER_OUTPUT_FILE" )"
+	v_USE_WGET="$( fn_is_string "$v_USE_WGET" "$v_MASTER_USE_WGET" )"
+	v_USER_AGENT="$( fn_is_string "$v_USER_AGENT" "$v_MASTER_USER_AGENT" )"
+	v_VERBOSITY="$( fn_is_string "$v_VERBOSITY" "$v_MASTER_VERBOSITY" )"
+	v_WAIT_SECONDS="$( fn_is_string "$v_WAIT_SECONDS" "$v_MASTER_WAIT_SECONDS" )"
+	### Child Parameters that have a default, but are not in the master config
+	v_DNS_RECORD_TYPE="$( fn_is_string "$v_DNS_RECORD_TYPE" "$v_MASTER_DNS_RECORD_TYPE" )"
+	v_MIN_LOAD_FAILURE="$( fn_is_string "$v_MIN_LOAD_FAILURE" "$v_MASTER_MIN_LOAD_FAILURE" )"
+	v_MIN_LOAD_PARTIAL_SUCCESS="$( fn_is_string "$v_MIN_LOAD_PARTIAL_SUCCESS" "$v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" )"
+	v_SERVER_PORT="$( fn_is_string "$v_SERVER_PORT" "$v_MASTER_SERVER_PORT" )"
+}
+
+

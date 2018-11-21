@@ -1,6 +1,7 @@
 #! /bin/bash
 
 function fn_list {
+	fn_debug "fn_list"
 	### This just lists the lwmon master process and all child processes.
 	if [[ "$v_RUNNING_STATE" == "master" ]]; then
 		echo "No current lwmon processes. Exiting."
@@ -13,8 +14,7 @@ function fn_list {
 	a_CHILD_PID=()
 	for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
-		fn_read_conf JOB_NAME "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_NAME="$v_RESULT"
-		fn_read_conf JOB_TYPE "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_TYPE="$v_RESULT"
+		fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 		echo "  $v_CHILD_NUMBER) [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME"
 		a_CHILD_PID[$(( $v_CHILD_NUMBER - 2 ))]="$v_CHILD_PID"
 		v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
@@ -23,6 +23,7 @@ function fn_list {
 
 function fn_modify_master {
 ### Options for the master process
+	fn_debug "fn_modify_master"
 	echo -e "Options:\n"
 	echo "  1) Exit out of the master process without backing up the child processes."
 	echo "  2) First back-up the child processes so that they'll run immediately when lwmon is next started, then exit out of the master process."
@@ -57,6 +58,7 @@ function fn_modify_master {
 
 function fn_modify_no_master {
 ### Options if there is no master process
+	fn_debug "fn_modify_no_master"
 	echo -e "Options:\n"
 	echo "  1) Output general help information (same as with \"--help\" flag)."
 	echo "  2) Output help information specific to flags (same as with \"--help-flags\" flag)."
@@ -94,6 +96,7 @@ function fn_modify_no_master {
 
 function fn_modify_old_jobs {
 	### This is the menu front-end for modifying old child processes.
+	fn_debug "fn_modify_old_jobs"
 	echo "List of old lwmon jobs:"
 	echo
 	v_CHILD_NUMBER=1
@@ -102,8 +105,7 @@ function fn_modify_old_jobs {
 		v_ENDED_DATE="$( echo "$v_CHILD_PID" | cut -d "_" -f3 )"
 		v_ENDED_DATE="$( date --date="@$v_ENDED_DATE" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
-		fn_read_conf JOB_NAME "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_NAME="$v_RESULT"
-		fn_read_conf JOB_TYPE "$d_WORKING"/"$v_CHILD_PID"/params; v_JOB_TYPE="$v_RESULT"
+		fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 		echo "  $v_CHILD_NUMBER) $v_JOB_TYPE $v_JOB_NAME (ended $v_ENDED_DATE)"
 		a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]="$v_CHILD_PID"
 		v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
@@ -120,7 +122,7 @@ function fn_modify_old_jobs {
 		exit 1
 	fi
 	v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]}"
-	fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+	fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 	echo "$v_JOB_NAME:"
 	echo
 	echo "  1) Delete this monitoring job."
@@ -150,13 +152,13 @@ function fn_modify_old_jobs {
 		less +G "$d_WORKING"/"$v_CHILD_PID/log"
 	elif [[ "$v_OPTION_NUM" == "5" ]]; then
 		echo
+		##### this will need to be updated to match however lwmon ends up being packaged
 		echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
 		echo "chmod +x ./lwmon.sh"
 		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
 		echo
-	elif [[ "$v_OPTION_NUM" == "6" && -n "$d_WORKING"/ && -n "$v_CHILD_PID" ]]; then
-		##### I'm pretty sure that $i here is not being populated by anything. Need to fix this
-		v_NEW_DIRECTORY="$( basename "$i" | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
+	elif [[ "$v_OPTION_NUM" == "6" && -n "$d_WORKING" && -n "$v_CHILD_PID" ]]; then
+		v_NEW_DIRECTORY="$( basename "$v_CHILD_PID" | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
 		mv -f "$d_WORKING"/"$v_CHILD_PID" "$d_WORKING"/"$v_NEW_DIRECTORY"
 	elif [[ "$v_OPTION_NUM" == "7" ]]; then
 		fn_modify_html
@@ -168,6 +170,7 @@ function fn_modify_old_jobs {
 
 function fn_modify_html {
 ### Lists html files associated with a process and then gives options for them.
+	fn_debug "fn_modify_html"
 	echo "List of html files associated with $v_JOB_NAME"
 	echo
 	v_HTML_NUMBER=1
@@ -213,6 +216,7 @@ function fn_modify_html {
 
 function fn_modify {
 ### lists the lwmon processes and then gives options for the currently running processes.
+	fn_debug "fn_modify"
 	if [[ "$v_RUNNING_STATE" == "master" ]]; then
 		fn_modify_no_master
 	fi
@@ -227,7 +231,7 @@ function fn_modify {
 		fn_modify_master
 	fi
 	v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 2 ))]}"
-	fn_read_conf JOB_NAME child; v_JOB_NAME="$v_RESULT"
+	fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 	echo "$v_JOB_NAME:"
 	echo
 	echo "  1) Kill this process."
@@ -260,6 +264,7 @@ function fn_modify {
 		less +G "$d_WORKING"/"$v_CHILD_PID/log"
 	elif [[ "$v_OPTION_NUM" == "5" ]]; then
 		echo
+		##### this will need to be updated to match however lwmon ends up being packaged
 		echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
 		echo "chmod +x ./lwmon.sh"
 		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"

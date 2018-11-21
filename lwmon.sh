@@ -1,7 +1,11 @@
 #! /bin/bash
 
+b_DEBUG=false
+b_DEBUG2=false
+
 ### determine where we're located
 function fn_locate {
+	if [[ "$b_DEBUG" == true ]]; then echo "$$ - $v_RUNNING_STATE: fn_locate" > /dev/stderr; fi
 	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
@@ -46,141 +50,15 @@ source "$d_PROGRAM"/includes/mutual.shf
 #== Functions related to the configuration ==#
 #============================================#
 
-##### Is this still the best way to parse command line arguments?
-function fn_parse_cl_argument {
-	### Function Version 1.1.0
-	### For this function, $1 is the flag that was passed (without trailing equal sign), $2 is "num" or "int" if it's a number, "float" if it's a number with the potential of having a decimal point, "string" if it's a string, "bool" if it's true or false, "date" if it's a date, "file" if it's a file, "directory" if it's a directory, and "none" if nothing follows it, and $3 is an alternate flag with the same functionality. If $2 is bool, then $4 determines the behavior for a boolean flags if no argument is passed for them: "true" sets them to true, "false" sets them to "false" and "exit" tells the script to exit with an error. If $2 is "file" or "directory", then $4 can be "create" if the file should be created, and "error" if the file needs to have existed previously.
-	### This function will prompt for responses if the variable "$v_CL_PROMPT" is set to "true".
-	### This function makes use of, but does not rely on the function "fn_fix_home".
-	### Currently scrub.sh has the prettiest implimentation of passing data to this function.
-	unset v_RESULT
-	if [[ "$2" == "none" ]]; then
-		v_RESULT="true"
-	##### If I'm going to be using regex interpretation here, then I should be consistant and use it everywhere
-	elif [[ "$v_ARG" =~ ^$1$ && "$2" != "none" ]]; then
-	### If there is no equal sign, the next argument is the modifier for the flag
-		if [[ -n "${a_ARGS[$(( $c + 1 ))]}" && ! "${a_ARGS[$(( $c + 1 ))]}" =~ ^- ]]; then
-		### If the next argument doesn't begin with a dash.
-			if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_ARGS[$(( $c + 1 ))]}" | grep -E -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
-			### If it's not bool, or if it is bool, but the next argument is neither true nor false
-				c=$(( $c + 1 ))
-				v_RESULT="${a_ARGS[$c]}"
-			fi
-		elif [[ "$2" != "bool" && $v_CL_PROMPT == true ]]; then
-			read -ep "The \"$v_ARG\" flag requires an argument: " v_RESULT
-		elif [[ "$2" != "bool" && $v_CL_PROMPT != true ]]; then
-			echo "The flag \"$1\" needs to be followed by an argument. Exiting."
-			exit 1
-		fi
-	elif [[ "$v_ARG" =~ ^$1[0-9]*$ && ( $2 == "int" || $2 == "num" ) ]]; then
-	### If the argument doesn't have an equal sign, has a number on the end, and it's type is "int" or "num", then the number is the modifier (example "-n1")
-		v_RESULT="$( echo "$v_ARG" | sed "s/^$1//" )"
-	elif [[ "$v_ARG" =~ ^$1= && "$2" != "none" ]]; then
-	### If the argument has an equal sign, then the modifier for the flag is within this argument
-		v_RESULT="$( echo "$v_ARG" | cut -d "=" -f2- )"
-		if [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT == true ]]; then
-			read -ep "The \"$v_ARG\" flag requires an argument: " v_RESULT
-		elif [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT != true ]]; then
-			echo "The flag \"$1\" needs to be followed by an argument. Exiting."
-			exit 1
-		fi
-	elif [[ -n "$3" && "$v_ARG" =~ ^$3$ && "$2" != "none" ]]; then
-	### If there is no equal sign, the next argument is the modifier for the alternate flag
-		if [[ -n "${a_ARGS[$(( $c + 1 ))]}" && ! "${a_ARGS[$(( $c + 1 ))]}" =~ ^- ]]; then
-			if [[ "$2" != "bool" || ( "$2" == "bool" && $( echo "${a_ARGS[$(( $c + 1 ))]}" | grep -E -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 1 ) ]]; then
-				c=$(( $c + 1 ))
-				v_RESULT="${a_ARGS[$c]}"
-			fi
-		elif [[ "$2" != "bool" && $v_CL_PROMPT == true ]]; then
-			read -ep "The \"$v_ARG\" flag requires an argument: " v_RESULT
-		elif [[ "$2" != "bool" && $v_CL_PROMPT != true ]]; then
-			echo "The flag \"$3\" needs to be followed by an argument. Exiting."
-			exit 1
-		fi
-	elif [[ "$v_ARG" =~ ^$3[0-9]*$ && ( $2 == "int" || $2 == "num" ) ]]; then
-	### If the argument has a number on the end, and it's type is "int" or "num", then the number is the modifier
-		v_RESULT="$( echo "$v_ARG" | sed "s/^$3//" )"
-	elif [[ -n "$3" && "$v_ARG" =~ ^$3= && "$2" != "none" ]]; then
-	### If the argument has an equal sign, then the modifier for the alternate flag is within this argument
-		v_RESULT="$( echo "$v_ARG" | cut -d "=" -f2- )"
-		if [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT == true ]]; then
-			read -ep "The \"$v_ARG\" flag requires an argument: " v_RESULT
-		elif [[ -z "$v_RESULT" && "$2" != "bool" && $v_CL_PROMPT != true ]]; then
-			echo "The flag \"$3\" needs to be followed by an argument. Exiting."
-			exit 1
-		fi
-	fi
-	if [[ ( "$2" == "num" || "$2" == "int" ) && ! "$v_RESULT" =~ ^[0-9]+$ ]]; then
-		echo "The flag \"$1\" needs to be followed by an integer. Exiting."
+function fn_assign_run_type {
+	fn_debug "fn_assign_run_type"
+	if [[ -n "$v_RUN_TYPE" ]]; then
+		echo "Cannot use \"$v_RUN_TYPE\" and \"$1\" simultaneously. Exiting."
 		exit 1
-	elif [[ "$2" == "date" ]]; then
-		### Dates are validated by ensuring that they can be passed to the "date" command,so things like "yesterday" also work.
-		date --date="$v_RESULT" > /dev/null 2>&1
-		if [[ "$?" -ne 0 ]]; then
-			echo "The flag \"$1\" needs to be followed by a date. Exiting."
-			exit 1
-		fi
-		v_RESULT="$( date --date="$v_RESULT" +%F )"
-	elif [[ "$2" == "float" && ! "$v_RESULT" =~ ^[0-9.]+$ ]]; then
-		echo "The flag \"$1\" needs to be followed by a number. Exiting."
-		exit 1
-	elif [[ "$2" == "file" ]]; then
-		if [[ "$( type -t fn_fix_home )" == "function" ]]; then
-			v_RESULT="$( fn_fix_home "$v_RESULT" )"
-		fi
-		if [[ "$4" == "error" && ! -f "$v_RESULT" ]]; then
-			echo "File \"$v_RESULT\" does not appear to exist. Exiting."
-			exit 1
-		elif [[ "$4" == "create" ]]; then
-			touch "$v_RESULT"
-			v_EXIT_CODE="$?"
-			if [[ "$v_EXIT_CODE" -ne 0 ]]; then
-				echo "Error creating file \"$v_RESULT\". Exiting."
-				exit 1
-			fi
-		fi
-	elif [[ "$2" == "directory" ]]; then
-		if [[ "$( type -t fn_fix_home )" == "function" ]]; then
-			v_RESULT="$( fn_fix_home "$v_RESULT" --directory )"
-		fi
-		if [[ "$4" == "error" && ! -d "$v_RESULT" ]]; then
-			echo "Directory \"$v_RESULT\" does not appear to exist. Exiting."
-			exit 1
-		elif [[ "$4" == "create" ]]; then
-			mkdir -p "$v_RESULT"
-			v_EXIT_CODE="$?"
-			if [[ "$v_EXIT_CODE" -ne 0 ]]; then
-				echo "Error creating directory \"$v_RESULT\". Exiting."
-				exit 1
-			fi
-		fi
-		##### Is there any reason why I'm adding slashes to the end of directories?
-		if [[ "$v_RESULT" =~ /$ ]]; then
-			v_RESULT="$v_RESULT/"
-		fi
-	elif [[ "$2" == "bool" ]]; then
-		if [[ $( echo "$v_RESULT" | grep -E -c "^([Tt]([Rr][Uu][Ee])*|[Ff]([Aa][Ll][Ss][Ee])*)$" ) -eq 0 ]]; then
-			if [[ -z "$4" || "$4" == "exit" ]]; then
-				echo "The flag \"$1\" needs to be followed by \"true\" or \"false\". Exiting."
-				exit 1
-			elif [[ "$4" == "false" ]]; then
-				v_RESULT="false"
-			else
-				v_RESULT="true"
-			fi
-		elif [[ $( echo "$v_RESULT" | grep -E -c "^[Tt]([Rr][Uu][Ee])*$" ) -eq 1 ]]; then
-			v_RESULT="true"
-		elif [[ $( echo "$v_RESULT" | grep -E -c "^[Ff]([Aa][Ll][Ss][Ee])*$" ) -eq 1 ]]; then
-			v_RESULT="false"
-		fi
+	else
+		v_RUN_TYPE="$1"
 	fi
 }
-
-#================================#
-#== Help and Version Functions ==#
-#================================#
-
-
 
 #===================#
 #== END FUNCTIONS ==#
@@ -191,20 +69,57 @@ fn_start_script
 ### If there's a no-output file from the previous session, remove it.
 rm -f "$d_WORKING"/no_output
 
-### If any of the arguments are asking for help, output help and exit
+function fn_process_args {
+	fn_debug "fn_process_args"
+	local v_VALUE=
+	local v_ARG="$1"
+	if [[ "${v_ARG:0:1}" == "-" && "${v_ARG:0:2}" != "--" ]]; then
+		local v_INDEX="$( expr index "$v_ARG" "=" )"
+		if [[ "$v_INDEX" -gt 0 ]]; then
+			v_VALUE="${v_ARG:$v_INDEX}"
+			v_ARG="${v_ARG:1:$v_INDEX-2}"
+		else
+			v_ARG="${v_ARG:1}"
+		fi
+		local c
+		for (( c=0; c<=$(( ${#v_ARG} - 1 )); c++ )); do
+			a_ARGS2[${#a_ARGS2[@]}]="-${v_ARG:$c:1}"
+		done
+	elif [[ "${v_ARG:0:2}" != "--" ]]; then
+		if [[ "$v_INDEX" -gt 0 ]]; then
+			v_VALUE="${v_ARG:$v_INDEX}"
+			v_ARG="${v_ARG:0:$v_INDEX-1}"
+		fi
+		a_ARGS2[${#a_ARGS2[@]}]="$v_ARG"
+	else
+		a_ARGS2[${#a_ARGS2[@]}]="$v_ARG"
+	fi
+	if [[ -n "$v_VALUE" ]]; then
+		a_ARGS2[${#a_ARGS2[@]}]="$v_VALUE"
+	fi
+}
+
+### Separate out any instances where we have multiple single letter arguments, or arguments followed by an "="
 a_ARGS=( "$@" )
+a_ARGS2=()
 for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
-	v_ARG="${a_ARGS[$c]}"
+	fn_process_args "${a_ARGS[$c]}"
+done
+
+### If any of the arguments are asking for help, output help and exit. Otherwise, find the run type
+v_RUN_TYPE=
+for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
+	v_ARG="${a_ARGS2[$c]}"
 	if [[ "$v_ARG" == "-h" || "$v_ARG" == "--help" ]]; then
-		if [[ "${a_ARGS[$c + 1]}" == "process-types" ]]; then
+		if [[ "${a_ARGS2[$c + 1]}" == "process-types" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_process_types.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS[$c + 1]}" == "params-file" ]]; then
+		elif [[ "${a_ARGS2[$c + 1]}" == "params-file" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_params_file.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS[$c + 1]}" == "files" ]]; then
+		elif [[ "${a_ARGS2[$c + 1]}" == "files" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_files.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS[$c + 1]}" == "flags" ]]; then
+		elif [[ "${a_ARGS2[$c + 1]}" == "flags" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_flags.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS[$c + 1]}" == "notes" ]]; then
+		elif [[ "${a_ARGS2[$c + 1]}" == "notes" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_notes.txt "$d_PROGRAM"/texts/help_feedback.txt
 		else
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_basic.txt "$d_PROGRAM"/texts/help_feedback.txt
@@ -213,10 +128,26 @@ for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
 	elif [[ "$v_ARG" == "--version" || "$v_ARG" == "--changelog" ]]; then
 		echo -n "Current Version: "
 		grep -E -m1 "^[0-9]" "$d_PROGRAM"/texts/changelog.txt | sed -r "s/\s*-\s*$//"
-		if [[ "${a_ARGS[$c + 1]}" == "--full" || "$v_ARG" == "--changelog" ]]; then
+		if [[ "${a_ARGS2[$c + 1]}" == "--full" || "$v_ARG" == "--changelog" ]]; then
 			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/changelog.txt
 		fi
 		exit
+	elif [[ "$v_ARG" == "-u" || "$v_ARG" == "--url" || "$v_ARG" == "--curl" ]]; then
+		fn_assign_run_type "--url"
+	elif [[ "$v_ARG" == "-d" || "$v_ARG" == "--dns" ]]; then
+		fn_assign_run_type "--dns"
+	elif [[ "$v_ARG" == "-p" || "$v_ARG" == "--ping" ]]; then
+		fn_assign_run_type "--ping"
+	elif [[ "$v_ARG" == "--ssh-load" || "$v_ARG" == "--load" ]]; then
+		fn_assign_run_type "--ssh-load"
+	elif [[ "$v_ARG" == "--kill" ]]; then
+		fn_assign_run_type "--kill"
+	elif [[ "$v_ARG" == "--list" || "$v_ARG" == "-l" ]]; then
+		fn_assign_run_type "--list"
+	elif [[ "$v_ARG" == "--master" ]]; then
+		fn_assign_run_type "--master"
+	elif [[ "$v_ARG" == "--modify" || "$v_ARG" == "-m" ]]; then
+		fn_assign_run_type "--modify"
 	fi
 done
 
@@ -231,11 +162,12 @@ done
 
 ### Determine the running state
 if [[ -f "$d_WORKING"/lwmon.pid && $( cat /proc/$( cat "$d_WORKING"/lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
+### This tests if the master process exists
 	if [[ "$PPID" == $( cat "$d_WORKING"/lwmon.pid ) ]]; then
 		### Child processes monitor one thing only they are spawned only by the master process and when the master process is no longer present, they die.
+		echo "Master process launched a child process wrong"
 		v_RUNNING_STATE="child"
 		fn_child 
-		##### If we're directing everything at the child script, there's no reason why this should need to be here.
 	else
 		### Control processes set up the parameters for new child processes and then exit.
 		v_RUNNING_STATE="control"
@@ -251,124 +183,289 @@ else
 	fi
 fi
 
-### More necessary configuration files.
-if [[ ! -f "$f_CONF" ]]; then
-	source "$d_PROGRAM"/includes/create_config.shf
-	fn_create_config
+### If it was run with no flags, lets just go straight to the modify process
+if [[ "${#a_ARGS2[@]}" -eq 0 ]]; then
+	source "$d_PROGRAM"/includes/modify.shf
+	fn_modify
 fi
 
-### Turn the command line arguments into an array.
-a_ARGS=( "$@" )
-v_CURL_STRING_COUNT=0
+function fn_test_string {
+### $1 is the argument that we're testing whether or not exists
+### $2 is the flag that was used
+### $3 is a noun to describe what the argument should be starting with "a" or "an"
+	fn_debug "fn_test_string"
+	if [[ ! -n "$1" ]]; then
+		echo "Argument \"$2\" must be followed by $3"
+		exit 1
+	fi
+}
 
-### For each command line argument, determine what needs to be done.
-for (( c=0; c<=$(( $# - 1 )); c++ )); do
-	v_ARG="${a_ARGS[$c]}"
-	if [[ $( echo "$v_ARG" | grep -E -c "^(--((c?url|dns|ping|kill|(ssh-)*load)(=.*)*|list|master|modify)|[^-]*-[mpudl])$" ) -gt 0 ]]; then
-		### These flags indicate a specific action for the script to take. Two actinos cannot be taken at once.
-		if [[ -n "$v_RUN_TYPE" ]]; then
-			### If another of these actions has already been specified, end.
-			echo "Cannot use \"$v_RUN_TYPE\" and \"$v_ARG\" simultaneously. Exiting."
+function fn_test_integer {
+### $1 is the argument that we're testing to see if it's a number
+### $2 is the flag
+	fn_debug "fn_test_integer"
+	if [[ $( echo "$1" | grep -Ec "^[0-9]+$" ) -lt 1 ]]; then
+		echo "Argument \"$2\" must be followed by a whole number"
+		exit 1
+	fi
+}
+
+function fn_test_float {
+	fn_debug "fn_test_float"
+	if [[ $( echo "$1" | grep -Ec "^[0-9.]+$" ) -lt 1 ]]; then
+		echo "Argument \"$2\" must be followed by a number (with or without decimal places)"
+		exit 1
+	fi
+}
+
+function fn_test_child_pid {
+	fn_debug "fn_test_child_pid"
+	if [[ $( echo "$1" | grep -Ec "^[0-9]+$" ) -lt 1 && -d "$d_WORKING"/"$1" ]]; then
+		echo "Argument \"$2\" must be followed by the ID of a child process"
+		exit 1
+	fi
+}
+
+function fn_test_email {
+	fn_debug "fn_fn_test_email"
+	if [[ $( echo "$1" | grep -E -c "^[^@ ]+@[^.@ ]+\.[^@ ]+$" ) -lt 1 ]]; then
+		echo "Argument \"$2\" must be followed by an email address"
+		exit 1
+	fi
+}
+
+function fn_test_ip {
+	fn_debug "fn_test_ip"
+	if [[ $( echo "$1" | grep -E -c "^((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$" ) -lt 1 ]]; then
+		echo "Argument \"$2\" must be followed by an IP address"
+		exit 1
+	fi
+}
+
+function fn_test_flag_with_run {
+### This function compares the run type to the flags that are used and assesses if they are not compatible
+### $1" is the flag we're verifying will work with this run type
+	fn_debug "fn_test_flag_with_run"
+	if [[ "$v_RUN_TYPE" == "$1" ]]; then
+		return
+	fi
+	if [[ "$v_RUN_TYPE" == "--url" ]]; then
+		if [[ "$1" == "--curl" || "$1" == "-u" ]]; then
+			return
+		fi
+		if [[ $( echo "$1" | grep -Ec "^--(check-result|(check-)?domain|load-(fail|ps)|port|record-type|(ssh-)?user)$" ) -gt 0 ]]; then
+			echo "The only flags that can be used with \"$v_RUN_TYPE\" are the following:"
+			echo "--check-timeout, --control, --ctps, --ident, --ip, --job-name, --ldd, --mail, --mail-delay, --ndr, --nsns, --nsr, --outfile, --seconds, --user-agent, --verbosity, --wget"
 			exit 1
 		fi
-		v_RUN_TYPE="$( echo "$v_ARG" | cut -d "=" -f1 )"
-		if [[ $( echo "$v_ARG" | grep -E -c "^-(u|-c?url)($|=)" ) -eq 1 ]]; then
-			fn_parse_cl_argument "$v_RUN_TYPE" "string" "-u"; v_CURL_URL="$v_RESULT"
-			v_RUN_TYPE="--url"
-		elif [[ $( echo "$v_ARG" | grep -E -c "^-(d|-dns)($|=)" ) -eq 1 ]]; then
-			fn_parse_cl_argument "--dns" "string" "-d"; v_DOMAIN="$v_RESULT"
-			v_RUN_TYPE="--dns"
-		elif [[ $( echo "$v_ARG" | grep -E -c "^-(p|-ping)($|=)" ) -eq 1 ]]; then
-			fn_parse_cl_argument "--ping" "string" "-p"; v_DOMAIN="$v_RESULT"
-			v_RUN_TYPE="--ping"
-		elif [[ $( echo "$v_ARG" | grep -E -c "^--(ssh-)*load($|=)" ) -eq 1 ]]; then
-			fn_parse_cl_argument "--ssh-load" "string" "--load"; v_DOMAIN="$v_RESULT"
-			v_RUN_TYPE="--ssh-load"
-		elif [[ $( echo "$v_ARG" | grep -E -c "^--kill($|=)" ) -eq 1 ]]; then
-			if [[ $( echo "$v_ARG" | grep -E -c "^--kill=" ) -eq 1 || ( -n ${a_ARGS[$(( $c + 1 ))]} && $( echo ${a_ARGS[$(( $c + 1 ))]} | grep -E -c "^-" ) -eq 0 ) ]]; then
-				fn_parse_cl_argument "--kill" "num"; v_CHILD_PID="$v_RESULT"
-			fi
+	elif [[ "$v_RUN_TYPE" == "--dns" ]]; then
+		if [[ "$1" == "-d" ]]; then
+			return
 		fi
-	### All other flags modify or contribute to one of the above actions.
+		if [[ $( echo "$1" | grep -Ec "^--(check-time(out|-partial-success)|ctps|ip(-address)?|load-(fail|ps)|port|string|(ssh-)?user|user-agent|wget)$" ) -gt 0 ]]; then
+			echo "The only flags that can be used with \"$v_RUN_TYPE\" are the following:"
+			echo "--check-result, --control, --domain, --ident, --job-name, --ldd, --mail, --mail-delay, --ndr, --nsns, --nsr, --outfile, --record-type, --seconds, --verbosity"
+			exit 1
+		fi
+	elif [[ "$v_RUN_TYPE" == "--ping" ]]; then
+		if [[ "$1" == "-p" ]]; then
+			return
+		fi
+		if [[ $( echo "$1" | grep -Ec "^--(check-(time(out|-partial-success)|result)|ctps|(check-)?domain|ip(-address)?|load-(fail|ps)|port|record-type|string|(ssh-)?user|user-agent|wget)$" ) -gt 0 ]]; then
+			echo "The only flags that can be used with \"$v_RUN_TYPE\" are the following:"
+			echo "--control, --ident, --job-name, --ldd, --mail, --mail-delay, --ndr, --nsns, --nsr, --outfile, --seconds, --verbosity"
+			exit 1
+		fi
+	elif [[ "$v_RUN_TYPE" == "--ssh-load" ]]; then
+		if [[ "$1" == "--load" ]]; then
+			return
+		fi
+		if [[ $( echo "$1" | grep -Ec "^--(check-result|(check-)?domain|ip(-address)?|port|record-type|string|user-agent|wget)$" ) -gt 0 ]]; then
+			echo "The only flags that can be used with \"$v_RUN_TYPE\" are the following:"
+			echo "--check-timeout, --control, --ctps, --ident, --job-name, --ldd, --load-ps, --load-fail, --mail, --mail-delay, --ndr, --nsns, --nsr, --outfile, --port, --seconds, --verbosity"
+			exit 1
+		fi
+	elif [[ "$v_RUN_TYPE" == "--kill" ]]; then
+		if [[ "$1" != "--save" ]]; then
+			echo "Flag \"$v_RUN_TYPE\" cannot be used with any other flags except \"--save\""
+			exit 1
+		fi
+	elif [[ "$v_RUN_TYPE" == "--list" ]]; then
+		if [[ "$1" == "-l" ]]; then
+			return
+		fi
+		echo "Flag \"$v_RUN_TYPE\" cannot be used with any other flags"
+		exit 1
+	elif [[ "$v_RUN_TYPE" == "--master" ]]; then
+		echo "Flag \"$v_RUN_TYPE\" cannot be used with any other flags"
+		exit 1
+	elif [[ "$v_RUN_TYPE" == "--modify" ]]; then
+		if [[ "$1" == "-m" ]]; then
+			return
+		fi
+		echo "Flag \"$v_RUN_TYPE\" cannot be used with any other flags"
+		exit 1
+	fi
+}
+
+### Go through the command line arguments again, this time gathering all the data
+for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
+	v_ARG="${a_ARGS2[$c]}"
+
+	### Flags for Run Type
+	if [[ "$v_ARG" == "-u" || "$v_ARG" == "--url" || "$v_ARG" == "--curl" ]]; then
+		c=$(( c + 1 ))
+		v_CURL_URL="${a_ARGS2[$c]}"
+		fn_test_string "$v_CURL_URL" "$v_ARG" "a website url"
+	elif [[ "$v_ARG" == "-d" || "$v_ARG" == "--dns" || "$v_ARG" == "-p" || "$v_ARG" == "--ping" || "$v_ARG" == "--ssh-load" || "$v_ARG" == "--load" ]]; then
+		c=$(( c + 1 ))
+		v_DOMAIN="${a_ARGS2[$c]}"
+		fn_test_string "$v_DOMAIN" "$v_ARG" "a hostname or IP address"
+	elif [[ "$v_ARG" == "--kill" ]]; then
+		if [[ -n "${a_ARGS2[$c + 1]}" && "${a_ARGS[$c + 1]}" != "--save" ]]; then
+			c=$(( c + 1 ))
+			v_CHILD_PID="${a_ARGS2[$c]}"
+			fn_test_child_pid "$v_CHILD_PID" "$v_ARG"
+		fi
+	elif [[ "$v_ARG" == "--list" || "$v_ARG" == "-l" || "$v_ARG" == "--master" ]]; then
+		if [[ -n "${a_ARGS2[$c + 1]}" || "$c" -gt 0 ]]; then
+			echo "Argument \"$v_ARG\" should not be used with other flags or arguments"
+			exit 1
+		fi
+	elif [[ "$v_ARG" == "--modify" || "$v_ARG" == "-m" ]]; then
+		if [[ -n "${a_ARGS2[$c + 1]}" ]]; then
+			c=$(( c + 1 ))
+			v_CHILD_PID="${a_ARGS2[$c]}"
+			fn_test_child_pid "$v_CHILD_PID" "$v_ARG"
+		fi
+
+	### Flags that don't require arguments
 	elif [[ "$v_ARG" == "--control" ]]; then
 		v_RUNNING_STATE="control"
 	elif [[ "$v_ARG" == "--save" ]]; then
 		v_SAVE_JOBS=true
 	elif [[ "$v_ARG" == "--testing" ]]; then
 		v_TESTING=true
-		v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS - 1 ))
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--user-agent($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--user-agent" "bool" "--user-agent" "true"; v_USER_AGENT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(ldd|log-duration-data)($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--ldd" "bool" "--log-duration-data" "true"; v_LOG_DURATION_DATA="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--wget($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--wget" "bool" "--wget" "false"; v_USE_WGET="$v_RESULT"
-		if [[ $v_USE_WGET == "true" ]]; then
-			fn_use_wget
+
+	### Flags with boolean arguments
+	elif [[ "$v_ARG" == "--user-agent" ]]; then
+		v_USER_AGENT=true
+		if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
+			c=$(( c + 1 ))
+			v_USER_AGENT="${a_ARGS2[$c]}"
 		fi
-		v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS - 1 ))
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(e)*mail($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--mail" "string" "--email"; v_EMAIL_ADDRESS="$v_RESULT"
-		if [[ -z "$v_EMAIL_ADDRESS" || $( echo "$v_EMAIL_ADDRESS" | grep -E -c "^[^@]+@[^.@]+\.[^@]+$" ) -lt 1 ]]; then
-			echo "The flag \"--mail\" needs to be followed by an e-mail address. Exiting."
-			exit 1
+	elif [[ "$v_ARG" == "--ldd" || "$v_ARG" == "--log-duration-data" ]]; then
+		v_LOG_DURATION_DATA=true
+		if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
+			c=$(( c + 1 ))
+			v_LOG_DURATION_DATA="${a_ARGS2[$c]}"
 		fi
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--seconds($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--seconds" "float"; v_WAIT_SECONDS="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--ctps($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--ctps" "float"; v_CHECK_TIME_PARTIAL_SUCCESS="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--check-timeout($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--check-timeout" "float"; v_CHECK_TIMEOUT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--mail-delay($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--mail-delay" "num"; v_MAIL_DELAY="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--load-ps($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--load-ps" "float"; v_MIN_LOAD_PARTIAL_SUCCESS="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--load-fail($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--load-fail" "float"; v_MIN_LOAD_FAILURE="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--port($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--port" "num"; v_CL_PORT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(ndr|num-durations-recent)($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--ndr" "num" "--num-durations-recent"; v_NUM_DURATIONS_RECENT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(nsr|num-statuses-recent)($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--nsr" "num" "--num-statuses-recent"; v_NUM_STATUSES_RECENT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(nsns|num-statuses-not-success)($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--nsns" "num" "--num-statuses-not-success"; v_NUM_STATUSES_NOT_SUCCESS="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(ident|ticket)($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--ident" "num" "--ticket"; v_IDENT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--ip(-address)*($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--ip" "string" "--ip-address"; v_IP_ADDRESS="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--string($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--string" "string"; a_CURL_STRING[${#a_CURL_STRING[@]}]="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(check-)*domain($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--domain" "string" "--check-domain"; v_DNS_CHECK_DOMAIN="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--check-result($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--check-result" "string"; v_DNS_CHECK_RESULT="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--record-type($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--record-type" "string"; v_DNS_RECORD_TYPE="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--(ssh-)*user($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--user" "string" "--ssh-user"; v_SSH_USER="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--job-name($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--job-name" "string"; v_JOB_NAME="$v_RESULT"
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--verbos(e|ity)($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--verbosity" "string" "--verbose"; v_VERBOSITY="$v_RESULT"
-		if [[ "$v_VERBOSITY" == "more" && "${a_ARGS[$(( $c + 1 ))]}" == "verbose" ]]; then
+	elif [[ "$v_ARG" == "--wget" ]]; then
+		v_USE_WGET=true
+		if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
+			c=$(( c + 1 ))
+			v_USE_WGET="${a_ARGS2[$c]}"
+		fi
+
+	### Flags that require other arguments
+	elif [[ "$v_ARG" == "--mail" || "$v_ARG" == "--email" ]]; then
+		c=$(( c + 1 ))
+		v_EMAIL="${a_ARGS2[$c]}"
+		fn_test_email "$v_EMAIL" "$v_ARG"
+	elif [[ "$v_ARG" == "--seconds" ]]; then
+		c=$(( c + 1 ))
+		v_WAIT_SECONDS="${a_ARGS2[$c]}"
+		fn_test_integer "$v_WAIT_SECONDS" "$v_ARG"
+	elif [[ "$v_ARG" == "--ctps" || "$v_ARG" == "--check-time-partial-success" ]]; then
+		c=$(( c + 1 ))
+		v_CHECK_TIME_PARTIAL_SUCCESS="${a_ARGS2[$c]}"
+		fn_test_float "$v_CHECK_TIME_PARTIAL_SUCCESS" "$v_ARG"
+	elif [[ "$v_ARG" == "--check-timeout" ]]; then
+		c=$(( c + 1 ))
+		v_CHECK_TIMEOUT="${a_ARGS2[$c]}"
+		fn_test_float "$v_CHECK_TIMEOUT" "$v_ARG"
+	elif [[ "$v_ARG" == "--mail-delay" ]]; then
+		c=$(( c + 1 ))
+		v_MAIL_DELAY="${a_ARGS2[$c]}"
+		fn_test_integer "$v_MAIL_DELAY" "$v_ARG"
+	elif [[ "$v_ARG" == "--load-ps" ]]; then
+		c=$(( c + 1 ))
+		v_MIN_LOAD_PARTIAL_SUCCESS="${a_ARGS2[$c]}"
+		fn_test_float "$v_MIN_LOAD_PARTIAL_SUCCESS" "$v_ARG"
+	elif [[ "$v_ARG" == "--load-fail" ]]; then
+		c=$(( c + 1 ))
+		v_MIN_LOAD_FAILURE="${a_ARGS2[$c]}"
+		fn_test_float "$v_MIN_LOAD_FAILURE" "$v_ARG"
+	elif [[ "$v_ARG" == "--port" ]]; then
+		c=$(( c + 1 ))
+		v_CL_PORT="${a_ARGS2[$c]}"
+		fn_test_integer "$v_CL_PORT" "$v_ARG"
+	elif [[ "$v_ARG" == "--ndr" || "$v_ARG" == "--num-durations-recent" ]]; then
+		c=$(( c + 1 ))
+		v_NUM_DURATIONS_RECENT="${a_ARGS2[$c]}"
+		fn_test_integer "$v_NUM_DURATIONS_RECENT" "$v_ARG"
+	elif [[ "$v_ARG" == "--nsr" || "$v_ARG" == "--num-statuses-recent" ]]; then
+		c=$(( c + 1 ))
+		v_NUM_STATUSES_RECENT="${a_ARGS2[$c]}"
+		fn_test_integer "$v_NUM_STATUSES_RECENT" "$v_ARG"
+	elif [[ "$v_ARG" == "--nsns" || "$v_ARG" == "--num-statuses-not-success" ]]; then
+		c=$(( c + 1 ))
+		v_NUM_STATUSES_NOT_SUCCESS="${a_ARGS2[$c]}"
+		fn_test_integer "$v_NUM_STATUSES_NOT_SUCCESS" "$v_ARG"
+	elif [[ "$v_ARG" == "--ident" || "$v_ARG" == "--ticket" ]]; then
+		if [[ -n "${a_ARGS2[$c + 1]}" ]]; then
+			c=$(( c + 1 ))
+			v_IDENT="${a_ARGS2[$c]}"
+		fi
+	elif [[ "$v_ARG" == "--ip" || "$v_ARG" == "--ip-address" ]]; then
+		c=$(( c + 1 ))
+		v_IP_ADDRESS="${a_ARGS2[$c]}"
+		fn_test_integer "$v_IP_ADDRESS" "$v_ARG"
+	elif [[ "$v_ARG" == "--string" ]]; then
+		c=$(( c + 1 ))
+		a_CURL_STRING[${#a_CURL_STRING[@]}]="${a_ARGS2[$c]}"
+		fn_test_string "${a_CURL_STRING[${#a_CURL_STRING[@]} - 1]}" "$v_ARG" "a string of text that the curl output must contain"
+	elif [[ "$v_ARG" == "--domain" || "$v_ARG" == "--check-domain" ]]; then
+		c=$(( c + 1 ))
+		v_DNS_CHECK_DOMAIN="${a_ARGS2[$c]}"
+		fn_test_string "$v_DNS_CHECK_DOMAIN" "$v_ARG" "a domain name to dig for at the remote host"
+	elif [[ "$v_ARG" == "--check-result" ]]; then
+		c=$(( c + 1 ))
+		v_DNS_CHECK_RESULT="${a_ARGS2[$c]}"
+		fn_test_string "$v_DNS_CHECK_RESULT" "$v_ARG" "a string of text that the dig output must contain"
+	elif [[ "$v_ARG" == "--record-type" ]]; then
+		c=$(( c + 1 ))
+		v_DNS_RECORD_TYPE="${a_ARGS2[$c]}"
+		fn_test_string "$v_DNS_RECORD_TYPE" "$v_ARG" "a DNS record type"
+	elif [[ "$v_ARG" == "--user" || "$v_ARG" == "--ssh-user" ]]; then
+		c=$(( c + 1 ))
+		v_SSH_USER="${a_ARGS2[$c]}"
+		fn_test_string "$v_SSH_USER" "$v_ARG" "an SSH user"
+	elif [[ "$v_ARG" == "--job-name" ]]; then
+		c=$(( c + 1 ))
+		v_JOB_NAME="${a_ARGS2[$c]}"
+		fn_test_string "$v_JOB_NAME" "$v_ARG" "a name for the LWmon job"
+	elif [[ "$v_ARG" == "--verbose" || "$v_ARG" == "--verbosity" ]]; then
+		c=$(( c + 1 ))
+		v_VERBOSITY="${a_ARGS2[$c]}"
+		if [[ "$v_VERBOSITY" == "more" && "${a_ARGS2[$c + 1]}" == "verbose" ]]; then
 			c=$(( $c + 1 ))
 			v_VERBOSITY="more verbose"
-		elif [[ "$v_VERBOSITY" == "more" ]]; then
+		elif [[ "$v_VERBOSITY" == "more" || "$v_VERBOSITY" == "more-verbose" || "$v_VERBOSITY" == "moreverbose" ]]; then
 			v_VERBOSITY="more verbose"
 		fi
-		if [[ $( echo "$v_VERBOSITY" | grep -E -c "^(verbose|more verbose|standard|change|none)$" ) -eq 0 ]]; then
+		if [[ $( echo "$v_VERBOSITY" | grep -E -c "^((more )?verbose|standard|change|none)$" ) -eq 0 ]]; then
 			echo "The flag \"--verbosity\" needs to be followed by either \"verbose\", \"more verbose\", \"standard\", \"change\", or \"none\". Exiting."
 			exit 1
 		fi
-	elif [[ $( echo "$v_ARG" | grep -E -c "^--out(put-)*file($|=)" ) -eq 1 ]]; then
-		fn_parse_cl_argument "--outfile" "string" "--output-file"; v_OUTPUT_FILE="$v_RESULT"
-		fn_test_file "$v_OUTPUT_FILE" false true; v_OUTPUT_FILE="$v_RESULT"
+	elif [[ "$v_ARG" == "--output-file" || "$v_ARG" == "--outfile" ]]; then
+		c=$(( $c + 1 ))
+		fn_test_file "${a_ARGS2[$c]}" false true; v_OUTPUT_FILE="$v_RESULT"
 		if [[ -z "$v_OUTPUT_FILE" ]]; then
 			echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
 			exit 1
 		fi
-	else
+	elif [[ -n "$v_ARG" ]]; then
 		if [[ $( echo "$v_ARG "| grep -E -c "^-" ) -eq 1 ]]; then
 			echo "There is no such flag \"$v_ARG\". Exiting."
 		else
@@ -376,16 +473,10 @@ for (( c=0; c<=$(( $# - 1 )); c++ )); do
 		fi
 		exit 1
 	fi
-	v_NUM_ARGUMENTS=$(( $v_NUM_ARGUMENTS + 1 ))
+	fn_test_flag_with_run "$v_ARG"
 done
 
-### Some of these flags need to be used alone.
-if [[ "$v_RUN_TYPE" == "--master" || "$v_RUN_TYPE" == "--version" || "$v_RUN_TYPE" == "--help-files" || "$v_RUN_TYPE" == "--help-flags" || "$v_RUN_TYPE" == "--help-process-types" || "$v_RUN_TYPE" == "--help-params-file" || "$v_RUN_TYPE" == "--help" || "$v_RUN_TYPE" == "--modify" || "$v_RUN_TYPE" == "-h" || "$v_RUN_TYPE" == "-m" ]]; then
-	if [[ "$v_NUM_ARGUMENTS" -gt 1 ]]; then
-		echo "The flag \"$v_RUN_TYPE\" cannot be used with other flags. Exiting."
-		exit 1
-	fi
-fi
+
 ### Tells the script where to go with the type of job that was selected.
 if [[ "$v_RUN_TYPE" == "--url" || "$v_RUN_TYPE" == "-u" ]]; then
 	source "$d_PROGRAM"/includes/create.shf
@@ -406,23 +497,16 @@ elif [[ "$v_RUN_TYPE" == "--kill" ]]; then
 			exit 1
 		fi
 		touch "$d_WORKING"/$v_CHILD_PID/die
+		##### Is there a way to kill and save a single job?
 		echo "The child process will exit shortly."
 		exit 0
 	elif [[ "$v_SAVE_JOBS" == true ]]; then
-		if [[ $v_NUM_ARGUMENTS -gt 2 ]]; then
-			echo "The \"--kill\" flag can only used alone, with the \"--save\" flag, or in conjunction with the ID number of a child process. Exiting."
-			exit 1
-		fi
 		touch "$d_WORKING"/save
-	else
-		if [[ "$v_NUM_ARGUMENTS" -gt 1 ]]; then
-			echo "The \"--kill\" flag can only used alone, with the \"--save\" flag, or in conjunction with the ID number of a child process. Exiting."
-			exit 1
-		fi
 	fi
 	touch "$d_WORKING"/die
 	exit 0
 elif [[ "$v_RUN_TYPE" == "--modify" || "$v_RUN_TYPE" == "-m" ]]; then
+	##### Modify can take a process ID, but what to do with it is not implimented yet
 	source "$d_PROGRAM"/includes/modify.shf
 	fn_modify
 elif [[ "$v_RUN_TYPE" == "--list" || "$v_RUN_TYPE" == "-l" ]]; then

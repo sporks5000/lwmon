@@ -14,7 +14,11 @@ Future Versions -
     - Moved the configuration file out of the working directory
     - Added the ability to specify a log file
     - Updated the standards I was following for variable quotation
-    - Seperaged out help and version information into their own files
+    - Seperated out help and version information into their own files
+    - Reviesd how command line arguments are parsed
+    - Revised how variables are pulled from the configuration and the params files
+    - Fixed a bug where resetting the end time on an old child directory would not function as expected
+    - A sane version of the params file is re-written every time it is updated
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified
