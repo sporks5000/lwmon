@@ -9,15 +9,13 @@ function fn_url_cl {
 	fi
 	### If there is an IP address, check to make sure that it's really an IP address, or can be translated into one.
 	if [[ -n "$v_IP_ADDRESS" ]]; then
-		fn_parse_server "$v_IP_ADDRESS"
-		if [[ "$v_IP_ADDRESSa" == false ]]; then
+		fn_parse_server "$v_IP_ADDRESS"; v_IP_ADDRESS="$v_IP_ADDRESSa"
+		if [[ "$v_IP_ADDRESS" == false ]]; then
 			echo "The IP address provided with the \"--ip\" flag is not a valid IP address. Exiting."
 			exit 1
 		fi
-		v_IP_ADDRESS="$v_IP_ADDRESSa"
 	fi
-	fn_parse_server "$v_CURL_URL"
-	v_CURL_URL="$v_CURL_URLa"
+	fn_parse_server "$v_CURL_URL" "url"; v_CURL_URL="$v_CURL_URLa"
 	### If there isn't an IP address, we don't need to specify it in the job name.
 	if [[ -z "$v_IP_ADDRESS" || "$v_IP_ADDRESS" == "false" ]]; then
 		v_IP_ADDRESS=false
@@ -44,7 +42,7 @@ function fn_ping_cl {
 		exit 1
 	fi
 	v_ORIG_JOB_NAME="$v_DOMAINa"
-	v_DOMAIN=$v_DOMAINa
+	v_DOMAIN="$v_DOMAINa"
 	v_JOB_TYPE="ping"
 
 	fn_mutual_cl
@@ -65,8 +63,7 @@ function fn_dns_cl {
 	fi
 	v_DOMAIN="$v_DOMAINa"
 	### Make sure that the domain we're digging is properly formatted as well
-	fn_parse_server "$v_DNS_CHECK_DOMAIN"
-	v_DNS_CHECK_DOMAIN="$v_DOMAINa"
+	fn_parse_server "$v_DNS_CHECK_DOMAIN" "domain"; v_DNS_CHECK_DOMAIN="$v_DOMAINa"
 	v_ORIG_JOB_NAME="$v_DNS_CHECK_DOMAIN @$v_DOMAIN"
 	v_JOB_TYPE="dns"
 
@@ -99,9 +96,7 @@ function fn_load_cl {
 	elif [[ "$v_SERVER_PORT" != "22" ]]; then
 		v_SERVER_PORT="$v_SERVER_PORTa"
 	fi
-	##### I should try to get rid of fn_test_file as well
-	fn_test_file "$v_SSH_CONTROL_PATH" false false; v_SSH_CONTROL_PATH2="$v_RESULT"
-	if [[ ! -e "$( echo "$v_SSH_CONTROL_PATH2" | sed "s/%h/$v_DOMAIN/;s/%p/$v_SERVER_PORT/;s/%r/$v_SSH_USER/" )" && "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" ]]; then
+	if [[ ! -e "$( echo "$v_SSH_CONTROL_PATH" | sed "s/%h/$v_DOMAIN/;s/%p/$v_SERVER_PORT/;s/%r/$v_SSH_USER/" )" && "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" ]]; then
 		echo
 		echo "There doesn't appear to be an SSH control socket open for this server. Use the following command to SSH into this server (you'll probably want to do this in another window, or a screen), and then try starting the job again:"
 		echo
@@ -118,8 +113,6 @@ function fn_load_cl {
 
 function fn_mutual_cl {
 	fn_debug "fn_mutual_cl"
-#	source "$d_PROGRAM"/includes/variables.shf
-#	fn_read_master_conf
 	v_NEW_JOB="$( date +%s )""_$RANDOM.job"
 	f_JOB="$d_WORKING"/"$v_NEW_JOB"
 	fn_read_child_params "$f_JOB"
@@ -129,5 +122,7 @@ function fn_mutual_cl {
 	if [[ "$v_RUNNING_STATE" == "master" ]]; then
 		source "$d_PROGRAM"/includes/master.shf
 		fn_master
+	else
+		exit 0
 	fi
 }

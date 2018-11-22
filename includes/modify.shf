@@ -16,8 +16,8 @@ function fn_list {
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 		echo "  $v_CHILD_NUMBER) [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME"
-		a_CHILD_PID[$(( $v_CHILD_NUMBER - 2 ))]="$v_CHILD_PID"
-		v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
+		a_CHILD_PID[$v_CHILD_NUMBER - 2]="$v_CHILD_PID"
+		v_CHILD_NUMBER=$(( v_CHILD_NUMBER + 1 ))
 	done
 }
 
@@ -42,8 +42,8 @@ function fn_modify_master {
 		if [[ -n $EDITOR ]]; then
 			$EDITOR "$f_CONF"
 		else
-			##### Maybe instead just output the file name and tell the user to edit it themself
-			vi "$f_CONF"
+			echo "The variable \"\$EDITOR\" is not set."
+			echo "Edit the following file: \"$f_CONF\""
 		fi
 	elif [[ "$v_OPTION_NUM" == "4" ]]; then
 		echo "Viewing the log at $v_LOG"
@@ -77,8 +77,8 @@ function fn_modify_no_master {
 		if [[ -n "$EDITOR" ]]; then
 			"$EDITOR" "$f_CONF"
 		else
-			##### Maybe instead just output the file name and tell the user to edit it themself
-			vi "$f_CONF"
+			echo "The variable \"\$EDITOR\" is not set."
+			echo "Edit the following file: \"$f_CONF\""
 		fi
 	elif [[ "$v_OPTION_NUM" == "4" ]]; then
 		echo "Viewing the log at $v_LOG"
@@ -107,8 +107,8 @@ function fn_modify_old_jobs {
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 		echo "  $v_CHILD_NUMBER) $v_JOB_TYPE $v_JOB_NAME (ended $v_ENDED_DATE)"
-		a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]="$v_CHILD_PID"
-		v_CHILD_NUMBER=$(( $v_CHILD_NUMBER + 1 ))
+		a_CHILD_PID[$v_CHILD_NUMBER - 1]="$v_CHILD_PID"
+		v_CHILD_NUMBER=$(( v_CHILD_NUMBER + 1 ))
 	done
 	if [[ ${#a_CHILD_PID[@]} -eq 0 ]]; then
 		echo "There are no old jobs. Exiting."
@@ -121,7 +121,7 @@ function fn_modify_old_jobs {
 		echo "Invalid Option. Exiting."
 		exit 1
 	fi
-	v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 1 ))]}"
+	v_CHILD_PID="${a_CHILD_PID[$v_CHILD_NUMBER - 1]}"
 	fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 	echo "$v_JOB_NAME:"
 	echo
@@ -180,8 +180,8 @@ function fn_modify_html {
 		v_HTML_TIMESTAMP="$( date --date="@$v_HTML_TIMESTAMP" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		echo "  $v_HTML_NUMBER) $v_HTML_TIMESTAMP - $v_HTML_NAME"
-		a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]="$v_HTML_NAME"
-		v_HTML_NUMBER=$(( $v_HTML_NUMBER + 1 ))
+		a_HTML_LIST[$v_HTML_NUMBER - 1]="$v_HTML_NAME"
+		v_HTML_NUMBER=$(( v_HTML_NUMBER + 1 ))
 	done
 	echo
 	if [[ "${#a_HTML_LIST[@]}" -eq 0 ]]; then
@@ -193,7 +193,7 @@ function fn_modify_html {
 		echo "Invalid Option. Exiting."
 		exit 1
 	fi
-	v_HTML_NAME="${a_HTML_LIST[$(( $v_HTML_NUMBER - 1 ))]}"
+	v_HTML_NAME="${a_HTML_LIST[$v_HTML_NUMBER - 1]}"
 	echo "$v_HTML_NAME:"
 	echo
 	echo "  1) Delete this file."
@@ -230,7 +230,7 @@ function fn_modify {
 	if [[ "$v_CHILD_NUMBER" -lt 2 ]]; then
 		fn_modify_master
 	fi
-	v_CHILD_PID="${a_CHILD_PID[$(( $v_CHILD_NUMBER - 2 ))]}"
+	v_CHILD_PID="${a_CHILD_PID[$v_CHILD_NUMBER - 2]}"
 	fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 	echo "$v_JOB_NAME:"
 	echo
@@ -255,8 +255,8 @@ function fn_modify {
 		if [[ -n "$EDITOR" ]]; then
 			"$EDITOR" "$d_WORKING"/"$v_CHILD_PID"/params
 		else
-			##### maybe just output where the file is and ask the user to edit it themselves
-			vi "$d_WORKING"/"$v_CHILD_PID"/params
+			echo "The variable \"\$EDITOR\" is not set."
+			echo "Edit the following file: \"$d_WORKING/$v_CHILD_PID/params\""
 		fi
 		rm -f "$d_WORKING"/"$v_CHILD_PID/params.temp"
 	elif [[ "$v_OPTION_NUM" == "4" ]]; then

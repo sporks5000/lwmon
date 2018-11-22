@@ -2,6 +2,8 @@
 
 function fn_create_config {
 fn_debug "fn_create_config"
+touch "$f_CONF"
+chmod 600 "$f_CONF"
 cat << EOF > "$f_CONF"
 # LWmon configuration file
 
@@ -68,13 +70,21 @@ LOG_HTTP_CODE = $v_DEFAULT_LOG_HTTP_CODE
 # Setting the "USE_WGET" directive to "true" forces the script to use wget rather than curl to pull files. Curl is typically preferred as its behavior is slightly more predictable and its error output is slightly more specific.
 USE_WGET = $v_DEFAULT_USE_WGET
 
+# The "CUSTOM_MESSAGE" directive allows the user to specify custom information to send at the beginning of email messages. The string "\n" will be interpreted as a new line.
+CUSTOM_MESSAGE = $v_DEFAULT_CUSTOM_MESSAGE
+
 # By default, LWmon logs to ./lwmon.log. Setting the "LOG" directive allows you to specify a different full path for the log file.
 LOG = $v_DEFAULT_LOG
 
-# The "ALT_MAIL" directive allows the user to set an alternate mail binary to use when sending mail. By default LWmon will use what ever is in the path for the user to send mail in the format of "echo 'message' | mail -s 'subject' user@example.com". using this directive will replace "mail" with what ever is specified.
-# You can include additional arguments for the alternate binary to use previous to "-s"
-# If the path to the alternate binary includes spaces, be sure to quote the path appropriately.
-ALT_MAIL = $v_DEFAULT_ALT_MAIL
+# The "MAIL_COMMAND" directive allows the user to specify the command that will be used to send mail. This command will be interpreted with "eval". It allows for the following variables:
+#     - $v_MESSAGE is the content of the message that will be sent (note that this will change based on if the message is for a success or a failure)
+#     - $v_EMAIL_ADDRESS is the address to which the message will be sent
+#     - $v_SUBJECT is the subject for the message (Note that this will change based on various aspects of the job)
+# LWmon will only log that a mail message was sent if the exit code for the command given is "0", otherwise it will log that the message failed to send
+# Note: If the permissions of the config file ever change from 600, instead of running the command given for this directive, LWmon will attempt to send mail via the default command
+#     - This is to prevent a potential security compromise resulting from having this file edited by another user
+# Note: If you are using the default vaules for this and mail is not sending, try adding the "-v" flag after "mail" to see the error output
+MAIL_COMMAND = $v_DEFAULT_MAIL_COMMAND
 
 # The "SSH_CONTROL_PATH" directive allows the user to specify where the control path socket file for an ssh-load job is located.
 SSH_CONTROL_PATH = $v_DEFAULT_SSH_CONTROL_PATH

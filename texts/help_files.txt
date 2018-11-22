@@ -19,10 +19,6 @@ LWMON FILES AND DIRECTORIES
 ./.lwmon/die
     - Creating this file tells the LWmon master process to exit out cleanly
 
-./.lwmon/die_list
-##### I want to remove this functionality
-    - The most recent pull of the remote die list
-
 ./.lwmon/lwmon.pid
     - This is the process ID of the current LWmon master process
 

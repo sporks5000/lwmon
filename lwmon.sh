@@ -66,9 +66,6 @@ function fn_assign_run_type {
 
 fn_start_script
 
-### If there's a no-output file from the previous session, remove it.
-rm -f "$d_WORKING"/no_output
-
 function fn_process_args {
 	fn_debug "fn_process_args"
 	local v_VALUE=
@@ -333,10 +330,9 @@ for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
 			exit 1
 		fi
 	elif [[ "$v_ARG" == "--modify" || "$v_ARG" == "-m" ]]; then
-		if [[ -n "${a_ARGS2[$c + 1]}" ]]; then
-			c=$(( c + 1 ))
-			v_CHILD_PID="${a_ARGS2[$c]}"
-			fn_test_child_pid "$v_CHILD_PID" "$v_ARG"
+		if [[ -n "${a_ARGS2[$c + 1]}" || "$c" -gt 0 ]]; then
+			echo "Argument \"$v_ARG\" should not be used with other flags or arguments"
+			exit 1
 		fi
 
 	### Flags that don't require arguments
@@ -420,7 +416,7 @@ for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
 	elif [[ "$v_ARG" == "--ip" || "$v_ARG" == "--ip-address" ]]; then
 		c=$(( c + 1 ))
 		v_IP_ADDRESS="${a_ARGS2[$c]}"
-		fn_test_integer "$v_IP_ADDRESS" "$v_ARG"
+		fn_test_ip "$v_IP_ADDRESS" "$v_ARG"
 	elif [[ "$v_ARG" == "--string" ]]; then
 		c=$(( c + 1 ))
 		a_CURL_STRING[${#a_CURL_STRING[@]}]="${a_ARGS2[$c]}"
@@ -460,7 +456,7 @@ for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
 		fi
 	elif [[ "$v_ARG" == "--output-file" || "$v_ARG" == "--outfile" ]]; then
 		c=$(( $c + 1 ))
-		fn_test_file "${a_ARGS2[$c]}" false true; v_OUTPUT_FILE="$v_RESULT"
+		v_OUTPUT_FILE="${a_ARGS2[$c]}"
 		if [[ -z "$v_OUTPUT_FILE" ]]; then
 			echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
 			exit 1
@@ -497,7 +493,6 @@ elif [[ "$v_RUN_TYPE" == "--kill" ]]; then
 			exit 1
 		fi
 		touch "$d_WORKING"/$v_CHILD_PID/die
-		##### Is there a way to kill and save a single job?
 		echo "The child process will exit shortly."
 		exit 0
 	elif [[ "$v_SAVE_JOBS" == true ]]; then
@@ -506,7 +501,6 @@ elif [[ "$v_RUN_TYPE" == "--kill" ]]; then
 	touch "$d_WORKING"/die
 	exit 0
 elif [[ "$v_RUN_TYPE" == "--modify" || "$v_RUN_TYPE" == "-m" ]]; then
-	##### Modify can take a process ID, but what to do with it is not implimented yet
 	source "$d_PROGRAM"/includes/modify.shf
 	fn_modify
 elif [[ "$v_RUN_TYPE" == "--list" || "$v_RUN_TYPE" == "-l" ]]; then

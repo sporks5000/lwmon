@@ -1,9 +1,10 @@
 #! /bin/bash
 
 function fn_remove_unnecessary_functions {
-### The only functions we need to keep are fn_read_conf, fn_check_mail_binary
+### dump all of the functions that we won't need in order to keep the master process as lightweight as possible
 	fn_debug "fn_remove_unnecessary_functions"
-	### Functions from ,aster.shf
+	##### Go back through and make sure that I'm getting rid of all of the functions I don't wat
+	### Functions from master.shf
 	unset -f fn_remove_unnecessary_functions
 
 	### Functions from ./lwmon.sh
@@ -19,10 +20,7 @@ function fn_remove_unnecessary_functions {
 	unset -f fn_test_flag_with_run
 
 	### Functions from mutual.shf
-	### "fn_read_conf" and "fn_check_mail_binary" need to be kept
-	unset -f fn_fix_home
 	unset -f fn_update_conf
-	unset -f fn_test_file
 	unset -f fn_convert_seconds
 	unset -f fn_start_script
 	unset -f fn_use_wget
@@ -55,54 +53,42 @@ function fn_master {
 	trap fn_master_exit SIGINT SIGTERM SIGKILL
 	fn_remove_unnecessary_functions
 	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
-	### Get rid of the save file (if there is one).
-	if [[ -f "$d_WORKING"/save ]]; then
-		rm -f "$d_WORKING"/save
-	fi
+
+	### Get rid of the save file and no_output file from the previous session.
+	rm -f "$d_WORKING"/save "$d_WORKING"/no_output
+
 	v_TIMESTAMP_FIVE_MINUTES=0
 	v_TIMESTAMP_THIRTY_MINUTES=0
+	v_TIMESTAMP_THIRTY_SECONDS=0
 	if [[ "$v_WGET_BIN" == "false" ]]; then
-		if [[ -n "$v_DEFAULT_REMOTE_DIE_LIST" ]]; then
-			"$v_CURL_BIN" -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$d_WORKING"/die_list 2> /dev/null
-		fi
+		DONOTHING=true #####
 		##### We used to check for the most up-to-date version here. need to re-impliment this
 	else
-		if [[ -n "$v_DEFAULT_REMOTE_DIE_LIST" ]]; then
-			"$v_WGET_BIN" -q --timeout=10 -O "$d_WORKING"/die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
-		fi
+		DONOTHING=true #####
 		##### We used to check for the most up-to-date version here. need to re-impliment this
 	fi
 	##### I removed all of the old version checking routines, but I'll need to create new ones
-	fn_check_mail_binary
-	if [[ "$v_SEND_MAIL" == false ]]; then
-		echo
-		echo -e "\e[1;31mThe \"mail\" binary needs to be installed for lwmon to perform some of its functions. Monitoring jobs will not be able to send email allerts regarding changes of status.\e[00m"
-		echo
-	fi
 	echo "$( date +%F" "%T" "%Z ) - [$$] - Starting the Master Process" >> "$v_LOG"
 	while [[ 1 == 1 ]]; do
-		### Every two seconds, check if we need to re-read the master conf
-		if [[ -z "$v_MASTER_RELOAD" || "$( stat --format=%Y "$f_CONF" )" -gt "$v_MASTER_RELOAD" ]]; then
-			v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
-			fn_read_master_conf master
+		local v_DATE="$( date +%s )"
+
+		### Every thirty seconds, check if we need to re-read the master conf
+		if [[ $(( v_DATE - 30 )) -gt "$v_TIMESTAMP_THIRTY_SECONDS" ]]; then
+			v_TIMESTAMP_THIRTY_SECONDS="$v_DATE"
+			local v_MASTER_CUR="$( stat --format=%Y "$f_CONF" )"
+			if [[ "$v_MASTER_CUR" -gt "$v_MASTER_RELOAD" ]]; then
+				v_MASTER_RELOAD="$v_MASTER_CUR"
+				fn_read_master_conf master
+			fi
 		fi
 
-		### Every thirty minutes check to see what the current IP address is (thanks to VPN, this can change).
-		##### Checking for the local IP is necessary for the die list. Let's get rid of all of that
-		if [[ $(( $( date +%s ) - 1800 )) -gt "$v_TIMESTAMP_THIRTY_MINUTES" ]]; then
-			v_TIMESTAMP_THIRTY_MINUTES="$( date +%s )"
-			if [[ "$v_WGET_BIN" == "false" ]]; then
-				v_LOCAL_IP="$( "$v_CURL_BIN" -Lsm 10 http://ip.liquidweb.com/ 2> /dev/null )"
-			else
-				v_LOCAL_IP="$( "$v_WGET_BIN" -q --timeout=10 -O /dev/null http://ip.liquidweb.com/ 2> /dev/null )"
-			fi
-			if [[ -z "$v_LOCAL_IP" ]]; then
-				v_LOCAL_IP="Not_Found"
-			fi
+		### Every thirty minutes get rid of the files for processes that ended greater than seven days ago
+		if [[ $(( v_DATE - 1800 )) -gt "$v_TIMESTAMP_THIRTY_MINUTES" ]]; then
+			v_TIMESTAMP_THIRTY_MINUTES="$v_DATE"
 			### Also, let's do getting rid of old processes here - there's no reason to do that every two seconds, and this already runs every half hour, so there's no need to create a separate timer for that.
 			for v_OLD_CHILD in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^old_[0-9]+_[0-9]+$" ); do
 				if [[ $( echo "$v_OLD_CHILD" | grep -E -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
-					if [[ $(( $( date +%s ) - $( echo "$v_OLD_CHILD" | cut -d "_" -f3 ) )) -gt 604800 ]]; then
+					if [[ $(( v_DATE - $( echo "$v_OLD_CHILD" | cut -d "_" -f3 ) )) -gt 604800 ]]; then
 						### 604800 seconds = seven days.
 						fn_read_child_params_lite "$d_WORKING"/"$v_OLD_CHILD"/params
 						echo "$( date +%F" "%T" "%Z ) - [$( echo "$v_OLD_CHILD" | cut -d "_" -f2)] - $v_JOB_TYPE $v_JOB_NAME - Child process dead for seven days. Deleting backed up data." >> "$v_LOG"
@@ -112,21 +98,9 @@ function fn_master {
 			done
 		fi
 
-		### Every five minutes, check a remote list to see if lwmon should be stopped, and check to see if old processes need to be backed up.
-		if [[ $(( $( date +%s ) - 300 )) -gt "$v_TIMESTAMP_FIVE_MINUTES" ]]; then
-			v_TIMESTAMP_FIVE_MINUTES="$( date +%s )"
-			##### I need to get rid of the remote die list
-			if [[ -n "$v_DEFAULT_REMOTE_DIE_LIST" && "$v_WGET_BIN" == "false" ]]; then
-				"$v_CURL_BIN" -Lsm 10 "$v_DEFAULT_REMOTE_DIE_LIST" > "$d_WORKING"/die_list 2> /dev/null
-			elif [[ -n $v_DEFAULT_REMOTE_DIE_LIST ]]; then
-				"$v_WGET_BIN" -q --timeout=10 -O "$d_WORKING"/die_list "$v_DEFAULT_REMOTE_DIE_LIST" 2> /dev/null
-			fi
-			if [[ $( grep -E -c "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$d_WORKING"/die_list ) -gt 0 ]]; then
-				touch "$d_WORKING"/die
-				touch "$d_WORKING"/save
-				echo "$( date +%F" "%T" "%Z ) - [$$] - Local IP found on remote list. The line reads \"$( grep -E "^[[:blank:]]*$v_LOCAL_IP[[:blank:]]*(#.*)*$" "$d_WORKING"/die_list | head -n1 )\". Process ended." >> "$v_LOG"
-				fn_master_exit 1
-			fi
+		### Every five minutes, make surethat the directories for child processes are ACTUALLY associated with running child processes
+		if [[ $(( v_DATE - 300 )) -gt "$v_TIMESTAMP_FIVE_MINUTES" ]]; then
+			v_TIMESTAMP_FIVE_MINUTES="$v_DATE"
 			### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
 			for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^[0-9]+$" ); do
 				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon_child.sh[[:blank:]]" ) -eq 0 ]]; then
@@ -134,7 +108,7 @@ function fn_master {
 					if [[ ! -f "$d_WORKING"/"$v_CHILD_PID/die" ]]; then
 						fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 						echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME - Child process was found dead. Restarting with new PID." >> "$v_LOG"
-						v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+						v_NEW_JOB="$v_DATE""_$RANDOM.job"
 						cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"new/$v_NEW_JOB.job"
 						if [[ -f "$d_WORKING"/"$v_CHILD_PID"/log ]]; then
 							### If there's a log file, let's keep that too.
@@ -142,7 +116,7 @@ function fn_master {
 						fi
 					fi
 					### Regardless of whether or not it's been marked to die, back it up.
-					v_TIMESTAMP="$( date +%s )"
+					v_TIMESTAMP="$v_DATE"
 					mv "$d_WORKING"/"$v_CHILD_PID" "$d_WORKING"/"old_""$v_CHILD_PID""_""$v_TIMESTAMP"
 				fi
 			done

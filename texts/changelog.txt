@@ -4,7 +4,6 @@ Future Versions -
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
     - Switch to using local variables where possible
-    - Have data on the last hour, last four hours, last 24 hours
 
 3.0.0 (DATE) -
     - Split lwmon up into multiple files
@@ -19,6 +18,14 @@ Future Versions -
     - Revised how variables are pulled from the configuration and the params files
     - Fixed a bug where resetting the end time on an old child directory would not function as expected
     - A sane version of the params file is re-written every time it is updated
+    - Replaced the "ALT_MAIL" directive with "MAIL_COMMAND", which offers more flexibility
+    - The values of the "MAIL_COMMAND" and "SCRIPT" directives are now parsed and ran by eval
+        - They will not be populated unless the files they're being pulled from have 600 permissions
+    - Removed anything related to the remote die list. It was a dumb idea from the start
+    - Fixed fn_parse_server so that it wasn't running "dig" every time it was called
+    - Added "CUSTOM_MESSAGE" to the main config
+    - Added "HTML_FILES_KEPT" to the "url" params file
+    - Fixed a bug where the previous verbose output was being overwritten
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified
@@ -28,10 +35,10 @@ Future Versions -
 
 2.3.8 (2018-08-02) -
     - "--curl" is now synonymous with "--url"
-    - Fixed a bug where shild processes were not dying when being told to
+    - Fixed a bug where child processes were not dying when being told to
     - Fixed a bug where URLs with arguments might be interpreted incorrectly due to poor quoting
     - Fixed a bug where wonky DNS resolvers could result in false negatives under circumstances where an IP was not specified
-    - Changed all instances of "grep" to "egrep"
+    - Changed all instances of "egrep" to "grep -E"
     - Custom messages can now be set in the master configuration file
     - "CURL VERBOSE" now also outputs the curl command and all command line arguments as it was ran
     - The commented out lines in child parameters files now include what the default value would have been

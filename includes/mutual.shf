@@ -10,20 +10,6 @@ function fn_debug {
 	fi
 }
 
-function fn_fix_home {
-### This function ensures that if a file begins with "~/" The file name is expanded appropriately.
-### It expects $1 to be the name of a file
-	fn_debug "fn_fn_fix_home"
-	local v_RESULT="$1"
-	if [[ "${v_RESULT:0:2}" == "~/" && -n "$HOME" ]]; then
-		v_RESULT="$HOME""${v_RESULT:1}"
-	elif [[ "${v_RESULT:0:2}" == "~/" ]]; then
-		echo "No \$HOME variable set. Cannot correct paths beginning with \"~/\"." > /dev/stderr
-		exit 1
-	fi
-	echo "$v_RESULT"
-}
-
 function fn_update_conf {
 ### This function updates a value in the conf file. It expects $1 to be the name of the directive, $2 to be the new value for that directive, and $3 to be the name of the conf file.
 	fn_debug "fn_update_conf"
@@ -45,46 +31,6 @@ function fn_update_conf {
 		else
 			echo "$1 = $v_MODIFIED_2" >> "$v_CONF_FILE"
 		fi
-	fi
-}
-
-function fn_test_file {
-### This function expects $1 to be the path to a file, $2 to be true or false whether the file needs to be tested for read permission, and $3 to be true or false whether the file needs to be tested for write permission.
-	fn_debug "fn_test_file"
-	v_RESULT="$1"
-	if [[ -n "$v_RESULT" ]]; then 
-		if [[ -n "$HOME" && "${v_RESULT:0:2}" == "~/" ]]; then
-			v_RESULT="$HOME""${v_RESULT:1}"
-		fi
-		if [[ ${v_RESULT:0:1} == "/" && "$3" == true && "$2" != true ]]; then
-			touch "$v_RESULT" 2> /dev/null
-			v_STATUS="$?"
-			if [[ ! -e "$v_RESULT" || ! -w "$v_RESULT" || "$v_STATUS" == 1 ]]; then
-				unset v_RESULT
-			fi
-		elif [[ "${v_RESULT:0:1}" == "/" && "$3" != true && "$2" == true ]]; then
-			tail -n1 "$v_RESULT" 2> /dev/null
-			v_STATUS="$?"
-			if [[ ! -e "$v_RESULT" || ! -r "$v_RESULT" || "$v_STATUS" == 1 ]]; then
-				unset v_RESULT
-			fi
-		elif [[ "${v_RESULT:0:1}" == "/" && "$3" == true && "$2" == true ]]; then
-			touch "$v_RESULT" 2> /dev/null
-			v_STATUS="$?"
-			if [[ ! -e "$v_RESULT" || ! -w "$v_RESULT" || "$v_STATUS" == 1 ]]; then
-				unset v_RESULT
-			else
-				tail -n1 "$v_RESULT" 2> /dev/null
-				v_STATUS="$?"
-				if [[ ! -e "$v_RESULT" || ! -r "$v_RESULT" || "$v_STATUS" == 1 ]]; then
-					unset v_RESULT
-				fi
-			fi
-		elif [[ "${v_RESULT:0:1}" != "/" ]]; then
-			unset v_RESULT
-		fi
-	else
-		unset v_RESULT
 	fi
 }
 
@@ -132,45 +78,73 @@ function fn_use_wget {
 	v_CURL_BIN="false"
 }
 
+function fn_sanitize {
+### Given a variable that we're going to run through an egrep, escape all special characters
+	v_OUTPUT="${1//\\/\\\\}"
+	v_OUTPUT="${v_OUTPUT//\*/\\*}"
+	v_OUTPUT="${v_OUTPUT//\./\\.}"
+	v_OUTPUT="${v_OUTPUT//[/\\[}"
+	v_OUTPUT="${v_OUTPUT//|/\\|}"
+	v_OUTPUT="${v_OUTPUT//\?/\\?}"
+	v_OUTPUT="${v_OUTPUT//\(/\\(}"
+	v_OUTPUT="${v_OUTPUT//)/\\)}"
+	v_OUTPUT="${v_OUTPUT//$/\\$}"
+	v_OUTPUT="${v_OUTPUT//+/\\+}"
+	v_OUTPUT="${v_OUTPUT//^/\\^}"
+	v_OUTPUT="${v_OUTPUT//{/\\{}"
+	echo -n "$v_OUTPUT"
+}
+
 function fn_parse_server {
-##### I'm sure I can do this better
 ### This function assumes that $1 is a URL, Domain name, or IP address. It then parses those out into the variables $v_CURL_URLa, $v_DOMAINa, $v_IP_ADDRESSa, and $v_SERVER_PORTa.
+### Optional: $2 can be "url", "domain", "port", or "ip". the function will exit after capturing the requested value
 	fn_debug "fn_parse_server"
-	if [[ -z $1 || "$1" == "false" ]]; then
-		unset v_SERVER
-		v_CURL_URLa="false"
-		v_DOMAINa="false"
-		v_IP_ADDRESSa="false"
-		v_SERVER_PORTa="false"
+	local v_SERVER="$1"
+	local v_TYPE=
+	if [[ -n "$2" ]]; then
+		v_TYPE="$2"
+	fi
+
+	v_CURL_URLa="false"
+	v_DOMAINa="false"
+	v_IP_ADDRESSa="false"
+	v_SERVER_PORTa="false"
+	if [[ -z "$v_SERVER" || "$v_SERVER" == "false" ]]; then
 		return
 	fi
-	local v_PASSED="$1"
-	if [[ -n "$1" && -z "$v_SERVER" ]]; then
-		v_SERVER="$1"
-	fi
-	if [[ $( echo "$v_SERVER" | grep -E -ci "^HTTP" ) -eq 0 ]]; then
+
+	###Find basic details
+	local v_UPPER="${v_SERVER^^}"
+	if [[ "${v_UPPER:0:4}" != "HTTP" ]]; then
 	### If what's passed doesn't start with http or https, we can straight away assume that it's on port 80
 		v_DOMAINa="$v_SERVER"
 		v_CURL_URLa="$v_SERVER"
 		v_SERVER_PORTa="80"
 	else
 		### For the domain, get rid of "http(s)" at the beginning
-		v_DOMAINa="$( echo "$v_SERVER" | sed -e "s/^[Hh][Tt][Tt][Pp][Ss]*:\/\///" )"
-		if [[ $( echo "$v_SERVER "| grep -E -ci "^HTTPS" ) -eq 1 ]]; then
+		if [[ "${v_UPPER:0:5}" == "HTTPS" ]]; then
 		### If it starts with https, assume port 443 and don't strip out the protocol from the URL
+			v_DOMAINa="${v_SERVER:8}"
 			v_CURL_URLa="$v_SERVER"
 			v_SERVER_PORTa="443"
 		else
 		### Otherwise assume port 80, and we don't need the protocol in the URL
-			v_CURL_URLa="$( echo "$v_SERVER" | sed -e "s/^[Hh][Tt][Tt][Pp]:\/\///" )"
+			v_DOMAINa="${v_SERVER:7}"
+			v_CURL_URLa="$v_SERVER"
 			v_SERVER_PORTa="80"
 		fi
 	fi
-	unset v_SERVER
+	if [[ "$v_TYPE" == "url" ]]; then
+		if [[ "$b_DEBUG2" == true ]]; then
+			echo -e "PASSED:     $1\nCURL_URL:   $v_CURL_URLa\n"
+		fi
+		return
+	fi
+
 	### At this point in the script, we have the beginnings of a domain, a curl URL and a port
 	### for the domain: get rid of the slash and anything else that follows the domain name
-	v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/^\([^/]*\).*$/\1/' )"
-	v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/[\xef\xbb\xbf]//g' )" ### <- Apparently billing is sometimes throwing special characters when you copy.
+	v_DOMAINa="${v_DOMAINa%%/*}"
+#	v_DOMAINa="$( echo "$v_DOMAINa" | sed 's/[\xef\xbb\xbf]//g' )" ### <- Apparently billing is sometimes throwing special characters when you copy
 	### If the domain contains a closing square bracket followed by a colon, then numbers, then the end of the string, it's likely an ipv6 address with a port on the end
 	if [[ $( echo "$v_DOMAINa" | grep -E -c "]:[0-9]+$" ) -ne 0 ]]; then
 		v_SERVER_PORTa="$( echo "$v_DOMAINa" | sed "s/^.*]:\([0-9][0-9]*\)$/\1/" )"
@@ -178,14 +152,34 @@ function fn_parse_server {
 	### Note: the regex here only covers IPv6 addresses.
 	elif [[ $( echo "$v_DOMAINa" | grep -E -c ":[0-9]+$" ) -ne 0 && $( echo "$v_DOMAINa" | grep -E -c "^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$" ) -eq 0 ]]; then
 	### If it doesn't match the above but it contains a colon, then numbers, then the end of the string, but is not a valid IPv6 address...
-		v_SERVER_PORTa="$( echo "$v_DOMAINa" | sed "s/^.*:\([0-9][0-9]*\)$/\1/" )"
-		v_DOMAINa="$( echo "$v_DOMAINa" | sed "s/^\(.*\):[0-9][0-9]*$/\1/" )"
+		v_SERVER_PORTa="${v_DOMAINa##*:}"
+		v_DOMAINa="${v_DOMAINa%%:*}"
 	fi
+	if [[ "$v_TYPE" == "domain" ]]; then
+		if [[ "$b_DEBUG2" == true ]]; then
+			echo -e "PASSED:     $1\nCURL_URL:   $v_CURL_URLa\nDOMAIN:     $v_DOMAINa\n"
+		fi
+		return
+	fi
+
+	### If there was a port specified at the command line, let's use that.
+	if [[ -n "$v_CL_PORT" ]]; then
+		v_SERVER_PORTa="$v_CL_PORT"
+	elif [[ "$v_RUN_TYPE" == "--ssh-load" ]]; then
+		v_SERVER_PORTa="22"
+	fi
+	if [[ "$v_TYPE" == "port" ]]; then
+		if [[ "$b_DEBUG2" == true ]]; then
+			echo -e "PASSED:     $1\nCURL_URL:   $v_CURL_URLa\nDOMAIN:     $v_DOMAINa\nPORT:       $v_SERVER_PORTa\n"
+		fi
+		return
+	fi
+
 	### check if it's an IP. The following should match all IPv4 and IPv6 addresses
 	if [[ $( echo "$v_DOMAINa" | grep -E -c "^((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$" ) -eq 0 ]]; then
 	### If it doesn't look like an IP address, let's find out what the IP address REALLY is
 		### Let's start by checking the hosts file
-		v_DOMAINa_EGREP_SAFE="$( echo "$v_DOMAINa" | sed 's/[]\.|$(){}?+*^]/\\&/g' )"
+		local v_DOMAINa_EGREP_SAFE="$( fn_sanitize "$v_DOMAINa" )"
 		if [[ $( sed "s/#.*$//" /etc/hosts | grep -E -c "[[:blank:]]$v_DOMAINa_EGREP_SAFE([[:blank:]]|$)" ) -gt 0 ]]; then
 			v_IP_ADDRESSa="$( sed "s/#.*$//" /etc/hosts | grep -E "[[:blank:]]$v_DOMAINa_EGREP_SAFE([[:blank:]]|$)" | tail -n1 | awk '{print $1}' )"
 		else
@@ -199,37 +193,8 @@ function fn_parse_server {
 	else
 		v_IP_ADDRESSa="$v_DOMAINa"
 	fi
-	### If there was a port specified at the command line, let's use that.
-	if [[ -n "$v_CL_PORT" ]]; then
-		v_SERVER_PORTa="$v_CL_PORT"
-	elif [[ "$v_RUN_TYPE" == "--ssh-load" ]]; then
-		v_SERVER_PORTa="22"
-	fi
-	### The line below can be uncommented to test this function.
-	# echo -e "PASSED:     $v_PASSED\nCURL_URL:   $v_CURL_URLa\nDOMAIN:     $v_DOMAINa\nIP_ADDRESS: $v_IP_ADDRESSa\nPORT:       $v_SERVER_PORTa\n"; exit
-}
-
-function fn_check_mail_binary {
-	### Check to see if an alternate mail binary has been set
-	fn_debug "fn_check_mail_binary"
-	a_MAIL_BIN=()
-	for word in $( echo "$v_ALT_MAIL" ); do
-		a_ALT_MAIL[${#a_ALT_MAIL[@]}]="$word"
-	done
-	unset v_ALT_MAIL
-	if [[ -z ${a_ALT_MAIL[0]} || ! -x "${a_ALT_MAIL[0]}" ]]; then
-		unset a_ALT_MAIL
-		if [[ -z $( which mail 2> /dev/null ) ]]; then
-			v_SEND_MAIL=false
-		else
-			v_SEND_MAIL=true
-			a_MAIL_BIN=( "$( which mail 2> /dev/null )" )
-		fi
-	else
-		v_SEND_MAIL=true
-		##### I'm sure that I've tested to verify that this works... but I want to double check those tests. Might be better to just use eval.
-		##### And if that's the case, is this function actually even necessary anymore?
-		a_MAIL_BIN=( "${a_ALT_MAIL[@]}" )
+	if [[ "$b_DEBUG2" == true ]]; then
+		echo -e "PASSED:     $1\nCURL_URL:   $v_CURL_URLa\nDOMAIN:     $v_DOMAINa\nIP_ADDRESS: $v_IP_ADDRESSa\nPORT:       $v_SERVER_PORTa\n"
 	fi
 }
 
@@ -240,6 +205,8 @@ function fn_make_params {
 	else
 		return
 	fi
+	touch "$f_JOB"
+	chmod 600 "$f_JOB"
 	echo "JOB_TYPE = $v_JOB_TYPE" > "$f_JOB"
 	if [[ -n "$v_IDENT" ]]; then
 		v_ORIG_JOB_NAME="$v_ORIG_JOB_NAME $v_IDENT"
@@ -258,18 +225,18 @@ function fn_make_params {
 			echo "CURL_STRING = ${a_CURL_STRING[$i]}" >> "$f_JOB"
 			i=$(( $i + 1 ))
 		done
-		if [[ -z "$v_USER_AGENT" ]]; then
-			echo "#USER_AGENT = $v_MASTER_USER_AGENT" >> "$f_JOB"
+		if [[ -z "$v_USER_AGENT_PREEDIT" ]]; then
+			echo "# USER_AGENT = $v_MASTER_USER_AGENT" >> "$f_JOB"
 		else
-			echo "USER_AGENT = $v_USER_AGENT" >> "$f_JOB"
+			echo "USER_AGENT = $v_USER_AGENT_PREEDIT" >> "$f_JOB"
 		fi
-		if [[ "$v_IP_ADDRESS" != "false" ]]; then
-			echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$f_JOB"
+		if [[ "$v_IP_ADDRESS" == "false" ]]; then
+			echo "# IP_ADDRESS = " >> "$f_JOB"
 		else
-			echo "#IP_ADDRESS = " >> "$f_JOB"
+			echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$f_JOB"
 		fi
 		if [[ -z "$v_USE_WGET" ]]; then
-			echo "#USE_WGET = $v_MASTER_USE_WGET" >> "$f_JOB"
+			echo "# USE_WGET = $v_MASTER_USE_WGET" >> "$f_JOB"
 		else
 			echo "USE_WGET = $v_USE_WGET" >> "$f_JOB"
 		fi
@@ -278,41 +245,46 @@ function fn_make_params {
 			v_LOG_HTTP_CODE="false"
 		fi
 		if [[ -z "$v_CURL_VERBOSE" ]]; then
-			echo "#CURL_VERBOSE = $v_MASTER_CURL_VERBOSE" >> "$f_JOB"
+			echo "# CURL_VERBOSE = $v_MASTER_CURL_VERBOSE" >> "$f_JOB"
 		else
 			echo "CURL_VERBOSE = $v_CURL_VERBOSE" >> "$f_JOB"
 		fi
 		if [[ -z "$v_LOG_HTTP_CODE" ]]; then
-			echo "#LOG_HTTP_CODE = $v_MASTER_LOG_HTTP_CODE" >> "$f_JOB"
+			echo "# LOG_HTTP_CODE = $v_MASTER_LOG_HTTP_CODE" >> "$f_JOB"
 		else
 			echo "LOG_HTTP_CODE = $v_LOG_HTTP_CODE" >> "$f_JOB"
 		fi
+		if [[ -z "$v_HTML_FILES_KEPT" ]]; then
+			echo "# HTML_FILES_KEPT = $v_MASTER_HTML_FILES_KEPT" >> "$f_JOB"
+		else
+			echo "HTML_FILES_KEPT = $v_HTML_FILES_KEPT" >> "$f_JOB"
+		fi
 	elif [[ "$v_JOB_TYPE" == "dns" ]]; then
 		echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$f_JOB"
-		if [[ -n "$v_DNS_CHECK_RESULT" ]]; then
-			echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$f_JOB"
+		if [[ -z "$v_DNS_CHECK_RESULT" ]]; then
+			echo "# DNS_CHECK_RESULT = " >> "$f_JOB"
 		else
-			echo "#DNS_CHECK_RESULT = " >> "$f_JOB"
+			echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$f_JOB"
 		fi
 		if [[ -z "$v_DNS_RECORD_TYPE" ]]; then
-			echo "#DNS_RECORD_TYPE = $v_MASTER_DNS_RECORD_TYPE" >> "$f_JOB"
+			echo "# DNS_RECORD_TYPE = $v_MASTER_DNS_RECORD_TYPE" >> "$f_JOB"
 		else
 			echo "DNS_RECORD_TYPE = $v_DNS_RECORD_TYPE" >> "$f_JOB"
 		fi
 	elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
 		if [[ -z "$v_SERVER_PORT" ]]; then
-			echo "#SERVER_PORT = $v_MASTER_SERVER_PORT" >> "$f_JOB"
+			echo "# SERVER_PORT = $v_MASTER_SERVER_PORT" >> "$f_JOB"
 		else
 			echo "SERVER_PORT = $v_SERVER_PORT" >> "$f_JOB"
 		fi
 		echo "SSH_USER = $v_SSH_USER" >> "$f_JOB"
 		if [[ -z "$v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" ]]; then
-			echo "#MIN_LOAD_PARTIAL_SUCCESS = $v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" >> "$f_JOB"
+			echo "# MIN_LOAD_PARTIAL_SUCCESS = $v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" >> "$f_JOB"
 		else
 			echo "MIN_LOAD_PARTIAL_SUCCESS = $v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
 		fi
-		if [[ -z "$v_MIN_LOAD_FAILURE" ]]; then
-			echo "#MIN_LOAD_FAILURE = $v_MASTER_MIN_LOAD_FAILURE" >> "$f_JOB"
+		if [[ -z "$v_MIN_LOAD_FAILURE_PREEDIT" ]]; then
+			echo "# MIN_LOAD_FAILURE = $v_MASTER_MIN_LOAD_FAILURE" >> "$f_JOB"
 		else
 			echo "MIN_LOAD_FAILURE = $v_MIN_LOAD_FAILURE_PREEDIT" >> "$f_JOB"
 		fi
@@ -320,13 +292,13 @@ function fn_make_params {
 
 
 	if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS" ]]; then
-			echo "#CHECK_TIME_PARTIAL_SUCCESS = $v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" >> "$f_JOB"
+		if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" ]]; then
+			echo "# CHECK_TIME_PARTIAL_SUCCESS = $v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" >> "$f_JOB"
 		else
 			echo "CHECK_TIME_PARTIAL_SUCCESS = $v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
 		fi
 		if [[ -z "$v_CHECK_TIMEOUT" ]]; then
-			echo "#CHECK_TIMEOUT = $v_MASTER_CHECK_TIMEOUT" >> "$f_JOB"
+			echo "# CHECK_TIMEOUT = $v_MASTER_CHECK_TIMEOUT" >> "$f_JOB"
 		else
 			echo "CHECK_TIMEOUT = $v_CHECK_TIMEOUT" >> "$f_JOB"
 		fi
@@ -335,57 +307,57 @@ function fn_make_params {
 		echo "DOMAIN = $v_DOMAIN" >> "$f_JOB"
 	fi
 	if [[ -z "$v_WAIT_SECONDS" ]]; then
-		echo "#WAIT_SECONDS = $v_MASTER_WAIT_SECONDS" >> "$f_JOB"
+		echo "# WAIT_SECONDS = $v_MASTER_WAIT_SECONDS" >> "$f_JOB"
 	else
 		echo "WAIT_SECONDS = $v_WAIT_SECONDS" >> "$f_JOB"
 	fi
 	if [[ -z "$v_EMAIL_ADDRESS" ]]; then
-		echo "#EMAIL_ADDRESS = $v_MASTER_EMAIL_ADDRESS" >> "$f_JOB"
+		echo "# EMAIL_ADDRESS = $v_MASTER_EMAIL_ADDRESS" >> "$f_JOB"
 	else
 		echo "EMAIL_ADDRESS = $v_EMAIL_ADDRESS" >> "$f_JOB"
 	fi
 	if [[ -z "$v_MAIL_DELAY" ]]; then
-		echo "#MAIL_DELAY = $v_MASTER_MAIL_DELAY" >> "$f_JOB"
+		echo "# MAIL_DELAY = $v_MASTER_MAIL_DELAY" >> "$f_JOB"
 	else
 		echo "MAIL_DELAY = $v_MAIL_DELAY" >> "$f_JOB"
 	fi
 	if [[ -z "$v_VERBOSITY" ]]; then
-		echo "#VERBOSITY = $v_MASTER_VERBOSITY" >> "$f_JOB"
+		echo "# VERBOSITY = $v_MASTER_VERBOSITY" >> "$f_JOB"
 	else
 		echo "VERBOSITY = $v_VERBOSITY" >> "$f_JOB"
 	fi
 	if [[ -z "$v_OUTPUT_FILE" ]]; then
-		echo "#OUTPUT_FILE = $v_MASTER_OUTPUT_FILE" >> "$f_JOB"
+		echo "# OUTPUT_FILE = $v_MASTER_OUTPUT_FILE" >> "$f_JOB"
 	else
 		echo "OUTPUT_FILE = $v_OUTPUT_FILE" >> "$f_JOB"
 	fi
 	if [[ -z "$v_CUSTOM_MESSAGE" ]]; then
-		echo "#CUSTOM_MESSAGE = $v_MASTER_CUSTOM_MESSAGE" >> "$f_JOB"
+		echo "# CUSTOM_MESSAGE = $v_MASTER_CUSTOM_MESSAGE" >> "$f_JOB"
 	else
 		echo "CUSTOM_MESSAGE = $v_CUSTOM_MESSAGE" >> "$f_JOB"
 	fi
 	if [[ -z "$v_LOG_DURATION_DATA" ]]; then
-		echo "#LOG_DURATION_DATA = $v_MASTER_LOG_DURATION_DATA" >> "$f_JOB"
+		echo "# LOG_DURATION_DATA = $v_MASTER_LOG_DURATION_DATA" >> "$f_JOB"
 	else
 		echo "LOG_DURATION_DATA = $v_LOG_DURATION_DATA" >> "$f_JOB"
 	fi
 	if [[ -z "$v_NUM_DURATIONS_RECENT" ]]; then
-		echo "#NUM_DURATIONS_RECENT = $v_MASTER_NUM_DURATIONS_RECENT" >> "$f_JOB"
+		echo "# NUM_DURATIONS_RECENT = $v_MASTER_NUM_DURATIONS_RECENT" >> "$f_JOB"
 	else
 		echo "NUM_DURATIONS_RECENT = $v_NUM_DURATIONS_RECENT" >> "$f_JOB"
 	fi
 	if [[ -z "$v_NUM_STATUSES_RECENT" ]]; then
-		echo "#NUM_STATUSES_RECENT = $v_MASTER_NUM_STATUSES_RECENT" >> "$f_JOB"
+		echo "# NUM_STATUSES_RECENT = $v_MASTER_NUM_STATUSES_RECENT" >> "$f_JOB"
 	else
 		echo "NUM_STATUSES_RECENT = $v_NUM_STATUSES_RECENT" >> "$f_JOB"
 	fi
 	if [[ -z "$v_NUM_STATUSES_NOT_SUCCESS" ]]; then
-		echo "#NUM_STATUSES_NOT_SUCCESS = $v_MASTER_NUM_STATUSES_NOT_SUCCESS" >> "$f_JOB"
+		echo "# NUM_STATUSES_NOT_SUCCESS = $v_MASTER_NUM_STATUSES_NOT_SUCCESS" >> "$f_JOB"
 	else
 		echo "NUM_STATUSES_NOT_SUCCESS = $v_NUM_STATUSES_NOT_SUCCESS" >> "$f_JOB"
 	fi
 	if [[ -z "$v_SCRIPT" ]]; then
-		echo "#SCRIPT = " >> "$f_JOB"
+		echo "# SCRIPT = " >> "$f_JOB"
 	else
 		echo "SCRIPT = $v_SCRIPT" >> "$f_JOB"
 	fi

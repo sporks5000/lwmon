@@ -3,6 +3,13 @@ PARAMETERS FILE (located at ".lwmon/[CHILD PID]/params")
 
 The "params" file contains the specifics of an LWmon job. Any lwmon.sh job that is currently running can be changed mid-run by editing the params file - this file can be accessed manually, or by using the "--modify" flag. The purpose of this document is to explain each variable in the params file and what it does. 
 
+Any line within the params file that begins with a "#" will be ignored.
+
+Any time the params file is changed, it will be read by the child process, then rebuilt so that the user will always be presented with a "sane" version of the file.
+
+
+PARAMS FILE DIRECTIVES:
+
 "CHECK_TIME_PARTIAL_SUCCESS"
     - For "--url" and "--ssh-load" jobs, an amount of seconds beyond which the check is considered a partial success.
     - The point of this designation is to alert the user that there's something amiss, even though portions of the process seem to indicate that everything's okay.
@@ -41,6 +48,9 @@ The "params" file contains the specifics of an LWmon job. Any lwmon.sh job that 
 
 "EMAIL_ADDRESS"
     - This is the email address that messages regarding failed or successful checks will be sent to.
+
+"HTML_FILES_KEPT"
+    - For "--url" jobs, when ever there is a change in status, a copy of the html file is stored for reference. This directive allows the user to specify the number of html files to keep.
 
 "IP_ADDRESS"
     - For "--url" jobs, this will be "false" if an IP address has not been specified. Otherwise, it will contain the IP address that we're connecting to before telling the remote server the domain we're trying sending a request to.
@@ -86,13 +96,15 @@ The "params" file contains the specifics of an LWmon job. Any lwmon.sh job that 
     - This file HAS TO BE referenced by its full path.
 
 "SCRIPT"
-    - You can specify a script to be run at any time that an email would be sent (minus the requirements for having the "mail" binary present and having the "EMAIL_ADDRESS" parameter defined)
-    - You can include any arguments or flags that you would like the script to be run with. The final argument passed to the script specified will be one of the following arguments (depending on the type of email that would be sent):
+    - You can specify a script to be run at any time that an email would be sent (minus the requirement of having the "EMAIL_ADDRESS" parameter defined)
+    - This script will be parsed and ran using the "eval" command.
+    - For security purposes, if the params file does not have "600" permissions, the script specified will not be run. This is to prevent the potential of other users being able to chang the file in order to execute arbitrary commands.
+    - The variable "$v_RESULT" can be used in the command you specify. It will be pre-populated with one of the following values (depending on the type of email that would be sent):
         - "success"
         - "psuccess"
         - "intermittent"
         - "failure"
-    - The full path to the script must be used, and the script itself must be executable. If the path to the script contains any spaces, it's path will need to be quoted.
+    - If the path to the script contains any spaces, its path will need to be quoted.
 
 "SERVER_PORT"
     - For "--ssh-load" jobs, this is the port that's being connected to.
