@@ -152,9 +152,6 @@ function fn_modify_old_jobs {
 		less +G "$d_WORKING"/"$v_CHILD_PID/log"
 	elif [[ "$v_OPTION_NUM" == "5" ]]; then
 		echo
-		##### this will need to be updated to match however lwmon ends up being packaged
-		echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
-		echo "chmod +x ./lwmon.sh"
 		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
 		echo
 	elif [[ "$v_OPTION_NUM" == "6" && -n "$d_WORKING" && -n "$v_CHILD_PID" ]]; then
@@ -264,9 +261,6 @@ function fn_modify {
 		less +G "$d_WORKING"/"$v_CHILD_PID/log"
 	elif [[ "$v_OPTION_NUM" == "5" ]]; then
 		echo
-		##### this will need to be updated to match however lwmon ends up being packaged
-		echo "wget -O ./lwmon.sh http://lwmon.com/lwmon.sh"
-		echo "chmod +x ./lwmon.sh"
 		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
 		echo
 	elif [[ "$v_OPTION_NUM" == "6" ]]; then
@@ -290,4 +284,28 @@ function fn_modify {
 		echo "Exiting."
 	fi
 	exit 0
+}
+
+function fn_update_conf {
+### This function updates a value in the conf file. It expects $1 to be the name of the directive, $2 to be the new value for that directive, and $3 to be the name of the conf file.
+	fn_debug "fn_update_conf"
+	if [[ "$3" == "child" && -f "$d_WORKING"/"$v_CHILD_PID"/params ]]; then
+		v_CONF_FILE="$d_WORKING"/"$v_CHILD_PID"/params
+	elif [[ "$3" == "master" && -f "$f_CONF" ]]; then
+		v_CONF_FILE="$f_CONF"
+	else
+		v_CONF_FILE="$3"
+	fi
+	if [[ -f "$v_CONF_FILE" ]]; then
+		### We're about to run $2 through sed, so it needs to have all of its slashes escaped.
+		v_MODIFIED_2="$( echo "$2" | sed -e 's/[\/&]/\\&/g' )"
+		if [[ $( grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
+			sed -i "$( grep -E -n "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/\(^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
+		elif [[ $( grep -E -c "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*$" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
+		### If there's a commended-out line, but it doesn't have a value afterward...
+			sed -i "$( grep -E -n "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/^[[:blank:]]*##*\([[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
+		else
+			echo "$1 = $v_MODIFIED_2" >> "$v_CONF_FILE"
+		fi
+	fi
 }

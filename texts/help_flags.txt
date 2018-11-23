@@ -215,10 +215,6 @@ OTHER FLAGS:
 --modify
     - Prompts you with a list of currently running child processes and allows you to modify how they function and what they're checking against, or kill them off if they're no longer desired.
 
---testing
-##### I need to fix this functionality
-    - Requires that the minified version of the script be rebuilt for every new child process. This flag only has function when used to spawn the master process.
-
 --version
     - Outputs the current verson number.
     - If followed by the "--full" flag, outputs the full changelog.

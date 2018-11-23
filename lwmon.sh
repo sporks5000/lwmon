@@ -1,11 +1,13 @@
 #! /bin/bash
 
+#== Start LWmon ==#
+
 b_DEBUG=false
-b_DEBUG2=false
+b_DEBUG_FUNCTIONS=false
 
 ### determine where we're located
 function fn_locate {
-	if [[ "$b_DEBUG" == true ]]; then echo "$$ - $v_RUNNING_STATE: fn_locate" > /dev/stderr; fi
+	if [[ "$b_DEBUG_FUNCTIONS" == true ]]; then echo "$$: fn_locate" > /dev/stderr; fi
 	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
@@ -16,57 +18,25 @@ function fn_locate {
 fn_locate
 source "$d_PROGRAM"/includes/mutual.shf
 
-#================================#
-#== Functions that create jobs ==#
-#================================#
+##### Go through all of the functions in all of the files and determine what variables we can set as local
 
-
-
-#=====================#
-#== Child Functions ==#
-#=====================#
-
-### Here's an example to test the logic being used for port numbers:
-### v_CURL_URL="https://sporks5000.com:4670/index.php"; v_DOMAIN="sporks5000.com"; v_SERVER_PORT=8080; v_IP_ADDRESS="10.30.6.88"; if [[ $( echo $v_CURL_URL | grep -E -c "^(http://|https://)*$v_DOMAIN:[0-9][0-9]*" ) -eq 1 ]]; then echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN:[0-9][0-9]*/$v_IP_ADDRESS:$v_SERVER_PORT/"; else echo "curl $v_CURL_URL --header 'Host: $v_DOMAIN'" | sed "s/$v_DOMAIN/$v_IP_ADDRESS:$v_SERVER_PORT/"; fi
-
-#===================================#
-#== Success and Failure Functions ==#
-#===================================#
-
-
-#======================#
-#== Master Functions ==#
-#======================#
-
-
-
-#=============================#
-#== Other Control Functions ==#
-#=============================#
-
-
-
-#============================================#
-#== Functions related to the configuration ==#
-#============================================#
+#========================================#
+#== Functions for Processing Arguments ==#
+#========================================#
 
 function fn_assign_run_type {
+### Make sure that we only have one running type
 	fn_debug "fn_assign_run_type"
 	if [[ -n "$v_RUN_TYPE" ]]; then
-		echo "Cannot use \"$v_RUN_TYPE\" and \"$1\" simultaneously. Exiting."
+		echo "Cannot use flags \"$v_RUN_TYPE\" and \"$1\" simultaneously. Exiting."
 		exit 1
 	else
 		v_RUN_TYPE="$1"
 	fi
 }
 
-#===================#
-#== END FUNCTIONS ==#
-#===================#
-
-fn_start_script
-
 function fn_process_args {
+### reformats the arguments so that they are easier to parse
 	fn_debug "fn_process_args"
 	local v_VALUE=
 	local v_ARG="$1"
@@ -96,95 +66,9 @@ function fn_process_args {
 	fi
 }
 
-### Separate out any instances where we have multiple single letter arguments, or arguments followed by an "="
-a_ARGS=( "$@" )
-a_ARGS2=()
-for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
-	fn_process_args "${a_ARGS[$c]}"
-done
-
-### If any of the arguments are asking for help, output help and exit. Otherwise, find the run type
-v_RUN_TYPE=
-for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
-	v_ARG="${a_ARGS2[$c]}"
-	if [[ "$v_ARG" == "-h" || "$v_ARG" == "--help" ]]; then
-		if [[ "${a_ARGS2[$c + 1]}" == "process-types" ]]; then
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_process_types.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS2[$c + 1]}" == "params-file" ]]; then
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_params_file.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS2[$c + 1]}" == "files" ]]; then
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_files.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS2[$c + 1]}" == "flags" ]]; then
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_flags.txt "$d_PROGRAM"/texts/help_feedback.txt
-		elif [[ "${a_ARGS2[$c + 1]}" == "notes" ]]; then
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_notes.txt "$d_PROGRAM"/texts/help_feedback.txt
-		else
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_basic.txt "$d_PROGRAM"/texts/help_feedback.txt
-		fi
-		exit
-	elif [[ "$v_ARG" == "--version" || "$v_ARG" == "--changelog" ]]; then
-		echo -n "Current Version: "
-		grep -E -m1 "^[0-9]" "$d_PROGRAM"/texts/changelog.txt | sed -r "s/\s*-\s*$//"
-		if [[ "${a_ARGS2[$c + 1]}" == "--full" || "$v_ARG" == "--changelog" ]]; then
-			"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/changelog.txt
-		fi
-		exit
-	elif [[ "$v_ARG" == "-u" || "$v_ARG" == "--url" || "$v_ARG" == "--curl" ]]; then
-		fn_assign_run_type "--url"
-	elif [[ "$v_ARG" == "-d" || "$v_ARG" == "--dns" ]]; then
-		fn_assign_run_type "--dns"
-	elif [[ "$v_ARG" == "-p" || "$v_ARG" == "--ping" ]]; then
-		fn_assign_run_type "--ping"
-	elif [[ "$v_ARG" == "--ssh-load" || "$v_ARG" == "--load" ]]; then
-		fn_assign_run_type "--ssh-load"
-	elif [[ "$v_ARG" == "--kill" ]]; then
-		fn_assign_run_type "--kill"
-	elif [[ "$v_ARG" == "--list" || "$v_ARG" == "-l" ]]; then
-		fn_assign_run_type "--list"
-	elif [[ "$v_ARG" == "--master" ]]; then
-		fn_assign_run_type "--master"
-	elif [[ "$v_ARG" == "--modify" || "$v_ARG" == "-m" ]]; then
-		fn_assign_run_type "--modify"
-	fi
-done
-
-### Make sure that ping, and dig are installed
-### curl, wget, and mail are being checked elsewhere within the script.
-for i in dig ping stat ssh; do
-	if [[ -z "$( which $i 2> /dev/null )" ]]; then
-		echo "The \"$i\" binary needs to be installed for LWmon to perform some of its functions. Exiting."
-		exit 1
-	fi
-done
-
-### Determine the running state
-if [[ -f "$d_WORKING"/lwmon.pid && $( cat /proc/$( cat "$d_WORKING"/lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
-### This tests if the master process exists
-	if [[ "$PPID" == $( cat "$d_WORKING"/lwmon.pid ) ]]; then
-		### Child processes monitor one thing only they are spawned only by the master process and when the master process is no longer present, they die.
-		echo "Master process launched a child process wrong"
-		v_RUNNING_STATE="child"
-		fn_child 
-	else
-		### Control processes set up the parameters for new child processes and then exit.
-		v_RUNNING_STATE="control"
-	fi
-else
-	### The master process (which typically starts out functioning as a control process) waits to see if there are waiting jobs present in the "new/" directory, and then spawns child processes for them.
-	v_RUNNING_STATE="master"
-	### Create some necessary configuration files and directories
-	mkdir -p "$d_WORKING"/"new/"
-	echo -n "$$" > "$d_WORKING"/lwmon.pid
-	if [[ -f "$d_WORKING"/no_output ]]; then
-		rm -f "$d_WORKING"/no_output
-	fi
-fi
-
-### If it was run with no flags, lets just go straight to the modify process
-if [[ "${#a_ARGS2[@]}" -eq 0 ]]; then
-	source "$d_PROGRAM"/includes/modify.shf
-	fn_modify
-fi
+#=====================================#
+#== Functions for Testing Arguments ==#
+#=====================================#
 
 function fn_test_string {
 ### $1 is the argument that we're testing whether or not exists
@@ -305,218 +189,312 @@ function fn_test_flag_with_run {
 	fi
 }
 
-### Go through the command line arguments again, this time gathering all the data
-for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
-	v_ARG="${a_ARGS2[$c]}"
+#======================================#
+#== Parse the Command Line Arguments ==#
+#======================================#
 
-	### Flags for Run Type
-	if [[ "$v_ARG" == "-u" || "$v_ARG" == "--url" || "$v_ARG" == "--curl" ]]; then
-		c=$(( c + 1 ))
-		v_CURL_URL="${a_ARGS2[$c]}"
-		fn_test_string "$v_CURL_URL" "$v_ARG" "a website url"
-	elif [[ "$v_ARG" == "-d" || "$v_ARG" == "--dns" || "$v_ARG" == "-p" || "$v_ARG" == "--ping" || "$v_ARG" == "--ssh-load" || "$v_ARG" == "--load" ]]; then
-		c=$(( c + 1 ))
-		v_DOMAIN="${a_ARGS2[$c]}"
-		fn_test_string "$v_DOMAIN" "$v_ARG" "a hostname or IP address"
-	elif [[ "$v_ARG" == "--kill" ]]; then
-		if [[ -n "${a_ARGS2[$c + 1]}" && "${a_ARGS[$c + 1]}" != "--save" ]]; then
-			c=$(( c + 1 ))
-			v_CHILD_PID="${a_ARGS2[$c]}"
-			fn_test_child_pid "$v_CHILD_PID" "$v_ARG"
+function fn_parse_cl_and_go {
+	fn_debug "fn_parse_cl_and_go"
+	### If any of the arguments are asking for help, output help and exit. Otherwise, find the run type
+	for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
+		v_ARG="${a_ARGS2[$c]}"
+		if [[ "$v_ARG" == "-h" || "$v_ARG" == "--help" ]]; then
+			##### There should be a way to output these if perl is not present
+			if [[ "${a_ARGS2[$c + 1]}" == "process-types" ]]; then
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_process_types.txt "$d_PROGRAM"/texts/help_feedback.txt
+			elif [[ "${a_ARGS2[$c + 1]}" == "params-file" ]]; then
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_params_file.txt "$d_PROGRAM"/texts/help_feedback.txt
+			elif [[ "${a_ARGS2[$c + 1]}" == "files" ]]; then
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_files.txt "$d_PROGRAM"/texts/help_feedback.txt
+			elif [[ "${a_ARGS2[$c + 1]}" == "flags" ]]; then
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_flags.txt "$d_PROGRAM"/texts/help_feedback.txt
+			elif [[ "${a_ARGS2[$c + 1]}" == "notes" ]]; then
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_notes.txt "$d_PROGRAM"/texts/help_feedback.txt
+			else
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/help_header.txt "$d_PROGRAM"/texts/help_basic.txt "$d_PROGRAM"/texts/help_feedback.txt
+			fi
+			exit
+		elif [[ "$v_ARG" == "--version" || "$v_ARG" == "--changelog" ]]; then
+			echo -n "Current Version: "
+			grep -E -m1 "^[0-9]" "$d_PROGRAM"/texts/changelog.txt | sed -r "s/\s*-\s*$//"
+			if [[ "${a_ARGS2[$c + 1]}" == "--full" || "$v_ARG" == "--changelog" ]]; then
+				"$d_PROGRAM"/scripts/fold_out.pl "$d_PROGRAM"/texts/changelog.txt
+			fi
+			exit
+		elif [[ "$v_ARG" == "-u" || "$v_ARG" == "--url" || "$v_ARG" == "--curl" ]]; then
+			fn_assign_run_type "--url"
+		elif [[ "$v_ARG" == "-d" || "$v_ARG" == "--dns" ]]; then
+			fn_assign_run_type "--dns"
+		elif [[ "$v_ARG" == "-p" || "$v_ARG" == "--ping" ]]; then
+			fn_assign_run_type "--ping"
+		elif [[ "$v_ARG" == "--ssh-load" || "$v_ARG" == "--load" ]]; then
+			fn_assign_run_type "--ssh-load"
+		elif [[ "$v_ARG" == "--kill" ]]; then
+			fn_assign_run_type "--kill"
+		elif [[ "$v_ARG" == "--list" || "$v_ARG" == "-l" ]]; then
+			fn_assign_run_type "--list"
+		elif [[ "$v_ARG" == "--master" ]]; then
+			fn_assign_run_type "--master"
+		elif [[ "$v_ARG" == "--modify" || "$v_ARG" == "-m" ]]; then
+			fn_assign_run_type "--modify"
 		fi
-	elif [[ "$v_ARG" == "--list" || "$v_ARG" == "-l" || "$v_ARG" == "--master" ]]; then
-		if [[ -n "${a_ARGS2[$c + 1]}" || "$c" -gt 0 ]]; then
-			echo "Argument \"$v_ARG\" should not be used with other flags or arguments"
+	done
+
+	### Make sure that ping, and dig are installed
+	### curl, wget, and mail are being checked elsewhere within the script.
+	for i in dig ping stat ssh; do
+		if [[ -z "$( which $i 2> /dev/null )" ]]; then
+			echo "The \"$i\" binary needs to be installed for LWmon to perform some of its functions. Exiting."
 			exit 1
 		fi
-	elif [[ "$v_ARG" == "--modify" || "$v_ARG" == "-m" ]]; then
-		if [[ -n "${a_ARGS2[$c + 1]}" || "$c" -gt 0 ]]; then
-			echo "Argument \"$v_ARG\" should not be used with other flags or arguments"
-			exit 1
-		fi
+	done
 
-	### Flags that don't require arguments
-	elif [[ "$v_ARG" == "--control" ]]; then
-		v_RUNNING_STATE="control"
-	elif [[ "$v_ARG" == "--save" ]]; then
-		v_SAVE_JOBS=true
-	elif [[ "$v_ARG" == "--testing" ]]; then
-		v_TESTING=true
-
-	### Flags with boolean arguments
-	elif [[ "$v_ARG" == "--user-agent" ]]; then
-		v_USER_AGENT=true
-		if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
-			c=$(( c + 1 ))
-			v_USER_AGENT="${a_ARGS2[$c]}"
-		fi
-	elif [[ "$v_ARG" == "--ldd" || "$v_ARG" == "--log-duration-data" ]]; then
-		v_LOG_DURATION_DATA=true
-		if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
-			c=$(( c + 1 ))
-			v_LOG_DURATION_DATA="${a_ARGS2[$c]}"
-		fi
-	elif [[ "$v_ARG" == "--wget" ]]; then
-		v_USE_WGET=true
-		if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
-			c=$(( c + 1 ))
-			v_USE_WGET="${a_ARGS2[$c]}"
-		fi
-
-	### Flags that require other arguments
-	elif [[ "$v_ARG" == "--mail" || "$v_ARG" == "--email" ]]; then
-		c=$(( c + 1 ))
-		v_EMAIL="${a_ARGS2[$c]}"
-		fn_test_email "$v_EMAIL" "$v_ARG"
-	elif [[ "$v_ARG" == "--seconds" ]]; then
-		c=$(( c + 1 ))
-		v_WAIT_SECONDS="${a_ARGS2[$c]}"
-		fn_test_integer "$v_WAIT_SECONDS" "$v_ARG"
-	elif [[ "$v_ARG" == "--ctps" || "$v_ARG" == "--check-time-partial-success" ]]; then
-		c=$(( c + 1 ))
-		v_CHECK_TIME_PARTIAL_SUCCESS="${a_ARGS2[$c]}"
-		fn_test_float "$v_CHECK_TIME_PARTIAL_SUCCESS" "$v_ARG"
-	elif [[ "$v_ARG" == "--check-timeout" ]]; then
-		c=$(( c + 1 ))
-		v_CHECK_TIMEOUT="${a_ARGS2[$c]}"
-		fn_test_float "$v_CHECK_TIMEOUT" "$v_ARG"
-	elif [[ "$v_ARG" == "--mail-delay" ]]; then
-		c=$(( c + 1 ))
-		v_MAIL_DELAY="${a_ARGS2[$c]}"
-		fn_test_integer "$v_MAIL_DELAY" "$v_ARG"
-	elif [[ "$v_ARG" == "--load-ps" ]]; then
-		c=$(( c + 1 ))
-		v_MIN_LOAD_PARTIAL_SUCCESS="${a_ARGS2[$c]}"
-		fn_test_float "$v_MIN_LOAD_PARTIAL_SUCCESS" "$v_ARG"
-	elif [[ "$v_ARG" == "--load-fail" ]]; then
-		c=$(( c + 1 ))
-		v_MIN_LOAD_FAILURE="${a_ARGS2[$c]}"
-		fn_test_float "$v_MIN_LOAD_FAILURE" "$v_ARG"
-	elif [[ "$v_ARG" == "--port" ]]; then
-		c=$(( c + 1 ))
-		v_CL_PORT="${a_ARGS2[$c]}"
-		fn_test_integer "$v_CL_PORT" "$v_ARG"
-	elif [[ "$v_ARG" == "--ndr" || "$v_ARG" == "--num-durations-recent" ]]; then
-		c=$(( c + 1 ))
-		v_NUM_DURATIONS_RECENT="${a_ARGS2[$c]}"
-		fn_test_integer "$v_NUM_DURATIONS_RECENT" "$v_ARG"
-	elif [[ "$v_ARG" == "--nsr" || "$v_ARG" == "--num-statuses-recent" ]]; then
-		c=$(( c + 1 ))
-		v_NUM_STATUSES_RECENT="${a_ARGS2[$c]}"
-		fn_test_integer "$v_NUM_STATUSES_RECENT" "$v_ARG"
-	elif [[ "$v_ARG" == "--nsns" || "$v_ARG" == "--num-statuses-not-success" ]]; then
-		c=$(( c + 1 ))
-		v_NUM_STATUSES_NOT_SUCCESS="${a_ARGS2[$c]}"
-		fn_test_integer "$v_NUM_STATUSES_NOT_SUCCESS" "$v_ARG"
-	elif [[ "$v_ARG" == "--ident" || "$v_ARG" == "--ticket" ]]; then
-		if [[ -n "${a_ARGS2[$c + 1]}" ]]; then
-			c=$(( c + 1 ))
-			v_IDENT="${a_ARGS2[$c]}"
-		fi
-	elif [[ "$v_ARG" == "--ip" || "$v_ARG" == "--ip-address" ]]; then
-		c=$(( c + 1 ))
-		v_IP_ADDRESS="${a_ARGS2[$c]}"
-		fn_test_ip "$v_IP_ADDRESS" "$v_ARG"
-	elif [[ "$v_ARG" == "--string" ]]; then
-		c=$(( c + 1 ))
-		a_CURL_STRING[${#a_CURL_STRING[@]}]="${a_ARGS2[$c]}"
-		fn_test_string "${a_CURL_STRING[${#a_CURL_STRING[@]} - 1]}" "$v_ARG" "a string of text that the curl output must contain"
-	elif [[ "$v_ARG" == "--domain" || "$v_ARG" == "--check-domain" ]]; then
-		c=$(( c + 1 ))
-		v_DNS_CHECK_DOMAIN="${a_ARGS2[$c]}"
-		fn_test_string "$v_DNS_CHECK_DOMAIN" "$v_ARG" "a domain name to dig for at the remote host"
-	elif [[ "$v_ARG" == "--check-result" ]]; then
-		c=$(( c + 1 ))
-		v_DNS_CHECK_RESULT="${a_ARGS2[$c]}"
-		fn_test_string "$v_DNS_CHECK_RESULT" "$v_ARG" "a string of text that the dig output must contain"
-	elif [[ "$v_ARG" == "--record-type" ]]; then
-		c=$(( c + 1 ))
-		v_DNS_RECORD_TYPE="${a_ARGS2[$c]}"
-		fn_test_string "$v_DNS_RECORD_TYPE" "$v_ARG" "a DNS record type"
-	elif [[ "$v_ARG" == "--user" || "$v_ARG" == "--ssh-user" ]]; then
-		c=$(( c + 1 ))
-		v_SSH_USER="${a_ARGS2[$c]}"
-		fn_test_string "$v_SSH_USER" "$v_ARG" "an SSH user"
-	elif [[ "$v_ARG" == "--job-name" ]]; then
-		c=$(( c + 1 ))
-		v_JOB_NAME="${a_ARGS2[$c]}"
-		fn_test_string "$v_JOB_NAME" "$v_ARG" "a name for the LWmon job"
-	elif [[ "$v_ARG" == "--verbose" || "$v_ARG" == "--verbosity" ]]; then
-		c=$(( c + 1 ))
-		v_VERBOSITY="${a_ARGS2[$c]}"
-		if [[ "$v_VERBOSITY" == "more" && "${a_ARGS2[$c + 1]}" == "verbose" ]]; then
-			c=$(( $c + 1 ))
-			v_VERBOSITY="more verbose"
-		elif [[ "$v_VERBOSITY" == "more" || "$v_VERBOSITY" == "more-verbose" || "$v_VERBOSITY" == "moreverbose" ]]; then
-			v_VERBOSITY="more verbose"
-		fi
-		if [[ $( echo "$v_VERBOSITY" | grep -E -c "^((more )?verbose|standard|change|none)$" ) -eq 0 ]]; then
-			echo "The flag \"--verbosity\" needs to be followed by either \"verbose\", \"more verbose\", \"standard\", \"change\", or \"none\". Exiting."
+	### Determine the running state
+	if [[ -f "$d_WORKING"/lwmon.pid && $( cat /proc/$( cat "$d_WORKING"/lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
+	### This tests if the master process exists
+		if [[ "$v_RUN_TYPE" == "--master" ]]; then
+			echo "Master Process is already running"
 			exit 1
-		fi
-	elif [[ "$v_ARG" == "--output-file" || "$v_ARG" == "--outfile" ]]; then
-		c=$(( $c + 1 ))
-		v_OUTPUT_FILE="${a_ARGS2[$c]}"
-		if [[ -z "$v_OUTPUT_FILE" ]]; then
-			echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
-			exit 1
-		fi
-	elif [[ -n "$v_ARG" ]]; then
-		if [[ $( echo "$v_ARG "| grep -E -c "^-" ) -eq 1 ]]; then
-			echo "There is no such flag \"$v_ARG\". Exiting."
 		else
-			echo "I don't understand what flag the argument \"$v_ARG\" is supposed to be associated with. Exiting."
+			### Control processes set up the parameters for new child processes and then exit.
+			v_RUNNING_STATE="control"
 		fi
-		exit 1
+	else
+		### The master process (which typically starts out functioning as a control process) waits to see if there are waiting jobs present in the "new/" directory, and then spawns child processes for them.
+		v_RUNNING_STATE="master"
 	fi
-	fn_test_flag_with_run "$v_ARG"
+
+	### If it was run with no flags, lets just go straight to the modify process
+	if [[ -z "$v_RUN_TYPE" || "$v_RUN_TYPE" == "--modify" ]]; then
+		source "$d_PROGRAM"/includes/modify.shf
+		fn_modify
+		exit
+	fi
+
+	### Go through the command line arguments again, this time gathering all the data
+	for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
+		v_ARG="${a_ARGS2[$c]}"
+
+		### Flags for Run Type
+		if [[ "$v_ARG" == "-u" || "$v_ARG" == "--url" || "$v_ARG" == "--curl" ]]; then
+			c=$(( c + 1 ))
+			v_CURL_URL="${a_ARGS2[$c]}"
+			fn_test_string "$v_CURL_URL" "$v_ARG" "a website url"
+		elif [[ "$v_ARG" == "-d" || "$v_ARG" == "--dns" || "$v_ARG" == "-p" || "$v_ARG" == "--ping" || "$v_ARG" == "--ssh-load" || "$v_ARG" == "--load" ]]; then
+			c=$(( c + 1 ))
+			v_DOMAIN="${a_ARGS2[$c]}"
+			fn_test_string "$v_DOMAIN" "$v_ARG" "a hostname or IP address"
+		elif [[ "$v_ARG" == "--kill" ]]; then
+			if [[ -n "${a_ARGS2[$c + 1]}" && "${a_ARGS[$c + 1]}" != "--save" ]]; then
+				c=$(( c + 1 ))
+				v_CHILD_PID="${a_ARGS2[$c]}"
+				fn_test_child_pid "$v_CHILD_PID" "$v_ARG"
+			fi
+		elif [[ "$v_ARG" == "--list" || "$v_ARG" == "-l" || "$v_ARG" == "--master" ]]; then
+			if [[ -n "${a_ARGS2[$c + 1]}" || "$c" -gt 0 ]]; then
+				echo "Argument \"$v_ARG\" should not be used with other flags or arguments"
+				exit 1
+			fi
+
+		### Flags that don't require arguments
+		elif [[ "$v_ARG" == "--control" ]]; then
+			v_RUNNING_STATE="control"
+		elif [[ "$v_ARG" == "--save" ]]; then
+			v_SAVE_JOBS=true
+		elif [[ "$v_ARG" == "--testing" ]]; then
+			v_TESTING=true
+
+		### Flags with boolean arguments
+		elif [[ "$v_ARG" == "--user-agent" ]]; then
+			v_USER_AGENT=true
+			if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
+				c=$(( c + 1 ))
+				v_USER_AGENT="${a_ARGS2[$c]}"
+			fi
+		elif [[ "$v_ARG" == "--ldd" || "$v_ARG" == "--log-duration-data" ]]; then
+			v_LOG_DURATION_DATA=true
+			if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
+				c=$(( c + 1 ))
+				v_LOG_DURATION_DATA="${a_ARGS2[$c]}"
+			fi
+		elif [[ "$v_ARG" == "--wget" ]]; then
+			v_USE_WGET=true
+			if [[ "${a_ARGS2[$c + 1]}" == "true" || "${a_ARGS2[$c + 1]}" == "false" ]]; then
+				c=$(( c + 1 ))
+				v_USE_WGET="${a_ARGS2[$c]}"
+			fi
+
+		### Flags that require other arguments
+		elif [[ "$v_ARG" == "--mail" || "$v_ARG" == "--email" ]]; then
+			c=$(( c + 1 ))
+			v_EMAIL="${a_ARGS2[$c]}"
+			fn_test_email "$v_EMAIL" "$v_ARG"
+		elif [[ "$v_ARG" == "--seconds" ]]; then
+			c=$(( c + 1 ))
+			v_WAIT_SECONDS="${a_ARGS2[$c]}"
+			fn_test_integer "$v_WAIT_SECONDS" "$v_ARG"
+		elif [[ "$v_ARG" == "--ctps" || "$v_ARG" == "--check-time-partial-success" ]]; then
+			c=$(( c + 1 ))
+			v_CHECK_TIME_PARTIAL_SUCCESS="${a_ARGS2[$c]}"
+			fn_test_float "$v_CHECK_TIME_PARTIAL_SUCCESS" "$v_ARG"
+		elif [[ "$v_ARG" == "--check-timeout" ]]; then
+			c=$(( c + 1 ))
+			v_CHECK_TIMEOUT="${a_ARGS2[$c]}"
+			fn_test_float "$v_CHECK_TIMEOUT" "$v_ARG"
+		elif [[ "$v_ARG" == "--mail-delay" ]]; then
+			c=$(( c + 1 ))
+			v_MAIL_DELAY="${a_ARGS2[$c]}"
+			fn_test_integer "$v_MAIL_DELAY" "$v_ARG"
+		elif [[ "$v_ARG" == "--load-ps" ]]; then
+			c=$(( c + 1 ))
+			v_MIN_LOAD_PARTIAL_SUCCESS="${a_ARGS2[$c]}"
+			fn_test_float "$v_MIN_LOAD_PARTIAL_SUCCESS" "$v_ARG"
+		elif [[ "$v_ARG" == "--load-fail" ]]; then
+			c=$(( c + 1 ))
+			v_MIN_LOAD_FAILURE="${a_ARGS2[$c]}"
+			fn_test_float "$v_MIN_LOAD_FAILURE" "$v_ARG"
+		elif [[ "$v_ARG" == "--port" ]]; then
+			c=$(( c + 1 ))
+			v_CL_PORT="${a_ARGS2[$c]}"
+			fn_test_integer "$v_CL_PORT" "$v_ARG"
+		elif [[ "$v_ARG" == "--ndr" || "$v_ARG" == "--num-durations-recent" ]]; then
+			c=$(( c + 1 ))
+			v_NUM_DURATIONS_RECENT="${a_ARGS2[$c]}"
+			fn_test_integer "$v_NUM_DURATIONS_RECENT" "$v_ARG"
+		elif [[ "$v_ARG" == "--nsr" || "$v_ARG" == "--num-statuses-recent" ]]; then
+			c=$(( c + 1 ))
+			v_NUM_STATUSES_RECENT="${a_ARGS2[$c]}"
+			fn_test_integer "$v_NUM_STATUSES_RECENT" "$v_ARG"
+		elif [[ "$v_ARG" == "--nsns" || "$v_ARG" == "--num-statuses-not-success" ]]; then
+			c=$(( c + 1 ))
+			v_NUM_STATUSES_NOT_SUCCESS="${a_ARGS2[$c]}"
+			fn_test_integer "$v_NUM_STATUSES_NOT_SUCCESS" "$v_ARG"
+		elif [[ "$v_ARG" == "--ident" || "$v_ARG" == "--ticket" ]]; then
+			if [[ -n "${a_ARGS2[$c + 1]}" ]]; then
+				c=$(( c + 1 ))
+				v_IDENT="${a_ARGS2[$c]}"
+			fi
+		elif [[ "$v_ARG" == "--ip" || "$v_ARG" == "--ip-address" ]]; then
+			c=$(( c + 1 ))
+			v_IP_ADDRESS="${a_ARGS2[$c]}"
+			fn_test_ip "$v_IP_ADDRESS" "$v_ARG"
+		elif [[ "$v_ARG" == "--string" ]]; then
+			c=$(( c + 1 ))
+			a_CURL_STRING[${#a_CURL_STRING[@]}]="${a_ARGS2[$c]}"
+			fn_test_string "${a_CURL_STRING[${#a_CURL_STRING[@]} - 1]}" "$v_ARG" "a string of text that the curl output must contain"
+		elif [[ "$v_ARG" == "--domain" || "$v_ARG" == "--check-domain" ]]; then
+			c=$(( c + 1 ))
+			v_DNS_CHECK_DOMAIN="${a_ARGS2[$c]}"
+			fn_test_string "$v_DNS_CHECK_DOMAIN" "$v_ARG" "a domain name to dig for at the remote host"
+		elif [[ "$v_ARG" == "--check-result" ]]; then
+			c=$(( c + 1 ))
+			v_DNS_CHECK_RESULT="${a_ARGS2[$c]}"
+			fn_test_string "$v_DNS_CHECK_RESULT" "$v_ARG" "a string of text that the dig output must contain"
+		elif [[ "$v_ARG" == "--record-type" ]]; then
+			c=$(( c + 1 ))
+			v_DNS_RECORD_TYPE="${a_ARGS2[$c]}"
+			fn_test_string "$v_DNS_RECORD_TYPE" "$v_ARG" "a DNS record type"
+		elif [[ "$v_ARG" == "--user" || "$v_ARG" == "--ssh-user" ]]; then
+			c=$(( c + 1 ))
+			v_SSH_USER="${a_ARGS2[$c]}"
+			fn_test_string "$v_SSH_USER" "$v_ARG" "an SSH user"
+		elif [[ "$v_ARG" == "--job-name" ]]; then
+			c=$(( c + 1 ))
+			v_JOB_NAME="${a_ARGS2[$c]}"
+			fn_test_string "$v_JOB_NAME" "$v_ARG" "a name for the LWmon job"
+		elif [[ "$v_ARG" == "--verbose" || "$v_ARG" == "--verbosity" ]]; then
+			c=$(( c + 1 ))
+			v_VERBOSITY="${a_ARGS2[$c]}"
+			if [[ "$v_VERBOSITY" == "more" && "${a_ARGS2[$c + 1]}" == "verbose" ]]; then
+				c=$(( $c + 1 ))
+				v_VERBOSITY="more verbose"
+			elif [[ "$v_VERBOSITY" == "more" || "$v_VERBOSITY" == "more-verbose" || "$v_VERBOSITY" == "moreverbose" ]]; then
+				v_VERBOSITY="more verbose"
+			fi
+			if [[ $( echo "$v_VERBOSITY" | grep -E -c "^((more )?verbose|standard|change|none)$" ) -eq 0 ]]; then
+				echo "The flag \"--verbosity\" needs to be followed by either \"verbose\", \"more verbose\", \"standard\", \"change\", or \"none\". Exiting."
+				exit 1
+			fi
+		elif [[ "$v_ARG" == "--output-file" || "$v_ARG" == "--outfile" ]]; then
+			c=$(( $c + 1 ))
+			v_OUTPUT_FILE="${a_ARGS2[$c]}"
+			if [[ -z "$v_OUTPUT_FILE" ]]; then
+				echo "The flag \"--outfile\" needs to be followed by a file with write permissions referenced by its full path. Exiting."
+				exit 1
+			fi
+		elif [[ -n "$v_ARG" ]]; then
+			if [[ $( echo "$v_ARG "| grep -E -c "^-" ) -eq 1 ]]; then
+				echo "There is no such flag \"$v_ARG\". Exiting."
+			else
+				echo "I don't understand what flag the argument \"$v_ARG\" is supposed to be associated with. Exiting."
+			fi
+			exit 1
+		fi
+		fn_test_flag_with_run "$v_ARG"
+	done
+
+
+	### Tells the script where to go with the type of job that was selected.
+	if [[ "$v_RUN_TYPE" == "--url" || "$v_RUN_TYPE" == "-u" ]]; then
+		source "$d_PROGRAM"/includes/create.shf
+		fn_url_cl
+	elif [[ "$v_RUN_TYPE" == "--ping" || "$v_RUN_TYPE" == "-p" ]]; then
+		source "$d_PROGRAM"/includes/create.shf
+		fn_ping_cl
+	elif [[ "$v_RUN_TYPE" == "--dns" || "$v_RUN_TYPE" == "-d" ]]; then
+		source "$d_PROGRAM"/includes/create.shf
+		fn_dns_cl
+	elif [[ "$v_RUN_TYPE" == "--ssh-load" ]]; then
+		source "$d_PROGRAM"/includes/create.shf
+		fn_load_cl
+	elif [[ "$v_RUN_TYPE" == "--kill" ]]; then
+		if [[ -n "$v_CHILD_PID" ]]; then
+			if [[ ! -f  "$d_WORKING"/"$v_CHILD_PID"/params ]]; then
+				echo "Child ID provided does not exist."
+				exit 1
+			fi
+			touch "$d_WORKING"/$v_CHILD_PID/die
+			echo "The child process will exit shortly."
+			exit 0
+		elif [[ "$v_SAVE_JOBS" == true ]]; then
+			touch "$d_WORKING"/save
+		fi
+		touch "$d_WORKING"/die
+		exit 0
+	elif [[ "$v_RUN_TYPE" == "--list" || "$v_RUN_TYPE" == "-l" ]]; then
+		source "$d_PROGRAM"/includes/modify.shf
+		fn_list
+		echo
+		exit 0
+	elif [[ -z "$v_RUN_TYPE" ]]; then
+		if [[ "$v_NUM_ARGUMENTS" -ne 0 ]]; then
+			echo "Some of the flags you used didn't make sense in context. Here's a menu instead."
+		fi
+		source "$d_PROGRAM"/includes/modify.shf
+		fn_modify
+	fi
+}
+
+#===================#
+#== END FUNCTIONS ==#
+#===================#
+
+fn_start_script
+
+### Separate out any instances where we have multiple single letter arguments, or arguments followed by an "="
+a_ARGS=( "$@" )
+a_ARGS2=()
+for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
+	fn_process_args "${a_ARGS[$c]}"
 done
 
+v_RUN_TYPE=
+fn_parse_cl_and_go
 
-### Tells the script where to go with the type of job that was selected.
-if [[ "$v_RUN_TYPE" == "--url" || "$v_RUN_TYPE" == "-u" ]]; then
-	source "$d_PROGRAM"/includes/create.shf
-	fn_url_cl
-elif [[ "$v_RUN_TYPE" == "--ping" || "$v_RUN_TYPE" == "-p" ]]; then
-	source "$d_PROGRAM"/includes/create.shf
-	fn_ping_cl
-elif [[ "$v_RUN_TYPE" == "--dns" || "$v_RUN_TYPE" == "-d" ]]; then
-	source "$d_PROGRAM"/includes/create.shf
-	fn_dns_cl
-elif [[ "$v_RUN_TYPE" == "--ssh-load" ]]; then
-	source "$d_PROGRAM"/includes/create.shf
-	fn_load_cl
-elif [[ "$v_RUN_TYPE" == "--kill" ]]; then
-	if [[ -n "$v_CHILD_PID" ]]; then
-		if [[ ! -f  "$d_WORKING"/"$v_CHILD_PID"/params ]]; then
-			echo "Child ID provided does not exist."
-			exit 1
-		fi
-		touch "$d_WORKING"/$v_CHILD_PID/die
-		echo "The child process will exit shortly."
-		exit 0
-	elif [[ "$v_SAVE_JOBS" == true ]]; then
-		touch "$d_WORKING"/save
-	fi
-	touch "$d_WORKING"/die
-	exit 0
-elif [[ "$v_RUN_TYPE" == "--modify" || "$v_RUN_TYPE" == "-m" ]]; then
-	source "$d_PROGRAM"/includes/modify.shf
-	fn_modify
-elif [[ "$v_RUN_TYPE" == "--list" || "$v_RUN_TYPE" == "-l" ]]; then
-	source "$d_PROGRAM"/includes/modify.shf
-	fn_list
-	echo
-	exit 0
-elif [[ "$v_RUN_TYPE" == "--master" ]]; then
+### If it's the master process, run that
+if [[ "$v_RUNNING_STATE" == "master" ]]; then
 	source "$d_PROGRAM"/includes/master.shf
 	fn_master
-elif [[ -z "$v_RUN_TYPE" ]]; then
-	if [[ "$v_NUM_ARGUMENTS" -ne 0 ]]; then
-		echo "Some of the flags you used didn't make sense in context. Here's a menu instead."
-	fi
-	source "$d_PROGRAM"/includes/modify.shf
-	fn_modify
 fi
 
 echo "The script should not get to this point. Exiting"

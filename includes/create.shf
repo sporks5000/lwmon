@@ -117,12 +117,10 @@ function fn_mutual_cl {
 	f_JOB="$d_WORKING"/"$v_NEW_JOB"
 	fn_read_child_params "$f_JOB"
 
-	mv -f "$f_JOB" "$d_WORKING"/"new/$v_NEW_JOB"
+	mkdir -p "$d_WORKING"/new
+	mv -f "$f_JOB" "$d_WORKING"/new/"$v_NEW_JOB"
 	### If this instance is running as master, go on to begin spawning child processes, etc.
-	if [[ "$v_RUNNING_STATE" == "master" ]]; then
-		source "$d_PROGRAM"/includes/master.shf
-		fn_master
-	else
+	if [[ "$v_RUNNING_STATE" != "master" ]]; then
 		exit 0
 	fi
 }

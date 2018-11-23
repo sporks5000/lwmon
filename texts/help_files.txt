@@ -23,16 +23,37 @@ LWMON FILES AND DIRECTORIES
     - This is the process ID of the current LWmon master process
 
 ./.lwmon/new/
-    - This directory is where LWmon control processes will place new jobs so that they can wait for the master process to start them up.
+    - This directory is where LWmon control processes will place new jobs so that they can wait for the master process to start them up
 
 ./.lwmon/no_output
     - When this file is present, the child processes will not output status information for the checks that they perform
 
 ./.lwmon/old_[CHILD PID]_[EPOCH TIMESTAMP]
-    - This is the working directory of an old LWmon child process, archived temporarily in case data from it is needed.
+    - This is the working directory of an old LWmon child process, archived temporarily in case data from it is needed
 
 ./.lwmon/save
     - Having this file present while the LWmon master process is exiting tells it to save all child processes so that they will start again next time a master process is started
+
+./includes
+    - A directory containing additional files of bash functions
+
+./modules
+    - A directory containing additional perl modules
+
+./scripts
+    - A directory containing additional scripts that LWmon relies on
+
+./texts
+    - A directory containing text files for the help and version documentation
+
+./version
+    - A directory for verifying that the version present is up to date
+
+./version/version
+    - Contains the md5hash of the download of the current verson of the file
+
+./version/version_check
+    - Contains the timestamp of the last time the version was checked
 
 
 FILES FOR LWMON CHILD PROCESSES

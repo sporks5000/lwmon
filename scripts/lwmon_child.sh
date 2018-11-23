@@ -1,10 +1,10 @@
 #! /bin/bash
 
 b_DEBUG=false
-b_DEBUG2=false
+b_DEBUG_FUNCTIONS=false
 
 function fn_locate {
-	if [[ "$b_DEBUG" == true ]]; then echo "$$ - $v_RUNNING_STATE: fn_locate" > /dev/stderr; fi
+	if [[ "$b_DEBUG_FUNCTIONS" == true ]]; then echo "$$: fn_locate" > /dev/stderr; fi
 	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
@@ -42,10 +42,11 @@ function fn_child {
 	v_NUM_PARTIAL_SUCCESSES_EMAIL=0
 	v_NUM_FAILURES_EMAIL=0
 	v_LAST_HTML_RESPONSE_CODE="none"
-	v_PARAMS_RELOAD="$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )"
+	d_CHILD="$d_WORKING"/"$v_CHILD_PID"
+	v_PARAMS_RELOAD="$( stat --format=%Y "$d_CHILD"/params )"
 	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
-	if [[ $( grep -E -c "^[[:blank:]]*JOB_TYPE[[:blank:]]*=" "$d_WORKING"/"$v_CHILD_PID"/params ) -eq 1 ]]; then
-		fn_read_child_params "$d_WORKING"/"$v_CHILD_PID"/params
+	if [[ $( grep -E -c "^[[:blank:]]*JOB_TYPE[[:blank:]]*=" "$d_CHILD"/params ) -eq 1 ]]; then
+		fn_read_child_params "$d_CHILD"/params
 		if [[ "$v_JOB_TYPE" == "url" ]]; then
 			fn_url_child
 		elif [[ "$v_JOB_TYPE" == "ping" ]]; then
@@ -67,21 +68,21 @@ function fn_child {
 function fn_child_start_loop {
 ### Check if the conf or params file have been updated, then get all of the necessary timestamps
 	fn_debug "fn_child_start_loop"
-	local v_PARAMS_CUR="$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )"
+	local v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
 	local v_MASTER_CUR="$( stat --format=%Y "$f_CONF" )"
 	if [[ "$v_MASTER_CUR" -gt "$v_MASTER_RELOAD" ]]; then
 		fn_read_master_conf
 		v_MASTER_RELOAD="$v_MASTER_CUR"
-		fn_read_child_params "$d_WORKING"/"$v_CHILD_PID"/params
-		v_PARAMS_CUR="$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )"
+		fn_read_child_params "$d_CHILD"/params
+		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
 	elif [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
-		fn_read_child_params "$d_WORKING"/"$v_CHILD_PID"/params
-		v_PARAMS_CUR="$( stat --format=%Y "$d_WORKING"/"$v_CHILD_PID"/params )"
+		fn_read_child_params "$d_CHILD"/params
+		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
 	fi
 	if [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
 		v_PARAMS_RELOAD="$v_PARAMS_CUR"
 		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$v_LOG"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$d_CHILD"/log
 		if [[ ! -f "$d_WORKING"/no_output ]]; then
 			echo "***Reloaded parameters for $v_URL_OR_PING $v_JOB_NAME.***"
 		fi
@@ -105,62 +106,62 @@ function fn_url_child {
 	while [[ 1 == 1 ]]; do
 		fn_child_start_loop
 		### Change the name of the previous download of the site
-		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/site_current.html ]]; then
+		if [[ -f "$d_CHILD"/site_current.html ]]; then
 			### The only instance where this isn't the case should be on the first run of the loop.
-			mv -f "$d_WORKING"/"$v_CHILD_PID"/site_current.html "$d_WORKING"/"$v_CHILD_PID"/site_previous.html
+			mv -f "$d_CHILD"/site_current.html "$d_CHILD"/site_previous.html
 		fi
-		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt ]]; then
-			mv -f "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt "$d_WORKING"/"$v_CHILD_PID"/previous_verbose_output.txt
+		if [[ -f "$d_CHILD"/current_verbose_output.txt ]]; then
+			mv -f "$d_CHILD"/current_verbose_output.txt "$d_CHILD"/previous_verbose_output.txt
 		fi
 		### Set up the command line arguments for curl
 		f_STDERR="/dev/null"
 		if [[ "$v_WGET_BIN" == "false" ]]; then
 			if [[ "$v_IP_ADDRESS" == false ]]; then
-				a_CURL_ARGS=( "$v_CHECK_TIMEOUT" "$v_CURL_URL" "--header" "User-Agent: $v_USER_AGENT" "-o" "$d_WORKING"/"$v_CHILD_PID/site_current.html" )
+				a_CURL_ARGS=( "$v_CHECK_TIMEOUT" "$v_CURL_URL" "--header" "User-Agent: $v_USER_AGENT" "-o" "$d_CHILD/site_current.html" )
 			else
-				a_CURL_ARGS=( "$v_CHECK_TIMEOUT" "$v_CURL_URL" "--header" "Host: $v_DOMAIN" "--header" "User-Agent: $v_USER_AGENT" "-o" "$d_WORKING"/"$v_CHILD_PID/site_current.html" )
+				a_CURL_ARGS=( "$v_CHECK_TIMEOUT" "$v_CURL_URL" "--header" "Host: $v_DOMAIN" "--header" "User-Agent: $v_USER_AGENT" "-o" "$d_CHILD/site_current.html" )
 			fi
 			if [[ "$v_CURL_VERBOSE" != true ]]; then
 				a_CURL_ARGS=( "-kLsm" "${a_CURL_ARGS[@]}" )
 			else
 				a_CURL_ARGS=( "-kLsvm" "${a_CURL_ARGS[@]}" )
-				f_STDERR="$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt
+				f_STDERR="$d_CHILD"/current_verbose_output.txt
 				echo "$v_CURL_BIN ${a_CURL_ARGS[@]}" > "$f_STDERR"
 			fi
 		else
 			if [[ "$v_IP_ADDRESS" == false ]]; then
-				a_WGET_ARGS=( "--no-check-certificate" "-q" "--timeout=$v_CHECK_TIMEOUT" "-O" "$d_WORKING"/"$v_CHILD_PID/site_current.html" "$v_CURL_URL" "--header=User-Agent: $v_USER_AGENT" )
+				a_WGET_ARGS=( "--no-check-certificate" "-q" "--timeout=$v_CHECK_TIMEOUT" "-O" "$d_CHILD/site_current.html" "$v_CURL_URL" "--header=User-Agent: $v_USER_AGENT" )
 			else
-				a_WGET_ARGS=( "--no-check-certificate" "-q" "--timeout=$v_CHECK_TIMEOUT" "-O" "$d_WORKING"/"$v_CHILD_PID/site_current.html" "$v_CURL_URL" "--header=Host: $v_DOMAIN" "--header=User-Agent: $v_USER_AGENT" )
+				a_WGET_ARGS=( "--no-check-certificate" "-q" "--timeout=$v_CHECK_TIMEOUT" "-O" "$d_CHILD/site_current.html" "$v_CURL_URL" "--header=Host: $v_DOMAIN" "--header=User-Agent: $v_USER_AGENT" )
 			fi
 		fi
 		### curl it!
 		v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 		if [[ "$v_WGET_BIN" == "false" ]]; then
-			$v_CURL_BIN "${a_CURL_ARGS[@]}" >> "$f_STDERR" 2>> "$f_STDERR"
+			"$v_CURL_BIN" "${a_CURL_ARGS[@]}" >> "$f_STDERR" 2>> "$f_STDERR"
 		else
-			$v_WGET_BIN "${a_WGET_ARGS[@]}" >> "$f_STDERR" 2>> "$f_STDERR"
+			"$v_WGET_BIN" "${a_WGET_ARGS[@]}" >> "$f_STDERR" 2>> "$f_STDERR"
 		fi
 		v_STATUS="$?"
 		v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		### If the exit status of curl is 28, this means that the page timed out.
 		if [[ "$v_STATUS" == 28 && "$v_WGET_BIN" == "false" ]]; then
-			echo -e "\n\n\n\nCurl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt
+			echo -e "\n\n\n\nCurl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$d_CHILD"/current_verbose_output.txt
 		elif [[ "$v_STATUS" != 0 && "$v_WGET_BIN" == "false" ]]; then
-			echo -e "\n\n\n\nCurl return code: $v_STATUS" >> "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt
+			echo -e "\n\n\n\nCurl return code: $v_STATUS" >> "$d_CHILD"/current_verbose_output.txt
 		elif [[ "$v_STATUS" != 0 ]]; then
-			echo -e "\n\n\n\nWget return code: $v_STATUS" >> "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt
+			echo -e "\n\n\n\nWget return code: $v_STATUS" >> "$d_CHILD"/current_verbose_output.txt
 		fi
 		if [[ "$v_CURL_VERBOSE" == true && "$v_LOG_HTTP_CODE" == true ]]; then
 		### Capture the html response code, if so directed.
-			v_HTML_RESPONSE_CODE="$( cat "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt | grep -E -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
+			v_HTML_RESPONSE_CODE="$( cat "$d_CHILD"/current_verbose_output.txt | grep -E -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
 			if [[ -z "$v_HTML_RESPONSE_CODE" ]]; then
 				v_HTML_RESPONSE_CODE="No Code Reported"
 			fi
 		fi
 		### Check the curl strings
 		i=0; j=0; while [[ "$i" -lt "${#a_CURL_STRING[@]}" ]]; do
-			if [[ -f "$d_WORKING"/"$v_CHILD_PID"/site_current.html && $( grep -c -F "${a_CURL_STRING[$i]}" "$d_WORKING"/"$v_CHILD_PID"/site_current.html ) -gt 0 ]]; then
+			if [[ -f "$d_CHILD"/site_current.html && $( grep -c -F "${a_CURL_STRING[$i]}" "$d_CHILD"/site_current.html ) -gt 0 ]]; then
 				j=$(( j + 1 ))
 			fi
 			i=$(( i + 1 ))
@@ -177,7 +178,7 @@ function fn_url_child {
 		fi
 		### if we're logging http response codes, and the response code has changed...
 		if [[ "$v_CURL_VERBOSE" == true && "$v_LOG_HTTP_CODE" == true && "$v_HTML_RESPONSE_CODE" != "$v_LAST_HTML_RESPONSE_CODE" ]]; then
-			echo "$v_DATE2 - [$v_CHILD_PID] - The HTML response code has changed to \"$v_HTML_RESPONSE_CODE\"." >> "$d_WORKING"/"$v_CHILD_PID"/log
+			echo "$v_DATE2 - [$v_CHILD_PID] - The HTML response code has changed to \"$v_HTML_RESPONSE_CODE\"." >> "$d_CHILD"/log
 			v_LAST_HTML_RESPONSE_CODE="$v_HTML_RESPONSE_CODE"
 		fi
 		fn_child_checks
@@ -287,6 +288,17 @@ function fn_child_checks {
 	fi
 }
 
+function fn_convert_seconds {
+### I really haven't wrapped my head around how this function I stole works, but it converts a number of seconds to hours, minutes, and seconds.
+	fn_debug "fn_convert_seconds"
+	((h=${1}/3600))
+	### This is the part where it does some stuff.
+	((m=(${1}%3600)/60))
+	((s=${1}%60))
+	### I'm really excited about this part here that does the thing.
+	printf "%02d:%02d:%02d\n" "$h" "$m" "$s"
+}
+
 function fn_child_exit {
 	fn_debug "fn_child_exit"
 
@@ -294,12 +306,12 @@ function fn_child_exit {
 	v_EXIT_CODE="$1"
 	if [[ "$v_TOTAL_CHECKS" -gt 0 ]]; then
 		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$v_LOG"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$d_CHILD"/log
 	fi
 	### Instead of deleting the directory, back it up temporarily.
-	if [[ -f "$d_WORKING"/"$v_CHILD_PID"/die ]]; then
-		mv -f "$d_WORKING"/"$v_CHILD_PID"/die "$d_WORKING"/"$v_CHILD_PID"/#die
-		mv "$d_WORKING"/"$v_CHILD_PID" "$d_WORKING"/"old_""$v_CHILD_PID""_""$v_DATE3"
+	if [[ -f "$d_CHILD"/die ]]; then
+		mv -f "$d_CHILD"/die "$d_CHILD"/#die
+		mv "$d_CHILD" "$d_WORKING"/"old_""$v_CHILD_PID""_""$v_DATE3"
 	fi
 
 	### Record the final "more verbose" status
@@ -309,15 +321,15 @@ function fn_child_exit {
 
 function fn_remove_old_html {
 ### Check if there are too many html files. If there are get rid of one or two
-	local v_HTML="$( ls -1 "$d_WORKING"/"$v_CHILD_PID"/ | grep -E "^site_" | grep -E -cv "current|previous" )"
+	local v_HTML="$( ls -1 "$d_CHILD"/ | grep -E "^site_" | grep -E -cv "current|previous" )"
 	if [[ "$v_HTML" -gt "$v_HTML_FILES_KEPT" ]]; then
 		### Remove the oldest
-		rm -f "$d_WORKING"/"$v_CHILD_PID"/site_"$( ls -1t "$d_WORKING"/"$v_CHILD_PID"/ | grep -E "^site_" | grep -E -v "current|previous" | tail -n1 | sed "s/site_//" )"
-		rm -f "$d_WORKING"/"$v_CHILD_PID"/curl_verbose_"$( ls -1t "$d_WORKING"/"$v_CHILD_PID"/ | grep -E "^curl_verbose_" | grep -E -v "current|previous" | tail -n1 | sed "s/curl_verbose_//" )"
+		rm -f "$d_CHILD"/site_"$( ls -1t "$d_CHILD"/ | grep -E "^site_" | grep -E -v "current|previous" | tail -n1 | sed "s/site_//" )"
+		rm -f "$d_CHILD"/curl_verbose_"$( ls -1t "$d_CHILD"/ | grep -E "^curl_verbose_" | grep -E -v "current|previous" | tail -n1 | sed "s/curl_verbose_//" )"
 		if [[ $(( v_HTML - 1 )) -gt "$v_HTML_FILES_KEPT" ]]; then
 		### If there were two greater than the number we should keep (likely) remove the second oldest as well
-			rm -f "$d_WORKING"/"$v_CHILD_PID"/site_"$( ls -1t "$d_WORKING"/"$v_CHILD_PID"/ | grep -E "^site_" | grep -E -v "current|previous" | tail -n1 | sed "s/site_//" )"
-			rm -f "$d_WORKING"/"$v_CHILD_PID"/curl_verbose_"$( ls -1t "$d_WORKING"/"$v_CHILD_PID"/ | grep -E "^curl_verbose_" | grep -E -v "current|previous" | tail -n1 | sed "s/curl_verbose_//" )"
+			rm -f "$d_CHILD"/site_"$( ls -1t "$d_CHILD"/ | grep -E "^site_" | grep -E -v "current|previous" | tail -n1 | sed "s/site_//" )"
+			rm -f "$d_CHILD"/curl_verbose_"$( ls -1t "$d_CHILD"/ | grep -E "^curl_verbose_" | grep -E -v "current|previous" | tail -n1 | sed "s/curl_verbose_//" )"
 		fi
 	fi
 }
@@ -338,13 +350,13 @@ function fn_url_save_html {
 		if [[ "$v_LAST_STATUS" == "success" ]]; then
 			v_DESCRIP2="success"
 		fi
-		cp -a "$d_WORKING"/"$v_CHILD_PID"/site_current.html "$d_WORKING"/"$v_CHILD_PID"/site_"$v_DATE3"_"$v_DESCRIP1".html
-		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt ]]; then
-			cp -a "$d_WORKING"/"$v_CHILD_PID"/current_verbose_output.txt "$d_WORKING"/"$v_CHILD_PID"/curl_verbose_"$v_DATE3"_"$v_DESCRIP1".txt
+		cp -a "$d_CHILD"/site_current.html "$d_CHILD"/site_"$v_DATE3"_"$v_DESCRIP1".html
+		if [[ -f "$d_CHILD"/current_verbose_output.txt ]]; then
+			cp -a "$d_CHILD"/current_verbose_output.txt "$d_CHILD"/curl_verbose_"$v_DATE3"_"$v_DESCRIP1".txt
 		fi
-		cp -a "$d_WORKING"/"$v_CHILD_PID"/site_previous.html "$d_WORKING"/"$v_CHILD_PID"/site_"$v_DATE3_LAST"_"$v_DESCRIP2".html
-		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/previous_verbose_output.txt ]]; then
-			cp -a "$d_WORKING"/"$v_CHILD_PID"/previous_verbose_output.txt "$d_WORKING"/"$v_CHILD_PID"/curl_verbose_"$v_DATE3_LAST"_"$v_DESCRIP2".txt
+		cp -a "$d_CHILD"/site_previous.html "$d_CHILD"/site_"$v_DATE3_LAST"_"$v_DESCRIP2".html
+		if [[ -f "$d_CHILD"/previous_verbose_output.txt ]]; then
+			cp -a "$d_CHILD"/previous_verbose_output.txt "$d_CHILD"/curl_verbose_"$v_DATE3_LAST"_"$v_DESCRIP2".txt
 		fi
 		fn_remove_old_html
 	fi
@@ -357,15 +369,15 @@ function fn_report_status {
 	local v_SAVE="$2"
 
 	### This is present if, for testing purposes, we need to override the result of a check
-	if [[ -f "$d_WORKING"/"$v_CHILD_PID"/force_success ]]; then
+	if [[ -f "$d_CHILD"/force_success ]]; then
 		v_THIS_STATUS="success"
-		rm -f "$d_WORKING"/"$v_CHILD_PID"/force_success
-	elif [[ -f "$d_WORKING"/"$v_CHILD_PID"/force_failure ]]; then
+		rm -f "$d_CHILD"/force_success
+	elif [[ -f "$d_CHILD"/force_failure ]]; then
 		v_THIS_STATUS="failure"
-		rm -f "$d_WORKING"/"$v_CHILD_PID"/force_failure
-	elif [[ -f "$d_WORKING"/"$v_CHILD_PID"/force_partial ]]; then
+		rm -f "$d_CHILD"/force_failure
+	elif [[ -f "$d_CHILD"/force_partial ]]; then
 		v_THIS_STATUS="partial success"
-		rm -f "$d_WORKING"/"$v_CHILD_PID"/force_partial
+		rm -f "$d_CHILD"/force_partial
 	fi
 
 	### Gather the specifics for each status
@@ -572,12 +584,12 @@ function fn_report_status {
 	fi
 
 	### Check to see if the parent is still in place, and die if not.
-	if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon.sh[[:blank:]]" ) -eq 0 || -f "$d_WORKING"/"$v_CHILD_PID"/die ]]; then
+	if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon.sh[[:blank:]]" ) -eq 0 || -f "$d_CHILD"/die ]]; then
 		v_DUMP_STATUS=true
 		v_DIE=true
 	fi
 
-	if [[ "$v_VERBOSITY" == "more verbose" || -f "$d_WORKING"/"$v_CHILD_PID"/status || "$v_DUMP_STATUS" == true ]]; then
+	if [[ "$v_VERBOSITY" == "more verbose" || -f "$d_CHILD"/status || "$v_DUMP_STATUS" == true ]]; then
 		### set up the "more verose" output if necessary.
 		v_REPORT2="$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME\n  Check Status:                 $v_DESCRIPTOR1\n  Checking for:                 $v_RUN_TIME\n  "
 		if [[ "$v_THIS_STATUS" != "success" ]]; then
@@ -590,9 +602,9 @@ function fn_report_status {
 			v_REPORT2="$v_REPORT2""Last failed check:            $v_LAST_FAILURE_STRING\n  "
 		fi
 		v_REPORT2="$v_REPORT2""Number of checks completed:   $v_TOTAL_CHECKS\n  #Success/#Partial/#Failure:   $v_TOTAL_SUCCESSES / $v_TOTAL_PARTIAL_SUCCESSES / $v_TOTAL_FAILURES\n  %Success/%Partial/%Failure:   $v_PERCENT_SUCCESSES% / $v_PERCENT_PARTIAL_SUCCESSES% / $v_PERCENT_FAILURES%\n  This check:                   $v_CHECK_DURATION seconds\n  Average check:                $v_AVERAGE_DURATION seconds\n  Average recent check:         $v_AVERAGE_RECENT_DURATION seconds\n  Average successful check:     $v_AVERAGE_SUCCESS_DURATION seconds"
-		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/status || "$v_DUMP_STATUS" == true ]]; then
-			echo -e "$v_REPORT2""\n  Total duration:               $v_TOTAL_DURATIONS seconds\n  Total recent duration:        $v_TOTAL_RECENT_DURATION seconds\n  Total successful duration:    $v_TOTAL_SUCCESS_DURATIONS seconds\n  Last $v_LONG_HOURS hours:\n    Number of checks completed: $v_LONG_COUNT\n    #Success/#Partial/#Failure: $v_LONG_SUCCESS / $v_LONG_PARTIAL / $v_LONG_FAIL\n    %Success/%Partial/%Failure: $v_LONG_PERCENT_SUCCESS% / $v_LONG_PERCENT_PARTIAL% / $v_LONG_PERCENT_FAIL%\n    Average check:              $v_LONG_AVERAGE_DURATION seconds\n    Total duration:             $v_LONG_TOTAL_DURATION seconds\n  Last $v_SHORT_HOURS hours:\n    Number of checks completed: $v_SHORT_COUNT\n    #Success/#Partial/#Failure: $v_SHORT_SUCCESS / $v_SHORT_PARTIAL / $v_SHORT_FAIL\n    %Success/%Partial/%Failure: $v_SHORT_PERCENT_SUCCESS% / $v_SHORT_PERCENT_PARTIAL% / $v_SHORT_PERCENT_FAIL%\n    Average check:              $v_SHORT_AVERAGE_DURATION seconds\n    Total duration:             $v_SHORT_TOTAL_DURATION seconds" > "$d_WORKING"/"$v_CHILD_PID"/status
-			mv -f "$d_WORKING"/"$v_CHILD_PID"/status "$d_WORKING"/"$v_CHILD_PID/#status"
+		if [[ -f "$d_CHILD"/status || "$v_DUMP_STATUS" == true ]]; then
+			echo -e "$v_REPORT2""\n  Total duration:               $v_TOTAL_DURATIONS seconds\n  Total recent duration:        $v_TOTAL_RECENT_DURATION seconds\n  Total successful duration:    $v_TOTAL_SUCCESS_DURATIONS seconds\n  Last $v_LONG_HOURS hours:\n    Number of checks completed: $v_LONG_COUNT\n    #Success/#Partial/#Failure: $v_LONG_SUCCESS / $v_LONG_PARTIAL / $v_LONG_FAIL\n    %Success/%Partial/%Failure: $v_LONG_PERCENT_SUCCESS% / $v_LONG_PERCENT_PARTIAL% / $v_LONG_PERCENT_FAIL%\n    Average check:              $v_LONG_AVERAGE_DURATION seconds\n    Total duration:             $v_LONG_TOTAL_DURATION seconds\n  Last $v_SHORT_HOURS hours:\n    Number of checks completed: $v_SHORT_COUNT\n    #Success/#Partial/#Failure: $v_SHORT_SUCCESS / $v_SHORT_PARTIAL / $v_SHORT_FAIL\n    %Success/%Partial/%Failure: $v_SHORT_PERCENT_SUCCESS% / $v_SHORT_PERCENT_PARTIAL% / $v_SHORT_PERCENT_FAIL%\n    Average check:              $v_SHORT_AVERAGE_DURATION seconds\n    Total duration:             $v_SHORT_TOTAL_DURATION seconds" > "$d_CHILD"/status
+			mv -f "$d_CHILD"/status "$d_CHILD/#status"
 		fi
 	fi
 
@@ -614,7 +626,7 @@ function fn_report_status {
 			v_REPORT="$v_REPORT Last failed check: $v_LAST_FAILURE_STRING."
 		fi
 		v_REPORT="$v_REPORT $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate."
-	elif [[ "$v_VERBOSITY" == "more verbose" || -f "$d_WORKING"/"$v_CHILD_PID"/status ]]; then
+	elif [[ "$v_VERBOSITY" == "more verbose" || -f "$d_CHILD"/status ]]; then
 		### more verbose
 		v_REPORT="$v_REPORT2"
 	else
@@ -638,7 +650,7 @@ function fn_report_status {
 			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
 		fi
 		echo "$v_DATE2 - [$v_CHILD_PID] - Initial status for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2" >> "$v_LOG"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Initial status for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2" >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_DATE2 - [$v_CHILD_PID] - Initial status for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2" >> "$d_CHILD"/log
 		### Mark the email type so that a message is not sent erroneously
 		v_LAST_EMAIL_SENT="$v_THIS_STATUS"
 	### If the last status was also successful
@@ -647,7 +659,7 @@ function fn_report_status {
 			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
 		fi
 		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$v_LOG"
-		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$d_CHILD"/log
 		v_SUCCESS_CHECKS=0
 		if [[ "$v_JOB_TYPE" == "url" && "$v_HTML_FILES_KEPT" -gt 0 ]]; then
 			fn_url_save_html "$v_LAST_STATUS" "$v_THIS_STATUS" "$v_SAVE"
@@ -659,7 +671,7 @@ function fn_report_status {
 			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
 		fi
 		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$v_LOG"
-		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$d_CHILD"/log
 		v_PARTIAL_SUCCESS_CHECKS=0
 		if [[ "$v_JOB_TYPE" == "url" && "$v_HTML_FILES_KEPT" -gt 0 ]]; then
 			fn_url_save_html "$v_LAST_STATUS" "$v_THIS_STATUS" "$v_SAVE"
@@ -671,13 +683,13 @@ function fn_report_status {
 			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
 		fi
 		echo "$v_LOG_MESSAGE after $v_FAILURE_CHECKS failed checks" >> "$v_LOG"
-		echo "$v_LOG_MESSAGE after $v_FAILURE_CHECKS failed checks" >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_LOG_MESSAGE after $v_FAILURE_CHECKS failed checks" >> "$d_CHILD"/log
 		v_FAILURE_CHECKS=0
 		fn_start_email
 	fi
 	### If we need to log the duration data, do so
 	if [[ "$v_LOG_DURATION_DATA" == "true" ]]; then
-		echo "$v_DATE2 - [$v_CHILD_PID] - Status: $v_DESCRIPTOR2 - Duration $v_CHECK_DURATION seconds" >> "$d_WORKING"/"$v_CHILD_PID"/log
+		echo "$v_DATE2 - [$v_CHILD_PID] - Status: $v_DESCRIPTOR2 - Duration $v_CHECK_DURATION seconds" >> "$d_CHILD"/log
 	fi
 
 	### Preparing for the next loop
@@ -701,7 +713,7 @@ function fn_report_status {
 
 function fn_start_email {
 	fn_debug "fn_start_email"
-	local v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n$( cat "$d_WORKING"/"$v_CHILD_PID"/log | grep -E -v "\] - (The HTML response code|Status: (Check (failed|succeeded)|Partial success) - Duration)" )"
+	local v_MUTUAL_EMAIL="thus meeting your threshold for being alerted. Since the previous e-mail was sent (Or if none have been sent, since checks against this server were started) there have been a total of $v_NUM_SUCCESSES_EMAIL successful checks, $v_NUM_PARTIAL_SUCCESSES_EMAIL partially successful checks, and $v_NUM_FAILURES_EMAIL failed checks.\n\nChecks have been running for $v_RUN_TIME. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate.\n\nThis check took $v_CHECK_DURATION seconds to complete. The last ${#a_RECENT_DURATIONS[@]} checks took an average of $v_AVERAGE_RECENT_DURATION seconds to complete. The average successful check has taken $v_AVERAGE_SUCCESS_DURATION seconds to complete. The average check overall has taken $v_AVERAGE_DURATION seconds to complete.\n\nLogs related to this check:\n\n$( cat "$d_CHILD"/log | grep -E -v "\] - (The HTML response code|Status: (Check (failed|succeeded)|Partial success) - Duration)" )"
 	if [[ "$v_THIS_STATUS" == "intermittent failure" ]]; then
 		fn_intermittent_failure_email "$v_MUTUAL_EMAIL"
 	elif [[ "$v_THIS_STATUS" == "success" ]]; then
@@ -834,7 +846,6 @@ function fn_run_script {
 	fi
 }
 
-v_RUNNING_STATE="child"
 fn_start_script
 if [[ -n "$1" ]]; then
 	fn_child

@@ -1,48 +1,15 @@
 #! /bin/bash
 
 function fn_debug {
-### if $b_DEBUG is true, this will cause every function to output its name every time it is run, and any other time fn_debug is called
-### If $b_DEBUG2 is true, this will only output if the data it's passed does not begin with "fn_"
-	if [[ "$b_DEBUG" == true ]]; then
-		echo "$$ - $v_RUNNING_STATE: '$1'" > /dev/stderr
-	elif [[ "$b_DEBUG2" == true && "${1:0:3}" != "fn_" ]]; then
-		echo "$$ - $v_RUNNING_STATE: '$1'" > /dev/stderr
-	fi
-}
-
-function fn_update_conf {
-### This function updates a value in the conf file. It expects $1 to be the name of the directive, $2 to be the new value for that directive, and $3 to be the name of the conf file.
-	fn_debug "fn_update_conf"
-	if [[ "$3" == "child" && -f "$d_WORKING"/"$v_CHILD_PID"/params ]]; then
-		v_CONF_FILE="$d_WORKING"/"$v_CHILD_PID"/params
-	elif [[ "$3" == "master" && -f "$f_CONF" ]]; then
-		v_CONF_FILE="$f_CONF"
-	else
-		v_CONF_FILE="$3"
-	fi
-	if [[ -f "$v_CONF_FILE" ]]; then
-		### We're about to run $2 through sed, so it needs to have all of its slashes escaped.
-		v_MODIFIED_2="$( echo "$2" | sed -e 's/[\/&]/\\&/g' )"
-		if [[ $( grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
-			sed -i "$( grep -E -n "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/\(^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
-		elif [[ $( grep -E -c "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*$" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
-		### If there's a commended-out line, but it doesn't have a value afterward...
-			sed -i "$( grep -E -n "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/^[[:blank:]]*##*\([[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
-		else
-			echo "$1 = $v_MODIFIED_2" >> "$v_CONF_FILE"
+### If $b_DEBUG is true, this will output debugging information that does not begin with "fn_"
+### If $b_DEBUG_FUNCTIONS is true, the function name for every function will be output every time a function starts
+	if [[ "${1:0:3}" != "fn_" ]]; then
+		if [[ "$b_DEBUG" == true ]]; then
+			echo "$$: $1" > /dev/stderr
 		fi
+	elif [[ "$b_DEBUG_FUNCTIONS" == true ]]; then
+		echo "$$: $1" > /dev/stderr
 	fi
-}
-
-function fn_convert_seconds {
-### I really haven't wrapped my head around how this function I stole works, but it converts a number of seconds to hours, minutes, and seconds.
-	fn_debug "fn_convert_seconds"
-	((h=${1}/3600))
-	### This is the part where it does some stuff.
-	((m=(${1}%3600)/60))
-	((s=${1}%60))
-	### I'm really excited about this part here that does the thing.
-	printf "%02d:%02d:%02d\n" "$h" "$m" "$s"
 }
 
 function fn_start_script {
@@ -80,7 +47,7 @@ function fn_use_wget {
 
 function fn_sanitize {
 ### Given a variable that we're going to run through an egrep, escape all special characters
-	v_OUTPUT="${1//\\/\\\\}"
+	local v_OUTPUT="${1//\\/\\\\}"
 	v_OUTPUT="${v_OUTPUT//\*/\\*}"
 	v_OUTPUT="${v_OUTPUT//\./\\.}"
 	v_OUTPUT="${v_OUTPUT//[/\\[}"
@@ -195,170 +162,5 @@ function fn_parse_server {
 	fi
 	if [[ "$b_DEBUG2" == true ]]; then
 		echo -e "PASSED:     $1\nCURL_URL:   $v_CURL_URLa\nDOMAIN:     $v_DOMAINa\nIP_ADDRESS: $v_IP_ADDRESSa\nPORT:       $v_SERVER_PORTa\n"
-	fi
-}
-
-function fn_make_params {
-	fn_debug "fn_make_params"
-	if [[ -n "$1" ]]; then
-		local f_JOB="$1"
-	else
-		return
-	fi
-	touch "$f_JOB"
-	chmod 600 "$f_JOB"
-	echo "JOB_TYPE = $v_JOB_TYPE" > "$f_JOB"
-	if [[ -n "$v_IDENT" ]]; then
-		v_ORIG_JOB_NAME="$v_ORIG_JOB_NAME $v_IDENT"
-		unset v_IDENT
-	fi
-	if [[ -z "$v_JOB_NAME" ]]; then
-		v_JOB_NAME="$v_ORIG_JOB_NAME"
-	fi
-	echo "JOB_NAME = $v_JOB_NAME" >> "$f_JOB"
-	echo "ORIG_JOB_NAME = $v_ORIG_JOB_NAME" >> "$f_JOB"
-
-	if [[ "$v_JOB_TYPE" == "url" ]]; then
-		echo "CURL_URL = $v_CURL_URL_PREEDIT" >> "$f_JOB"
-		i=0; while [[ $i -le $(( ${#a_CURL_STRING[@]} -1 )) ]]; do
-			### The sed at the end of this line should make the string egrep safe (which is good, because egrepping with it is exactly what we're going to do).
-			echo "CURL_STRING = ${a_CURL_STRING[$i]}" >> "$f_JOB"
-			i=$(( $i + 1 ))
-		done
-		if [[ -z "$v_USER_AGENT_PREEDIT" ]]; then
-			echo "# USER_AGENT = $v_MASTER_USER_AGENT" >> "$f_JOB"
-		else
-			echo "USER_AGENT = $v_USER_AGENT_PREEDIT" >> "$f_JOB"
-		fi
-		if [[ "$v_IP_ADDRESS" == "false" ]]; then
-			echo "# IP_ADDRESS = " >> "$f_JOB"
-		else
-			echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$f_JOB"
-		fi
-		if [[ -z "$v_USE_WGET" ]]; then
-			echo "# USE_WGET = $v_MASTER_USE_WGET" >> "$f_JOB"
-		else
-			echo "USE_WGET = $v_USE_WGET" >> "$f_JOB"
-		fi
-		if [[ "$v_USE_WGET" == "true" ]]; then
-			v_CURL_VERBOSE="false"
-			v_LOG_HTTP_CODE="false"
-		fi
-		if [[ -z "$v_CURL_VERBOSE" ]]; then
-			echo "# CURL_VERBOSE = $v_MASTER_CURL_VERBOSE" >> "$f_JOB"
-		else
-			echo "CURL_VERBOSE = $v_CURL_VERBOSE" >> "$f_JOB"
-		fi
-		if [[ -z "$v_LOG_HTTP_CODE" ]]; then
-			echo "# LOG_HTTP_CODE = $v_MASTER_LOG_HTTP_CODE" >> "$f_JOB"
-		else
-			echo "LOG_HTTP_CODE = $v_LOG_HTTP_CODE" >> "$f_JOB"
-		fi
-		if [[ -z "$v_HTML_FILES_KEPT" ]]; then
-			echo "# HTML_FILES_KEPT = $v_MASTER_HTML_FILES_KEPT" >> "$f_JOB"
-		else
-			echo "HTML_FILES_KEPT = $v_HTML_FILES_KEPT" >> "$f_JOB"
-		fi
-	elif [[ "$v_JOB_TYPE" == "dns" ]]; then
-		echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$f_JOB"
-		if [[ -z "$v_DNS_CHECK_RESULT" ]]; then
-			echo "# DNS_CHECK_RESULT = " >> "$f_JOB"
-		else
-			echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$f_JOB"
-		fi
-		if [[ -z "$v_DNS_RECORD_TYPE" ]]; then
-			echo "# DNS_RECORD_TYPE = $v_MASTER_DNS_RECORD_TYPE" >> "$f_JOB"
-		else
-			echo "DNS_RECORD_TYPE = $v_DNS_RECORD_TYPE" >> "$f_JOB"
-		fi
-	elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
-		if [[ -z "$v_SERVER_PORT" ]]; then
-			echo "# SERVER_PORT = $v_MASTER_SERVER_PORT" >> "$f_JOB"
-		else
-			echo "SERVER_PORT = $v_SERVER_PORT" >> "$f_JOB"
-		fi
-		echo "SSH_USER = $v_SSH_USER" >> "$f_JOB"
-		if [[ -z "$v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" ]]; then
-			echo "# MIN_LOAD_PARTIAL_SUCCESS = $v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" >> "$f_JOB"
-		else
-			echo "MIN_LOAD_PARTIAL_SUCCESS = $v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
-		fi
-		if [[ -z "$v_MIN_LOAD_FAILURE_PREEDIT" ]]; then
-			echo "# MIN_LOAD_FAILURE = $v_MASTER_MIN_LOAD_FAILURE" >> "$f_JOB"
-		else
-			echo "MIN_LOAD_FAILURE = $v_MIN_LOAD_FAILURE_PREEDIT" >> "$f_JOB"
-		fi
-	fi
-
-
-	if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" ]]; then
-			echo "# CHECK_TIME_PARTIAL_SUCCESS = $v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" >> "$f_JOB"
-		else
-			echo "CHECK_TIME_PARTIAL_SUCCESS = $v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
-		fi
-		if [[ -z "$v_CHECK_TIMEOUT" ]]; then
-			echo "# CHECK_TIMEOUT = $v_MASTER_CHECK_TIMEOUT" >> "$f_JOB"
-		else
-			echo "CHECK_TIMEOUT = $v_CHECK_TIMEOUT" >> "$f_JOB"
-		fi
-	fi
-	if [[ "$v_JOB_TYPE" == "ping" || "$v_JOB_TYPE" == "dns" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		echo "DOMAIN = $v_DOMAIN" >> "$f_JOB"
-	fi
-	if [[ -z "$v_WAIT_SECONDS" ]]; then
-		echo "# WAIT_SECONDS = $v_MASTER_WAIT_SECONDS" >> "$f_JOB"
-	else
-		echo "WAIT_SECONDS = $v_WAIT_SECONDS" >> "$f_JOB"
-	fi
-	if [[ -z "$v_EMAIL_ADDRESS" ]]; then
-		echo "# EMAIL_ADDRESS = $v_MASTER_EMAIL_ADDRESS" >> "$f_JOB"
-	else
-		echo "EMAIL_ADDRESS = $v_EMAIL_ADDRESS" >> "$f_JOB"
-	fi
-	if [[ -z "$v_MAIL_DELAY" ]]; then
-		echo "# MAIL_DELAY = $v_MASTER_MAIL_DELAY" >> "$f_JOB"
-	else
-		echo "MAIL_DELAY = $v_MAIL_DELAY" >> "$f_JOB"
-	fi
-	if [[ -z "$v_VERBOSITY" ]]; then
-		echo "# VERBOSITY = $v_MASTER_VERBOSITY" >> "$f_JOB"
-	else
-		echo "VERBOSITY = $v_VERBOSITY" >> "$f_JOB"
-	fi
-	if [[ -z "$v_OUTPUT_FILE" ]]; then
-		echo "# OUTPUT_FILE = $v_MASTER_OUTPUT_FILE" >> "$f_JOB"
-	else
-		echo "OUTPUT_FILE = $v_OUTPUT_FILE" >> "$f_JOB"
-	fi
-	if [[ -z "$v_CUSTOM_MESSAGE" ]]; then
-		echo "# CUSTOM_MESSAGE = $v_MASTER_CUSTOM_MESSAGE" >> "$f_JOB"
-	else
-		echo "CUSTOM_MESSAGE = $v_CUSTOM_MESSAGE" >> "$f_JOB"
-	fi
-	if [[ -z "$v_LOG_DURATION_DATA" ]]; then
-		echo "# LOG_DURATION_DATA = $v_MASTER_LOG_DURATION_DATA" >> "$f_JOB"
-	else
-		echo "LOG_DURATION_DATA = $v_LOG_DURATION_DATA" >> "$f_JOB"
-	fi
-	if [[ -z "$v_NUM_DURATIONS_RECENT" ]]; then
-		echo "# NUM_DURATIONS_RECENT = $v_MASTER_NUM_DURATIONS_RECENT" >> "$f_JOB"
-	else
-		echo "NUM_DURATIONS_RECENT = $v_NUM_DURATIONS_RECENT" >> "$f_JOB"
-	fi
-	if [[ -z "$v_NUM_STATUSES_RECENT" ]]; then
-		echo "# NUM_STATUSES_RECENT = $v_MASTER_NUM_STATUSES_RECENT" >> "$f_JOB"
-	else
-		echo "NUM_STATUSES_RECENT = $v_NUM_STATUSES_RECENT" >> "$f_JOB"
-	fi
-	if [[ -z "$v_NUM_STATUSES_NOT_SUCCESS" ]]; then
-		echo "# NUM_STATUSES_NOT_SUCCESS = $v_MASTER_NUM_STATUSES_NOT_SUCCESS" >> "$f_JOB"
-	else
-		echo "NUM_STATUSES_NOT_SUCCESS = $v_NUM_STATUSES_NOT_SUCCESS" >> "$f_JOB"
-	fi
-	if [[ -z "$v_SCRIPT" ]]; then
-		echo "# SCRIPT = " >> "$f_JOB"
-	else
-		echo "SCRIPT = $v_SCRIPT" >> "$f_JOB"
 	fi
 }

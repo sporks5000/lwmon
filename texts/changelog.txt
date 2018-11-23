@@ -17,6 +17,8 @@ Future Versions -
     - Reviesd how command line arguments are parsed
     - Revised how variables are pulled from the configuration and the params files
     - Fixed a bug where resetting the end time on an old child directory would not function as expected
+    - The command line details now only give the details specific to that job
+        - No default values or master conf values are included
     - A sane version of the params file is re-written every time it is updated
     - Replaced the "ALT_MAIL" directive with "MAIL_COMMAND", which offers more flexibility
     - The values of the "MAIL_COMMAND" and "SCRIPT" directives are now parsed and ran by eval
@@ -26,6 +28,8 @@ Future Versions -
     - Added "CUSTOM_MESSAGE" to the main config
     - Added "HTML_FILES_KEPT" to the "url" params file
     - Fixed a bug where the previous verbose output was being overwritten
+    - Allowed "DEBUG" and "DEBUG_FUNCTIONS" do be directives in both conf and params
+    - Re-worked the process for notifying the user of new versions
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified
