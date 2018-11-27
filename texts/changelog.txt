@@ -4,7 +4,7 @@ Future Versions -
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
 
-3.0.0 (DATE) -
+3.0.0 (2018-11-27) -
     - Split lwmon up into multiple files
         - Better change tracking
         - Allows processes to be more light weight
@@ -30,6 +30,7 @@ Future Versions -
     - Allowed "DEBUG" and "DEBUG_FUNCTIONS" do be directives in both conf and params
     - Re-worked the process for notifying the user of new versions
     - Re-worked functions so that variables are local where possible, and that non-local variables are declared at the start of each file
+    - Added an installation process
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified

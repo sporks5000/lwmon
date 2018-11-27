@@ -58,6 +58,11 @@ function fn_use_wget {
 	v_CURL_BIN="false"
 }
 
+function fn_version {
+### Output the version number
+	grep -E -m1 -o "^[0-9]+\.[0-9]+\.[0-9]+" "$d_PROGRAM"/texts/changelog.txt
+}
+
 function fn_sanitize {
 ### Given a variable that we're going to run through an egrep, escape all special characters
 	local v_OUTPUT="${1//\\/\\\\}"

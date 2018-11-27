@@ -26,20 +26,11 @@ function fn_remove_unnecessary_functions {
 	unset -f fn_parse_cl_and_go
 
 	### Functions from mutual.shf
-	### Keep the following: fn_debug fn_use_wget fn_sanitize fn_parse_server
+	### Keep the following: fn_debug fn_use_wget fn_sanitize fn_parse_server fn_version
 	unset -f fn_start_script
 
 	### functions from variables.shf
 	### Functions we keep: fn_set_defaults fn_is_integer fn_is_float fn_is_boolean fn_is_file_path fn_is_email fn_is_verbosity fn_is_string fn_read_master_conf fn_read_child_params_lite
-	unset -f fn_set_defaults
-	unset -f fn_is_integer
-	unset -f fn_is_float
-	unset -f fn_is_boolean
-	unset -f fn_is_file_path
-	unset -f fn_is_email
-	unset -f fn_is_verbosity
-	unset -f fn_is_string
-	unset -f fn_read_master_conf
 	unset -f fn_read_child_params
 
 	### Functions from create.shf
@@ -100,7 +91,7 @@ function fn_master {
 
 			### Announce if there is a new version
 			if [[ "$b_DOWNLOAD_NEW" == true ]]; then
-				echo -e "\e[31mThere is a new version of LWmon available at https://www.lwmon.com/lwmon.tar.gz\e00m"
+				echo -e "\e[31mThere is a new version of LWmon available at https://www.lwmon.com/lwmon.tar.gz\e[00m"
 			fi
 
 			### Also, let's do getting rid of old processes here - there's no reason to do that every two seconds, and this already runs every half hour, so there's no need to create a separate timer for that.
@@ -180,6 +171,30 @@ function fn_check_updates {
 	if [[ "$v_DATE" -gt $(( v_VERSION_CHECK + ( 3600 * 24 ) )) ]]; then
 	### If it's been 24 hours or more since the last version check
 		local v_HASH="$( cat "$d_PROGRAM"/version/version 2> /dev/null )"
+		if [[ "$v_HASH" == "new" ]]; then
+		### If we do not already have a hash file, get it
+			local v_VERSION="$( fn_version )"
+
+			### Download the most recent hash
+			##### I should store historical versions at lwmon.com eventually
+			if [[ "$v_WGET_BIN" == "false" ]]; then
+				"$v_CURL_BIN" -Ls 'https://sporks5000.com/scripts/lwmon.tar.gz.'"$v_VERSION"'.md5sum' -o "$d_PROGRAM"/version/version_ 2> /dev/null
+			else
+				"$v_WGET_BIN" -q 'https://sporks5000.com/scripts/lwmon.tar.gz.'"$v_VERSION"'.md5sum' -O "$d_PROGRAM"/version/version_ 2> /dev/null
+			fi
+
+			### Check that the download worked
+			if [[ "$?" != "0" ]]; then
+				rm -f "$d_PROGRAM"/version/version_
+				v_VERSION_CHECK="$v_DATE"
+				echo -n "$v_DATE" > "$d_PROGRAM"/version/version_check
+				return
+			fi
+
+			### Move the hash file into place
+			mv -f "$d_PROGRAM"/version/version_ "$d_PROGRAM"/version/version
+			v_HASH="$( cat "$d_PROGRAM"/version/version 2> /dev/null )"
+		fi
 
 		### Download the most recent hash
 		if [[ "$v_WGET_BIN" == "false" ]]; then
@@ -188,12 +203,9 @@ function fn_check_updates {
 			"$v_WGET_BIN" -q 'https://lwmon.com/lwmon.tar.gz.md5sum' -O "$d_PROGRAM"/version/version_ 2> /dev/null
 		fi
 
-		### check that the download worked
+		### Check that the download worked
 		if [[ "$?" != "0" ]]; then
 			rm -f "$d_PROGRAM"/version/version_
-		elif [[ "$v_HASH" == "new" ]]; then
-		### If we do not already have a hash file, now we do
-			mv -f "$d_PROGRAM"/version/version_ "$d_PROGRAM"/version/version
 		else
 		### Compare the current hash to the new hash
 			local v_HASH_NEW="$( cat "$d_PROGRAM"/version/version_ 2> /dev/null )"

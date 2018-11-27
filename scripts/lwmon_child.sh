@@ -99,8 +99,6 @@ function fn_locate {
 	d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && cd ../ && pwd )"
 }
 
-##### Do a second pass to make sure that we've localized as much as possible
-
 #==================================================#
 #== Functions for Starting and Ending Child Jobs ==#
 #==================================================#
@@ -175,7 +173,7 @@ function fn_url_child {
 	local v_LAST_HTML_RESPONSE_CODE
 	local f_STDERR="/dev/null"
 	local a_CURL_ARGS=()
-	v_VERSION="$( grep -E -m1 -o "^[0-9]+\.[0-9]+\.[0-9]+" "$d_PROGRAM"/texts/changelog.txt )"
+	v_VERSION="$( fn_version )"
 	while [[ 1 == 1 ]]; do
 		fn_child_start_loop
 		### Change the name of the previous download of the site
@@ -575,6 +573,18 @@ function fn_long_short_dur {
 	v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} + ${v_CHECK_DURATION}}" 2> /dev/null || echo "error with awk 18" > /dev/stderr )"
 }
 
+function fn_output {
+### Output the status to the correct place
+	local v_MESSAGE="$1"
+	if [[ "$v_OUTPUT_FILE" == "/dev/stdout" ]]; then
+		echo -e "$v_MESSAGE"
+	elif [[ "$v_OUTPUT_FILE" == "/dev/stderr" ]]; then
+		( >&2 echo -e "$v_MESSAGE" )
+	else
+		echo -e "$v_MESSAGE" >> "$v_OUTPUT_FILE"
+	fi
+}
+
 #==================================================#
 #== That one Big Function for Outputting Results ==#
 #==================================================#
@@ -784,13 +794,13 @@ function fn_report_status {
 	v_SENT=false
 	if [[ "$v_THIS_STATUS" == "$v_LAST_STATUS" ]]; then
 		if [[ "$v_VERBOSITY" != "change" && "$v_VERBOSITY" != "none" && ! -f "$d_WORKING"/no_output ]]; then
-			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
+			fn_output "$v_COLOR_START""$v_REPORT""$v_COLOR_END"
 		fi
 		fn_start_email
 	### If there was no last status
 	elif [[ -z "$v_LAST_STATUS" ]]; then
 		if [[ "$v_VERBOSITY" != "none" && ! -f "$d_WORKING"/no_output ]]; then
-			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
+			fn_output "$v_COLOR_START""$v_REPORT""$v_COLOR_END"
 		fi
 		echo "$v_DATE2 - [$v_CHILD_PID] - Initial status for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2" >> "$v_LOG"
 		echo "$v_DATE2 - [$v_CHILD_PID] - Initial status for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2" >> "$d_CHILD"/log
@@ -799,7 +809,7 @@ function fn_report_status {
 	### If the last status was also successful
 	elif [[ "$v_LAST_STATUS" == "success" ]]; then
 		if [[ "$v_VERBOSITY" != "none" && ! -f "$d_WORKING"/no_output ]]; then
-			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
+			fn_output "$v_COLOR_START""$v_REPORT""$v_COLOR_END"
 		fi
 		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$v_LOG"
 		echo "$v_LOG_MESSAGE after $v_SUCCESS_CHECKS successful checks" >> "$d_CHILD"/log
@@ -811,7 +821,7 @@ function fn_report_status {
 	### If the last status was partial success
 	elif [[ "$v_LAST_STATUS" == "partial success" ]]; then
 		if [[ "$v_VERBOSITY" != "none" && ! -f "$d_WORKING"/no_output ]]; then
-			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
+			fn_output "$v_COLOR_START""$v_REPORT""$v_COLOR_END"
 		fi
 		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$v_LOG"
 		echo "$v_LOG_MESSAGE after $v_PARTIAL_SUCCESS_CHECKS partial successes" >> "$d_CHILD"/log
@@ -823,7 +833,7 @@ function fn_report_status {
 	### If the last status was failure
 	elif [[ "$v_LAST_STATUS" == "failure" ]]; then
 		if [[ "$v_VERBOSITY" != "none" && ! -f "$d_WORKING"/no_output ]]; then
-			echo -e "$v_COLOR_START""$v_REPORT""$v_COLOR_END" >> "$v_OUTPUT_FILE"
+			fn_output "$v_COLOR_START""$v_REPORT""$v_COLOR_END"
 		fi
 		echo "$v_LOG_MESSAGE after $v_FAILURE_CHECKS failed checks" >> "$v_LOG"
 		echo "$v_LOG_MESSAGE after $v_FAILURE_CHECKS failed checks" >> "$d_CHILD"/log
