@@ -1,5 +1,19 @@
 #! /bin/bash
 
+### Global variables set within these functions
+f_CONF=
+d_WORKING=
+v_CURL_BIN=
+v_CURL_BIN_VERSION=
+v_WGET_BIN=
+v_WGET_BIN_VERSION=
+
+### Variables used with fn_parse_server
+v_CURL_URLa="false"
+v_DOMAINa="false"
+v_IP_ADDRESSa="false"
+v_SERVER_PORTa="false"
+
 function fn_debug {
 ### If $b_DEBUG is true, this will output debugging information that does not begin with "fn_"
 ### If $b_DEBUG_FUNCTIONS is true, the function name for every function will be output every time a function starts
@@ -20,7 +34,6 @@ function fn_start_script {
 	### Specify the working directory; create it if not present; specify the log file
 	d_WORKING="$d_PROGRAM"/".lwmon"
 	mkdir -p "$d_WORKING"
-	v_CHILD_SCRIPT="$d_PROGRAM"/scripts/lwmon_child.sh
 
 	### find the newst version of curl
 	### /usr/bin/curl is the standard installation of curl

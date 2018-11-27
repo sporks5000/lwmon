@@ -1,5 +1,11 @@
 #! /bin/bash
 
+#==================================================#
+#== Functions for Setting and Clearing Variables ==#
+#==================================================#
+
+### These functions are here at least in part in order to help keep track of the variables that we're using
+
 function fn_set_defaults {
 	fn_debug "fn_set_defaults"
 	### Variables that can be set in the main config
@@ -46,6 +52,96 @@ function fn_set_defaults {
 	v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS="4"
 	v_DEFAULT_MIN_LOAD_FAILURE="8"
 }
+
+function fn_clear_master_vars1 {
+### Clear the variables that can also be set in the params files
+	v_MASTER_VERBOSITY=
+	v_MASTER_EMAIL_ADDRESS=
+	v_MASTER_MAIL_DELAY=
+	v_MASTER_WAIT_SECONDS=
+	v_MASTER_CHECK_TIMEOUT=
+	v_MASTER_OUTPUT_FILE=
+	v_MASTER_USER_AGENT=
+	v_MASTER_HTML_FILES_KEPT=
+	v_MASTER_NUM_DURATIONS_RECENT=
+	v_MASTER_NUM_STATUSES_RECENT=
+	v_MASTER_NUM_STATUSES_NOT_SUCCESS=
+	v_MASTER_CHECK_TIME_PARTIAL_SUCCESS=
+	v_MASTER_LOG_DURATION_DATA=
+	v_MASTER_CURL_VERBOSE=
+	v_MASTER_LOG_HTTP_CODE=
+	v_MASTER_USE_WGET=
+	v_MASTER_CUSTOM_MESSAGE=
+	v_MASTER_DNS_RECORD_TYPE=
+	v_MASTER_SERVER_PORT=
+	v_MASTER_MIN_LOAD_PARTIAL_SUCCESS=
+	v_MASTER_MIN_LOAD_FAILURE=
+	v_MASTER_DEBUG=
+	v_MASTER_DEBUG_FUNCTIONS=
+}
+
+function fn_clear_master_vars2 {
+### Clear the variables that cannot be set in params files
+	v_MASTER_LOG=
+	v_MASTER_MAIL_COMMAND=
+	v_MASTER_SSH_CONTROL_PATH=
+	v_MASTER_COLOR_SUCCESS=
+	v_MASTER_COLOR_FIRST_SUCCESS=
+	v_MASTER_COLOR_FAILURE=
+	v_MASTER_COLOR_FIRST_FAILURE=
+	v_MASTER_COLOR_PARTIAL_SUCCESS=
+	v_MASTER_COLOR_FIRST_PARTIAL_SUCCESS=
+	v_MASTER_RETURN_SUCCESS=
+	v_MASTER_RETURN_FIRST_SUCCESS=
+	v_MASTER_RETURN_FAILURE=
+	v_MASTER_RETURN_FIRST_FAILURE=
+	v_MASTER_RETURN_PARTIAL_SUCCESS=
+	v_MASTER_RETURN_FIRST_PARTIAL_SUCCESS=
+}
+
+function fn_clear_params_vars {
+### Clear variables that are set with the parameters file
+	### Global variables carried over from another file
+	v_JOB_TYPE=
+	v_ORIG_JOB_NAME=
+	v_CHECK_TIME_PARTIAL_SUCCESS=
+	v_CHECK_TIMEOUT=
+	v_CURL_VERBOSE=
+	v_CUSTOM_MESSAGE=
+	v_EMAIL_ADDRESS=
+	v_HTML_FILES_KEPT=
+	v_LOG_DURATION_DATA=
+	v_PORT=
+	v_CURL_URL=
+	v_DNS_CHECK_DOMAIN=
+	v_DOMAIN=
+	v_JOB_NAME=
+	v_SSH_USER=
+	v_DNS_CHECK_RESULT=
+	v_IP_ADDRESS=
+	v_SCRIPT=
+	v_DNS_RECORD_TYPE=
+	v_LOG_HTTP_CODE=
+	v_MAIL_DELAY=
+	v_MIN_LOAD_FAILURE=
+	v_MIN_LOAD_PARTIAL_SUCCESS=
+	v_NUM_DURATIONS_RECENT=
+	v_NUM_STATUSES_NOT_SUCCESS=
+	v_NUM_STATUSES_RECENT=
+	v_OUTPUT_FILE=
+	v_SERVER_PORT=
+	v_USE_WGET=
+	v_USER_AGENT=
+	v_VERBOSITY=
+	v_WAIT_SECONDS=
+	v_DEBUG=
+	v_DEBUG_FUNCTIONS=
+	a_CURL_STRING=()
+}
+
+#=====================================#
+#== Functions for Testing Variables ==#
+#=====================================#
 
 function fn_is_integer {
 ### Given a variable that should be a number ($1) and a variable that's the default ($2), return a number, or "0"
@@ -138,13 +234,16 @@ function fn_read_master_conf {
 	fn_debug "fn_read_master_conf"
 	fn_set_defaults
 
+	### If we're asked to read the master conf, and there IS NO master conf present, create one
 	if [[ ! -f "$f_CONF" ]]; then
 		source "$d_PROGRAM"/includes/create_config.shf
 		fn_create_config
 	fi
 
+	### Clear the master variables
+	fn_clear_master_vars1
+	fn_clear_master_vars2
 	### Read the configuration
-	unset v_MASTER_VERBOSITY v_MASTER_EMAIL_ADDRESS v_MASTER_MAIL_DELAY v_MASTER_WAIT_SECONDS v_MASTER_CHECK_TIMEOUT v_MASTER_OUTPUT_FILE v_MASTER_USER_AGENT v_MASTER_HTML_FILES_KEPT v_MASTER_NUM_DURATIONS_RECENT v_MASTER_NUM_STATUSES_RECENT v_MASTER_NUM_STATUSES_NOT_SUCCESS v_MASTER_CHECK_TIME_PARTIAL_SUCCESS v_MASTER_LOG_DURATION_DATA v_MASTER_CURL_VERBOSE v_MASTER_LOG_HTTP_CODE v_MASTER_USE_WGET v_MASTER_CUSTOM_MESSAGE v_MASTER_LOG v_MASTER_MAIL_COMMAND v_MASTER_SSH_CONTROL_PATH v_MASTER_COLOR_SUCCESS v_MASTER_COLOR_FIRST_SUCCESS v_MASTER_COLOR_FAILURE v_MASTER_COLOR_FIRST_FAILURE v_MASTER_COLOR_PARTIAL_SUCCESS v_MASTER_COLOR_FIRST_PARTIAL_SUCCESS v_MASTER_RETURN_SUCCESS v_MASTER_RETURN_FIRST_SUCCESS v_MASTER_RETURN_FAILURE v_MASTER_RETURN_FIRST_FAILURE v_MASTER_RETURN_PARTIAL_SUCCESS v_MASTER_RETURN_FIRST_PARTIAL_SUCCESS v_MASTER_DNS_RECORD_TYPE v_MASTER_SERVER_PORT v_MASTER_MIN_LOAD_PARTIAL_SUCCESS v_MASTER_MIN_LOAD_FAILURE v_MASTER_DEBUG v_MASTER_DEBUG_FUNCTIONS
 	source <( cat "$f_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_MASTER_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_MASTER_(VERBOSITY|EMAIL_ADDRESS|MAIL_(DELAY|COMMAND)|WAIT_SECONDS|OUTPUT_FILE|USE(R_AGENT|_WGET)|HTML_FILES_KEPT|NUM_((STATUSES|DURATIONS)_RECENT|STATUSES_NOT_SUCCESS)|CHECK_TIME(OUT|_PARTIAL_SUCCESS)|LOG(_DURATION_DATA|_HTTP_CODE)?|(COLOR|RETURN)_(FIRST_)?(PARTIAL_)?(SUCCESS|FAILURE)|CURL_VERBOSE|SSH_CONTROL_PATH|DEBUG(_FUNCTIONS)?)='.*'$" ) 2> /dev/null
 
 	### Replace values with defaults if necessary
@@ -198,8 +297,7 @@ function fn_read_master_conf {
 	v_MASTER_MIN_LOAD_FAILURE="$( fn_is_float "$v_MASTER_MIN_LOAD_FAILURE" "$v_DEFAULT_MIN_LOAD_FAILURE" )"
 
 	### unset unneeded master variables
-	unset v_MASTER_LOG v_MASTER_MAIL_COMMAND v_MASTER_SSH_CONTROL_PATH v_MASTER_COLOR_SUCCESS v_MASTER_COLOR_FIRST_SUCCESS v_MASTER_COLOR_FAILURE v_MASTER_COLOR_FIRST_FAILURE v_MASTER_COLOR_PARTIAL_SUCCESS v_MASTER_COLOR_FIRST_PARTIAL_SUCCESS v_MASTER_RETURN_SUCCESS v_MASTER_RETURN_FIRST_SUCCESS v_MASTER_RETURN_FAILURE v_MASTER_RETURN_FIRST_FAILURE v_MASTER_RETURN_PARTIAL_SUCCESS v_MASTER_RETURN_FIRST_PARTIAL_SUCCESS v_MASTER_DEBUG
-
+	fn_clear_master_vars2
 	if [[ "$1" == "master" ]]; then
 	### Rename all of the variables for the master process, then unset the variables that we don't need.
 		v_VERBOSITY="$v_MASTER_VERBOSITY"
@@ -226,7 +324,7 @@ function fn_read_master_conf {
 		b_DEBUG="$v_MASTER_DEBUG"
 		b_DEBUG_FUNCTIONS="$v_MASTER_DEBUG_FUNCTIONS"
 
-		unset v_MASTER_VERBOSITY v_MASTER_EMAIL_ADDRESS v_MASTER_MAIL_DELAY v_MASTER_WAIT_SECONDS v_MASTER_CHECK_TIMEOUT v_MASTER_OUTPUT_FILE v_MASTER_USER_AGENT v_MASTER_HTML_FILES_KEPT v_MASTER_NUM_DURATIONS_RECENT v_MASTER_NUM_STATUSES_RECENT v_MASTER_NUM_STATUSES_NOT_SUCCESS v_MASTER_CHECK_TIME_PARTIAL_SUCCESS v_MASTER_LOG_DURATION_DATA v_MASTER_CURL_VERBOSE v_MASTER_LOG_HTTP_CODE v_MASTER_USE_WGET v_MASTER_CUSTOM_MESSAGE v_MASTER_DNS_RECORD_TYPE v_MASTER_SERVER_PORT v_MASTER_MIN_LOAD_PARTIAL_SUCCESS v_MASTER_MIN_LOAD_FAILURE v_MASTER_DEBUG v_MASTER_DEBUG_FUNCTIONS
+		fn_clear_master_vars1
 	fi
 }
 
@@ -273,7 +371,7 @@ function fn_read_child_params {
 	### Read the child params file and get the variables from it
 	if [[ -n "$f_JOB" && -f "$f_JOB" ]]; then
 		### Unset all existing variables
-		unset v_JOB_TYPE v_ORIG_JOB_NAME v_CHECK_TIME_PARTIAL_SUCCESS v_CHECK_TIMEOUT v_CURL_VERBOSE v_CUSTOM_MESSAGE v_EMAIL_ADDRESS v_HTML_FILES_KEPT v_LOG_DURATION_DATA v_PORT v_CURL_URL v_DNS_CHECK_DOMAIN v_DOMAIN v_JOB_NAME v_SSH_USER v_DNS_CHECK_RESULT v_IP_ADDRESS v_SCRIPT v_DNS_RECORD_TYPE v_LOG_HTTP_CODE v_MAIL_DELAY v_MIN_LOAD_FAILURE v_MIN_LOAD_PARTIAL_SUCCESS v_NUM_DURATIONS_RECENT v_NUM_STATUSES_NOT_SUCCESS v_NUM_STATUSES_RECENT v_OUTPUT_FILE v_SERVER_PORT v_USE_WGET v_USER_AGENT v_VERBOSITY v_WAIT_SECONDS a_CURL_STRING
+		fn_clear_params_vars
 
 		source <( cat "$f_JOB" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_(CHECK_TIME(_PARTIAL_SUCCESS|OUT)|CURL_(STRING|URL|VERBOSE)|CUSTOM_MESSAGE|DNS_(CHECK_(DOMAIN|RESULT)|RECORD_TYPE)|DOMAIN|(EMAIL|IP)_ADDRESS|(ORIG_)?JOB_(NAME|TYPE)|LOG_(DURATION_DATA|HTTP_CODE)|MAIL_DELAY|MIN_LOAD_(FAILURE|PARTIAL_SUCCESS)|NUM_(DURATIONS_RECENT|STATUSES_(NOT_SUCCESS|RECENT))|OUTPUT_FILE|SCRIPT|SERVER_PORT|SSH_USER|USE(_WGET|R_AGENT)|VERBOSITY|WAIT_SECONDS|HTML_FILES_KEPT|DEBUG(_FUNCTIONS)?)='.*'$" | grep -Ev "^v_CURL_STRING=''" | sed "s/^v_CURL_STRING=/a_CURL_STRING[\${#a_CURL_STRING[@]}]=/" ) 2> /dev/null
 	fi
@@ -535,92 +633,7 @@ function fn_make_params {
 	echo "JOB_NAME = $v_JOB_NAME" >> "$f_JOB"
 	echo "ORIG_JOB_NAME = $v_ORIG_JOB_NAME" >> "$f_JOB"
 
-	if [[ "$v_JOB_TYPE" == "url" ]]; then
-		echo "CURL_URL = $v_CURL_URL_PREEDIT" >> "$f_JOB"
-		i=0; while [[ $i -le $(( ${#a_CURL_STRING[@]} -1 )) ]]; do
-			echo "CURL_STRING = ${a_CURL_STRING[$i]}" >> "$f_JOB"
-			i=$(( $i + 1 ))
-		done
-		if [[ -z "$v_USER_AGENT_PREEDIT" ]]; then
-			echo "# USER_AGENT = $v_MASTER_USER_AGENT" >> "$f_JOB"
-		else
-			echo "USER_AGENT = $v_USER_AGENT_PREEDIT" >> "$f_JOB"
-		fi
-		if [[ "$v_IP_ADDRESS" == "false" ]]; then
-			echo "# IP_ADDRESS = " >> "$f_JOB"
-		else
-			echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$f_JOB"
-		fi
-		if [[ -z "$v_USE_WGET" ]]; then
-			echo "# USE_WGET = $v_MASTER_USE_WGET" >> "$f_JOB"
-		else
-			echo "USE_WGET = $v_USE_WGET" >> "$f_JOB"
-		fi
-		if [[ "$v_USE_WGET" == "true" ]]; then
-			v_CURL_VERBOSE="false"
-			v_LOG_HTTP_CODE="false"
-		fi
-		if [[ -z "$v_CURL_VERBOSE" ]]; then
-			echo "# CURL_VERBOSE = $v_MASTER_CURL_VERBOSE" >> "$f_JOB"
-		else
-			echo "CURL_VERBOSE = $v_CURL_VERBOSE" >> "$f_JOB"
-		fi
-		if [[ -z "$v_LOG_HTTP_CODE" ]]; then
-			echo "# LOG_HTTP_CODE = $v_MASTER_LOG_HTTP_CODE" >> "$f_JOB"
-		else
-			echo "LOG_HTTP_CODE = $v_LOG_HTTP_CODE" >> "$f_JOB"
-		fi
-		if [[ -z "$v_HTML_FILES_KEPT" ]]; then
-			echo "# HTML_FILES_KEPT = $v_MASTER_HTML_FILES_KEPT" >> "$f_JOB"
-		else
-			echo "HTML_FILES_KEPT = $v_HTML_FILES_KEPT" >> "$f_JOB"
-		fi
-	elif [[ "$v_JOB_TYPE" == "dns" ]]; then
-		echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$f_JOB"
-		if [[ -z "$v_DNS_CHECK_RESULT" ]]; then
-			echo "# DNS_CHECK_RESULT = " >> "$f_JOB"
-		else
-			echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$f_JOB"
-		fi
-		if [[ -z "$v_DNS_RECORD_TYPE" ]]; then
-			echo "# DNS_RECORD_TYPE = $v_MASTER_DNS_RECORD_TYPE" >> "$f_JOB"
-		else
-			echo "DNS_RECORD_TYPE = $v_DNS_RECORD_TYPE" >> "$f_JOB"
-		fi
-	elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
-		if [[ -z "$v_SERVER_PORT" ]]; then
-			echo "# SERVER_PORT = $v_MASTER_SERVER_PORT" >> "$f_JOB"
-		else
-			echo "SERVER_PORT = $v_SERVER_PORT" >> "$f_JOB"
-		fi
-		echo "SSH_USER = $v_SSH_USER" >> "$f_JOB"
-		if [[ -z "$v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" ]]; then
-			echo "# MIN_LOAD_PARTIAL_SUCCESS = $v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" >> "$f_JOB"
-		else
-			echo "MIN_LOAD_PARTIAL_SUCCESS = $v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
-		fi
-		if [[ -z "$v_MIN_LOAD_FAILURE_PREEDIT" ]]; then
-			echo "# MIN_LOAD_FAILURE = $v_MASTER_MIN_LOAD_FAILURE" >> "$f_JOB"
-		else
-			echo "MIN_LOAD_FAILURE = $v_MIN_LOAD_FAILURE_PREEDIT" >> "$f_JOB"
-		fi
-	fi
-
-	if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" ]]; then
-			echo "# CHECK_TIME_PARTIAL_SUCCESS = $v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" >> "$f_JOB"
-		else
-			echo "CHECK_TIME_PARTIAL_SUCCESS = $v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
-		fi
-		if [[ -z "$v_CHECK_TIMEOUT" ]]; then
-			echo "# CHECK_TIMEOUT = $v_MASTER_CHECK_TIMEOUT" >> "$f_JOB"
-		else
-			echo "CHECK_TIMEOUT = $v_CHECK_TIMEOUT" >> "$f_JOB"
-		fi
-	fi
-	if [[ "$v_JOB_TYPE" == "ping" || "$v_JOB_TYPE" == "dns" || "$v_JOB_TYPE" == "ssh-load" ]]; then
-		echo "DOMAIN = $v_DOMAIN" >> "$f_JOB"
-	fi
+	### Output present for every job type
 	if [[ -z "$v_WAIT_SECONDS" ]]; then
 		echo "# WAIT_SECONDS = $v_MASTER_WAIT_SECONDS" >> "$f_JOB"
 	else
@@ -675,5 +688,119 @@ function fn_make_params {
 		echo "# SCRIPT = " >> "$f_JOB"
 	else
 		echo "SCRIPT = $v_SCRIPT" >> "$f_JOB"
+	fi
+
+	### Output specific to various job types
+	if [[ "$v_JOB_TYPE" == "url" ]]; then
+		echo "CURL_URL = $v_CURL_URL_PREEDIT" >> "$f_JOB"
+		i=0; while [[ $i -le $(( ${#a_CURL_STRING[@]} -1 )) ]]; do
+			echo "CURL_STRING = ${a_CURL_STRING[$i]}" >> "$f_JOB"
+			i=$(( $i + 1 ))
+		done
+		if [[ -z "$v_USER_AGENT_PREEDIT" ]]; then
+			echo "# USER_AGENT = $v_MASTER_USER_AGENT" >> "$f_JOB"
+		else
+			echo "USER_AGENT = $v_USER_AGENT_PREEDIT" >> "$f_JOB"
+		fi
+		if [[ "$v_IP_ADDRESS" == "false" ]]; then
+			echo "# IP_ADDRESS = " >> "$f_JOB"
+		else
+			echo "IP_ADDRESS = $v_IP_ADDRESS" >> "$f_JOB"
+		fi
+		if [[ -z "$v_USE_WGET" ]]; then
+			echo "# USE_WGET = $v_MASTER_USE_WGET" >> "$f_JOB"
+			v_USE_WGET="$v_MASTER_USE_WGET"
+		else
+			echo "USE_WGET = $v_USE_WGET" >> "$f_JOB"
+		fi
+		### These variables only have function if we're not using wget
+		if [[ "$v_USE_WGET" == "true" ]]; then
+			v_CURL_VERBOSE="false"
+			v_LOG_HTTP_CODE="false"
+		else
+			if [[ -z "$v_CURL_VERBOSE" ]]; then
+				echo "# CURL_VERBOSE = $v_MASTER_CURL_VERBOSE" >> "$f_JOB"
+			else
+				echo "CURL_VERBOSE = $v_CURL_VERBOSE" >> "$f_JOB"
+			fi
+			if [[ -z "$v_LOG_HTTP_CODE" ]]; then
+				echo "# LOG_HTTP_CODE = $v_MASTER_LOG_HTTP_CODE" >> "$f_JOB"
+			else
+				echo "LOG_HTTP_CODE = $v_LOG_HTTP_CODE" >> "$f_JOB"
+			fi
+		fi
+		if [[ -z "$v_HTML_FILES_KEPT" ]]; then
+			echo "# HTML_FILES_KEPT = $v_MASTER_HTML_FILES_KEPT" >> "$f_JOB"
+		else
+			echo "HTML_FILES_KEPT = $v_HTML_FILES_KEPT" >> "$f_JOB"
+		fi
+		### Unset DNS variables
+		unset v_DNS_CHECK_RESULT v_DNS_RECORD_TYPE
+		### Unset ssh-load variables
+		unset v_SERVER_PORT v_SSH_USER v_MIN_LOAD_PARTIAL_SUCCESS v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT v_MIN_LOAD_FAILURE v_MIN_LOAD_FAILURE_PREEDIT
+	elif [[ "$v_JOB_TYPE" == "dns" ]]; then
+		echo "DNS_CHECK_DOMAIN = $v_DNS_CHECK_DOMAIN" >> "$f_JOB"
+		if [[ -z "$v_DNS_CHECK_RESULT" ]]; then
+			echo "# DNS_CHECK_RESULT = " >> "$f_JOB"
+		else
+			echo "DNS_CHECK_RESULT = $v_DNS_CHECK_RESULT" >> "$f_JOB"
+		fi
+		if [[ -z "$v_DNS_RECORD_TYPE" ]]; then
+			echo "# DNS_RECORD_TYPE = $v_MASTER_DNS_RECORD_TYPE" >> "$f_JOB"
+		else
+			echo "DNS_RECORD_TYPE = $v_DNS_RECORD_TYPE" >> "$f_JOB"
+		fi
+		### Unset url variables
+		unset v_CURL_URL v_CURL_URL_PREEDIT v_USER_AGENT v_USER_AGENT_PREEDIT v_IP_ADDRESS v_CURL_VERBOSE v_LOG_HTTP_CODE v_HTML_FILES_KEPT
+		### Unset ssh-load variables
+		unset v_SERVER_PORT v_SSH_USER v_MIN_LOAD_PARTIAL_SUCCESS v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT v_MIN_LOAD_FAILURE v_MIN_LOAD_FAILURE_PREEDIT
+	elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
+		if [[ -z "$v_SERVER_PORT" ]]; then
+			echo "# SERVER_PORT = $v_MASTER_SERVER_PORT" >> "$f_JOB"
+		else
+			echo "SERVER_PORT = $v_SERVER_PORT" >> "$f_JOB"
+		fi
+		echo "SSH_USER = $v_SSH_USER" >> "$f_JOB"
+		if [[ -z "$v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" ]]; then
+			echo "# MIN_LOAD_PARTIAL_SUCCESS = $v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" >> "$f_JOB"
+		else
+			echo "MIN_LOAD_PARTIAL_SUCCESS = $v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
+		fi
+		if [[ -z "$v_MIN_LOAD_FAILURE_PREEDIT" ]]; then
+			echo "# MIN_LOAD_FAILURE = $v_MASTER_MIN_LOAD_FAILURE" >> "$f_JOB"
+		else
+			echo "MIN_LOAD_FAILURE = $v_MIN_LOAD_FAILURE_PREEDIT" >> "$f_JOB"
+		fi
+		### Unset url variables
+		unset v_CURL_URL v_CURL_URL_PREEDIT v_USER_AGENT v_USER_AGENT_PREEDIT v_IP_ADDRESS v_CURL_VERBOSE v_LOG_HTTP_CODE v_HTML_FILES_KEPT
+		### Unset DNS variables
+		unset v_DNS_CHECK_RESULT v_DNS_RECORD_TYPE
+	elif [[ "$v_JOB_TYPE" == "ping" ]]; then
+		### Unset DNS variables
+		unset v_DNS_CHECK_RESULT v_DNS_RECORD_TYPE
+		### Unset ssh-load variables
+		unset v_SERVER_PORT v_SSH_USER v_MIN_LOAD_PARTIAL_SUCCESS v_MIN_LOAD_PARTIAL_SUCCESS_PREEDIT v_MIN_LOAD_FAILURE v_MIN_LOAD_FAILURE_PREEDIT
+		### Unset url variables
+		unset v_CURL_URL v_CURL_URL_PREEDIT v_USER_AGENT v_USER_AGENT_PREEDIT v_IP_ADDRESS v_CURL_VERBOSE v_LOG_HTTP_CODE v_HTML_FILES_KEPT
+	fi
+
+	if [[ "$v_JOB_TYPE" == "url" || "$v_JOB_TYPE" == "ssh-load" ]]; then
+		if [[ -z "$v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" ]]; then
+			echo "# CHECK_TIME_PARTIAL_SUCCESS = $v_MASTER_CHECK_TIME_PARTIAL_SUCCESS" >> "$f_JOB"
+		else
+			echo "CHECK_TIME_PARTIAL_SUCCESS = $v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT" >> "$f_JOB"
+		fi
+		if [[ -z "$v_CHECK_TIMEOUT" ]]; then
+			echo "# CHECK_TIMEOUT = $v_MASTER_CHECK_TIMEOUT" >> "$f_JOB"
+		else
+			echo "CHECK_TIMEOUT = $v_CHECK_TIMEOUT" >> "$f_JOB"
+		fi
+	else
+		unset v_CHECK_TIME_PARTIAL_SUCCESS v_CHECK_TIME_PARTIAL_SUCCESS_PREEDIT v_CHECK_TIMEOUT
+	fi
+	if [[ "$v_JOB_TYPE" == "ping" || "$v_JOB_TYPE" == "dns" || "$v_JOB_TYPE" == "ssh-load" ]]; then
+		echo "DOMAIN = $v_DOMAIN" >> "$f_JOB"
+	else
+		unset v_DOMAIN
 	fi
 }

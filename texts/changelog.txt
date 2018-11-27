@@ -3,7 +3,6 @@ Future Versions -
     - In URL jobs, should I compare the current pull to the previous pull? Compare file size?
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
-    - Switch to using local variables where possible
 
 3.0.0 (DATE) -
     - Split lwmon up into multiple files
@@ -14,7 +13,7 @@ Future Versions -
     - Added the ability to specify a log file
     - Updated the standards I was following for variable quotation
     - Seperated out help and version information into their own files
-    - Reviesd how command line arguments are parsed
+    - Revised how command line arguments are parsed
     - Revised how variables are pulled from the configuration and the params files
     - Fixed a bug where resetting the end time on an old child directory would not function as expected
     - The command line details now only give the details specific to that job
@@ -27,9 +26,10 @@ Future Versions -
     - Fixed fn_parse_server so that it wasn't running "dig" every time it was called
     - Added "CUSTOM_MESSAGE" to the main config
     - Added "HTML_FILES_KEPT" to the "url" params file
-    - Fixed a bug where the previous verbose output was being overwritten
+    - Fixed a bug where the previous verbose curl output was being overwritten
     - Allowed "DEBUG" and "DEBUG_FUNCTIONS" do be directives in both conf and params
     - Re-worked the process for notifying the user of new versions
+    - Re-worked functions so that variables are local where possible, and that non-local variables are declared at the start of each file
 
 2.3.9 (2018-08-03) -
     - Added the "ALT_MAIL" directive; an alternate mail program can be specified

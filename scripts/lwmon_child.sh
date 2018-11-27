@@ -1,20 +1,109 @@
 #! /bin/bash
 
+#=======================#
+#== Declare Variables ==#
+#=======================#
+
+### Debugging variables
 b_DEBUG=false
 b_DEBUG_FUNCTIONS=false
 
+### Global variables not related to running jobs
+d_PROGRAM=
+
+### Things that I should probably make variables in the master conf
+v_STATUS_DUMP_INC=600
+v_LONG_HOURS=8
+v_SHORT_HOURS=1
+
+### Variables with initial values
+v_CHILD_PID="$$"
+v_START_TIME="$( date +%s )"
+v_TOTAL_DURATIONS=0
+v_AVERAGE_DURATION=0
+v_TOTAL_SUCCESS_DURATIONS=0
+v_TOTAL_SUCCESSES=0
+v_TOTAL_PARTIAL_SUCCESSES=0
+v_TOTAL_FAILURES=0
+v_NUM_SUCCESSES_EMAIL=0
+v_NUM_PARTIAL_SUCCESSES_EMAIL=0
+v_NUM_FAILURES_EMAIL=0
+v_LAST_HTML_RESPONSE_CODE="none"
+v_NEXT_STATUS_DUMP="$v_STATUS_DUMP_INC"
+
+### Initial variables for long and short hours
+v_LONG_TOTAL_DURATION=0
+v_LONG_SUCCESS=0
+v_LONG_PARTIAL=0
+v_LONG_FAIL=0
+v_SHORT_TOTAL_DURATION=0
+v_SHORT_SUCCESS=0
+v_SHORT_PARTIAL=0
+v_SHORT_FAIL=0
+v_SHORT_PLACE=0
+
+### Revolving variables related to keeping track of things over time
+v_LONG_COUNT=0
+v_SHORT_COUNT=0
+a_LONG_STAMPS=()
+a_LONG_STATUSES=()
+a_LONG_DURATIONS=()
+v_TOTAL_RECENT_DURATION=0
+a_RECENT_DURATIONS=()
+v_AVERAGE_RECENT_DURATION=0
+a_RECENT_STATUSES=()
+
+### Date Variables
+v_DATE3_LAST=
+v_DATE=
+v_DATE2=
+v_DATE3=
+
+### Other global variables that are used throughout
+v_MASTER_PID=
+d_CHILD=
+v_PARAMS_RELOAD=
+v_MASTER_RELOAD=
+v_VERSION=
+v_URL_OR_PING=
+v_CHECK_START=
+v_CHECK_START=
+v_CHECK_END=
+v_CHECK_DURATION=
+v_LOAD_AVG=
+v_LAST_SUCCESS=
+v_DESCRIPTOR1=
+v_DESCRIPTOR2=
+v_SUCCESS_CHECKS=
+v_LAST_PARTIAL_SUCCESS=
+v_PARTIAL_SUCCESS_CHECKS=
+v_LAST_FAILURE=
+v_FAILURE_CHECKS=
+v_RUN_TIME=
+v_TOTAL_CHECKS=
+v_PERCENT_SUCCESSES=
+v_SENT=
+v_LAST_EMAIL_SENT=
+v_LAST_STATUS=
+
+#=====================#
+#== Begin Functions ==#
+#=====================#
+
 function fn_locate {
 	if [[ "$b_DEBUG_FUNCTIONS" == true ]]; then echo "$$: fn_locate" > /dev/stderr; fi
-	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
+	local f_PROGRAM="$( readlink -f "${BASH_SOURCE[0]}" )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
 	fi
 	d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && cd ../ && pwd )"
-	f_PROGRAM="$( basename "$f_PROGRAM" )"
 }
-fn_locate
-source "$d_PROGRAM"/includes/mutual.shf
-source "$d_PROGRAM"/includes/variables.shf
+
+##### Do a second pass to make sure that we've localized as much as possible
+
+#==================================================#
+#== Functions for Starting and Ending Child Jobs ==#
+#==================================================#
 
 function fn_child {
 ### The opening part of a child process!
@@ -24,24 +113,11 @@ function fn_child {
 	### Make sure that the child processes are not exited out of o'er hastily.
 	trap fn_child_exit SIGINT SIGTERM SIGKILL
 	### Define the variables that will be used over the life of the child process
-	v_CHILD_PID="$$"
 	if [[ ! -f "$d_WORKING"/lwmon.pid ]]; then
 		echo "$( date +%F":"%T" "%Z ) - [$v_CHILD_PID] - No Master Process present. Exiting." >> "$v_LOG"
 		exit 1
 	fi
-	v_MASTER_PID=$( cat "$d_WORKING"/lwmon.pid )
-	v_START_TIME="$( date +%s )"
-	v_TOTAL_DURATIONS=0
-	v_AVERAGE_DURATION=0
-	v_TOTAL_SUCCESS_DURATIONS=0
-	v_AVERAGE_SUCCESS_DURATION=0
-	v_TOTAL_SUCCESSES=0
-	v_TOTAL_PARTIAL_SUCCESSES=0
-	v_TOTAL_FAILURES=0
-	v_NUM_SUCCESSES_EMAIL=0
-	v_NUM_PARTIAL_SUCCESSES_EMAIL=0
-	v_NUM_FAILURES_EMAIL=0
-	v_LAST_HTML_RESPONSE_CODE="none"
+	v_MASTER_PID="$( cat "$d_WORKING"/lwmon.pid )"
 	d_CHILD="$d_WORKING"/"$v_CHILD_PID"
 	v_PARAMS_RELOAD="$( stat --format=%Y "$d_CHILD"/params )"
 	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
@@ -65,35 +141,29 @@ function fn_child {
 	fi
 }
 
-function fn_child_start_loop {
-### Check if the conf or params file have been updated, then get all of the necessary timestamps
-	fn_debug "fn_child_start_loop"
-	local v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
-	local v_MASTER_CUR="$( stat --format=%Y "$f_CONF" )"
-	if [[ "$v_MASTER_CUR" -gt "$v_MASTER_RELOAD" ]]; then
-		fn_read_master_conf
-		v_MASTER_RELOAD="$v_MASTER_CUR"
-		fn_read_child_params "$d_CHILD"/params
-		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
-	elif [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
-		fn_read_child_params "$d_CHILD"/params
-		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
+function fn_child_exit {
+	fn_debug "fn_child_exit"
+
+	### When a child process exits, it needs to clean up after itself and log the fact that it has exited. "$1" is the exit code that should be output.
+	v_EXIT_CODE="$1"
+	if [[ "$v_TOTAL_CHECKS" -gt 0 ]]; then
+		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$v_LOG"
+		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$d_CHILD"/log
 	fi
-	if [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
-		v_PARAMS_RELOAD="$v_PARAMS_CUR"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$v_LOG"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$d_CHILD"/log
-		if [[ ! -f "$d_WORKING"/no_output ]]; then
-			echo "***Reloaded parameters for $v_URL_OR_PING $v_JOB_NAME.***"
-		fi
+	### Instead of deleting the directory, back it up temporarily.
+	if [[ -f "$d_CHILD"/die ]]; then
+		mv -f "$d_CHILD"/die "$d_CHILD"/#die
+		mv "$d_CHILD" "$d_WORKING"/"old_""$v_CHILD_PID""_""$v_DATE3"
 	fi
 
-	### Get the three varieties of timestamps we'll need
-	v_DATE3_LAST="$v_DATE3"
-	v_DATE="$( date +%m"/"%d" "%H":"%M":"%S )"
-	v_DATE2="$( date +%F" "%T" "%Z )"
-	v_DATE3="$( date +%s )"
+	### Record the final "more verbose" status
+	
+	exit "$v_EXIT_CODE"
 }
+
+#==========================================#
+#== Functions for Specific Types of Jobs ==#
+#==========================================#
 
 function fn_url_child {
 ### The basic loop for a URL monitoring process.
@@ -102,6 +172,9 @@ function fn_url_child {
 	unset -f fn_load_child
 	unset -f fn_ping_child
 	unset -f fn_dns_child
+	local v_LAST_HTML_RESPONSE_CODE
+	local f_STDERR="/dev/null"
+	local a_CURL_ARGS=()
 	v_VERSION="$( grep -E -m1 -o "^[0-9]+\.[0-9]+\.[0-9]+" "$d_PROGRAM"/texts/changelog.txt )"
 	while [[ 1 == 1 ]]; do
 		fn_child_start_loop
@@ -114,7 +187,6 @@ function fn_url_child {
 			mv -f "$d_CHILD"/current_verbose_output.txt "$d_CHILD"/previous_verbose_output.txt
 		fi
 		### Set up the command line arguments for curl
-		f_STDERR="/dev/null"
 		if [[ "$v_WGET_BIN" == "false" ]]; then
 			if [[ "$v_IP_ADDRESS" == false ]]; then
 				a_CURL_ARGS=( "$v_CHECK_TIMEOUT" "$v_CURL_URL" "--header" "User-Agent: $v_USER_AGENT" "-o" "$d_CHILD/site_current.html" )
@@ -136,14 +208,17 @@ function fn_url_child {
 			fi
 		fi
 		### curl it!
-		v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 		if [[ "$v_WGET_BIN" == "false" ]]; then
+			v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 			"$v_CURL_BIN" "${a_CURL_ARGS[@]}" >> "$f_STDERR" 2>> "$f_STDERR"
+			v_STATUS="$?"
+			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		else
+			v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 			"$v_WGET_BIN" "${a_WGET_ARGS[@]}" >> "$f_STDERR" 2>> "$f_STDERR"
+			v_STATUS="$?"
+			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		fi
-		v_STATUS="$?"
-		v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		### If the exit status of curl is 28, this means that the page timed out.
 		if [[ "$v_STATUS" == 28 && "$v_WGET_BIN" == "false" ]]; then
 			echo -e "\n\n\n\nCurl return code: $v_STATUS (This means that the timeout was reached before the full page was returned.)" >> "$d_CHILD"/current_verbose_output.txt
@@ -152,6 +227,7 @@ function fn_url_child {
 		elif [[ "$v_STATUS" != 0 ]]; then
 			echo -e "\n\n\n\nWget return code: $v_STATUS" >> "$d_CHILD"/current_verbose_output.txt
 		fi
+		local v_HTML_RESPONSE_CODE
 		if [[ "$v_CURL_VERBOSE" == true && "$v_LOG_HTTP_CODE" == true ]]; then
 		### Capture the html response code, if so directed.
 			v_HTML_RESPONSE_CODE="$( cat "$d_CHILD"/current_verbose_output.txt | grep -E -m1 "<" | cut -d " " -f3- | tr -dc '[[:print:]]' )"
@@ -160,13 +236,16 @@ function fn_url_child {
 			fi
 		fi
 		### Check the curl strings
+		local i
+		local j
 		i=0; j=0; while [[ "$i" -lt "${#a_CURL_STRING[@]}" ]]; do
 			if [[ -f "$d_CHILD"/site_current.html && $( grep -c -F "${a_CURL_STRING[$i]}" "$d_CHILD"/site_current.html ) -gt 0 ]]; then
 				j=$(( j + 1 ))
 			fi
 			i=$(( i + 1 ))
 		done
-		v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",( ${v_CHECK_END} - ${v_CHECK_START} ) * 100}" )"
+
+		v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",( ${v_CHECK_END} - ${v_CHECK_START} ) * 100}" 2> /dev/null || echo "error with awk 1" > /dev/stderr )"
 		if [[ "$j" -lt "$i" && "$j" -gt 0 ]]; then
 			fn_report_status "partial success" save
 		elif [[ $( echo "$v_CHECK_DURATION" | cut -d "." -f1 ) -ge "$v_CHECK_TIME_PARTIAL_SUCCESS" && "$j" -gt 0 ]]; then
@@ -208,10 +287,11 @@ function fn_load_child {
 			fi
 			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		fi
+		local v_MODIFIED_LOAD_AVERAGE
 		if [[ -n "$v_LOAD_AVG" ]]; then
-			v_MODIFIED_LOAD_AVERAGE="$( awk "BEGIN {printf \"%.0f\",${v_LOAD_AVG} * 100}" )"
+			v_MODIFIED_LOAD_AVERAGE="$( awk "BEGIN {printf \"%.0f\",${v_LOAD_AVG} * 100}" 2> /dev/null || echo "error with awk 2" > /dev/stderr )"
 		fi
-		v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",(${v_CHECK_END} - ${v_CHECK_START} ) * 100}" )"
+		v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",(${v_CHECK_END} - ${v_CHECK_START} ) * 100}" 2> /dev/null || echo "error with awk 3" > /dev/stderr )"
 		if [[ -n "$v_LOAD_AVG" && "$v_MODIFIED_LOAD_AVERAGE" -lt "$v_MIN_LOAD_PARTIAL_SUCCESS" && "$v_MODIFIED_LOAD_AVERAGE" -lt "$v_MIN_LOAD_FAILURE" && $( echo "$v_CHECK_DURATION" | cut -d "." -f1 ) -ge "$v_CHECK_TIME_PARTIAL_SUCCESS" ]]; then
 			fn_report_status "partial success"
 		elif [[ -n "$v_LOAD_AVG" && "$v_MODIFIED_LOAD_AVERAGE" -lt "$v_MIN_LOAD_PARTIAL_SUCCESS" && "$v_MODIFIED_LOAD_AVERAGE" -lt "$v_MIN_LOAD_FAILURE" ]]; then
@@ -235,9 +315,9 @@ function fn_ping_child {
 	while [[ 1 == 1 ]]; do
 		fn_child_start_loop
 		v_CHECK_START="$( date +%s"."%N | head -c -6 )"
-		v_PING_RESULT="$( ping -W2 -c1 $v_DOMAIN 2> /dev/null | grep -E "icmp_[rs]eq" )"
+		v_PING_RESULT="$( ping -W2 -c1 "$v_DOMAIN" 2> /dev/null | grep -E "icmp_[rs]eq" )"
 		v_CHECK_END="$( date +%s"."%N | head -c -6 )"
-		v_WATCH="$( echo $v_PING_RESULT | grep -E -c "icmp_[rs]eq" )"
+		local v_WATCH="$( echo "$v_PING_RESULT" | grep -E -c "icmp_[rs]eq" )"
 		if [[ "$v_WATCH" -ne 0 ]]; then
 			fn_report_status success
 		else
@@ -257,17 +337,23 @@ function fn_dns_child {
 	unset -f fn_ping_child
 	while [[ 1 == 1 ]]; do
 		fn_child_start_loop
-		v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 		if [[ -n "$v_DNS_RECORD_TYPE" && -n "$v_DNS_CHECK_RESULT" ]]; then
+			v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 			v_QUERY_RESULT="$( dig +tries=1 +short "$v_DNS_RECORD_TYPE" "$v_DNS_CHECK_DOMAIN" @"$v_DOMAIN" 2> /dev/null | grep -F -c "$v_DNS_CHECK_RESULT" )"
+			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		elif [[ -n "$v_DNS_RECORD_TYPE" ]]; then
+			v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 			v_QUERY_RESULT="$( dig +tries=1 +short "$v_DNS_RECORD_TYPE" "$v_DNS_CHECK_DOMAIN" @"$v_DOMAIN" 2> /dev/null | wc -l )"
+			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		elif [[ -n "$v_DNS_CHECK_RESULT" ]]; then
+			v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 			v_QUERY_RESULT="$( dig +tries=1 +short "$v_DNS_CHECK_DOMAIN" @"$v_DOMAIN" 2> /dev/null | grep -F -c "$v_DNS_CHECK_RESULT" )"
+			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		else
+			v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 			v_QUERY_RESULT="$( dig +tries=1 "$v_DNS_CHECK_DOMAIN" @"$v_DOMAIN" 2> /dev/null | grep -F -c "ANSWER SECTION" )"
+			v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		fi
-		v_CHECK_END="$( date +%s"."%N | head -c -6 )"
 		if [[ "$v_QUERY_RESULT" -ne 0 ]]; then
 			fn_report_status success
 		else
@@ -277,12 +363,46 @@ function fn_dns_child {
 	done
 }
 
+#============================================#
+#== Additional Functions run while Looping ==#
+#============================================#
+
+function fn_child_start_loop {
+### Check if the conf or params file have been updated, then get all of the necessary timestamps
+	fn_debug "fn_child_start_loop"
+	local v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
+	local v_MASTER_CUR="$( stat --format=%Y "$f_CONF" )"
+	if [[ "$v_MASTER_CUR" -gt "$v_MASTER_RELOAD" ]]; then
+		fn_read_master_conf
+		v_MASTER_RELOAD="$v_MASTER_CUR"
+		fn_read_child_params "$d_CHILD"/params
+		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
+	elif [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
+		fn_read_child_params "$d_CHILD"/params
+		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
+	fi
+	if [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
+		v_PARAMS_RELOAD="$v_PARAMS_CUR"
+		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$v_LOG"
+		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$d_CHILD"/log
+		if [[ ! -f "$d_WORKING"/no_output ]]; then
+			echo "***Reloaded parameters for $v_URL_OR_PING $v_JOB_NAME.***"
+		fi
+	fi
+
+	### Get the three varieties of timestamps we'll need
+	v_DATE3_LAST="$v_DATE3"
+	v_DATE="$( date +%m"/"%d" "%H":"%M":"%S )"
+	v_DATE2="$( date +%F" "%T" "%Z )"
+	v_DATE3="$( date +%s )"
+}
+
 function fn_child_checks {
 	fn_debug "fn_child_checks"
 	### Wait until the next loop to die so that the full status will be recorded
 	### Generally all of the STUFF between the actual check and running sleep lasts 0.1 seconds-ish. No harm in calculating exactly how long it took and then subtracting that from the wait seconds.
 	v_CHECK_END2="$( date +%s"."%N | head -c -6 )"
-	v_SLEEP_SECONDS="$( awk "BEGIN {printf \"%.2f\",${v_WAIT_SECONDS} - ( ${v_CHECK_END2} - ${v_CHECK_END} )}" )"
+	v_SLEEP_SECONDS="$( awk "BEGIN {printf \"%.2f\",${v_WAIT_SECONDS} - ( ${v_CHECK_END2} - ${v_CHECK_END} )}" 2> /dev/null || echo "error with awk 4" > /dev/stderr )"
 	if [[ "${v_SLEEP_SECONDS:0:1}" != "-" ]]; then
 		sleep $v_SLEEP_SECONDS
 	fi
@@ -297,26 +417,6 @@ function fn_convert_seconds {
 	((s=${1}%60))
 	### I'm really excited about this part here that does the thing.
 	printf "%02d:%02d:%02d\n" "$h" "$m" "$s"
-}
-
-function fn_child_exit {
-	fn_debug "fn_child_exit"
-
-	### When a child process exits, it needs to clean up after itself and log the fact that it has exited. "$1" is the exit code that should be output.
-	v_EXIT_CODE="$1"
-	if [[ "$v_TOTAL_CHECKS" -gt 0 ]]; then
-		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$v_LOG"
-		echo "$v_DATE2 - [$v_CHILD_PID] - Stopped watching $v_URL_OR_PING $v_ORIG_JOB_NAME: Running for $v_RUN_TIME seconds. $v_TOTAL_CHECKS checks completed. $v_PERCENT_SUCCESSES% success rate." >> "$d_CHILD"/log
-	fi
-	### Instead of deleting the directory, back it up temporarily.
-	if [[ -f "$d_CHILD"/die ]]; then
-		mv -f "$d_CHILD"/die "$d_CHILD"/#die
-		mv "$d_CHILD" "$d_WORKING"/"old_""$v_CHILD_PID""_""$v_DATE3"
-	fi
-
-	### Record the final "more verbose" status
-	
-	exit "$v_EXIT_CODE"
 }
 
 function fn_remove_old_html {
@@ -362,11 +462,132 @@ function fn_url_save_html {
 	fi
 }
 
+#======================================#
+#== Functions for Mathing Things Out ==#
+#======================================#
+
+function fn_more_verbose {
+### Create the more verbose status if we need it
+### This function is designed to be run in a subshell so that its output can be captured in a variable
+### $1 is Whether or not we're writing to the status file
+### $2 is the current status
+	local v_DUMP_STATUS="$1"
+	local v_THIS_STATUS="$2"
+
+	local v_PERCENT_PARTIAL_SUCCESSES="$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_PARTIAL_SUCCESSES} * 100 ) / ${v_TOTAL_CHECKS}}" 2> /dev/null || echo "error with awk 5" > /dev/stderr )"
+	local v_PERCENT_FAILURES="$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_FAILURES} * 100 ) / ${v_TOTAL_CHECKS}}" 2> /dev/null || echo "error with awk 6" > /dev/stderr )"
+
+	local v_AVERAGE_SUCCESS_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_SUCCESS_DURATIONS} / ${v_TOTAL_SUCCESSES}}" 2> /dev/null || echo "error with awk 7" > /dev/stderr )"
+
+	### Do the math for long hours
+	local v_LONG_PERCENT_SUCCESS="$( awk "BEGIN {printf \"%.2f\",( ${v_LONG_SUCCESS} * 100 ) / ${v_LONG_COUNT}}" 2> /dev/null || echo "error with awk 8" > /dev/stderr )"
+	local v_LONG_PERCENT_PARTIAL="$( awk "BEGIN {printf \"%.2f\",( ${v_LONG_PARTIAL} * 100 ) / ${v_LONG_COUNT}}" 2> /dev/null || echo "error with awk 9" > /dev/stderr )"
+	local v_LONG_PERCENT_FAIL="$( awk "BEGIN {printf \"%.2f\",( ${v_LONG_FAIL} * 100 ) / ${v_LONG_COUNT}}" 2> /dev/null || echo "error with awk 10" > /dev/stderr )"	
+	local v_LONG_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} / ${v_LONG_COUNT}}" 2> /dev/null || echo "error with awk 17" > /dev/stderr )"
+
+	### Do the math for short hours
+	local v_SHORT_PERCENT_SUCCESS="$( awk "BEGIN {printf \"%.2f\",( ${v_SHORT_SUCCESS} * 100 ) / ${v_SHORT_COUNT}}" 2> /dev/null || echo "error with awk 11" > /dev/stderr )"
+	local v_SHORT_PERCENT_PARTIAL="$( awk "BEGIN {printf \"%.2f\",( ${v_SHORT_PARTIAL} * 100 ) / ${v_SHORT_COUNT}}" 2> /dev/null || echo "error with awk 12" > /dev/stderr )"
+	local v_SHORT_PERCENT_FAIL="$( awk "BEGIN {printf \"%.2f\",( ${v_SHORT_FAIL} * 100 ) / ${v_SHORT_COUNT}}" 2> /dev/null || echo "error with awk 13" > /dev/stderr )"
+	local v_SHORT_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} / ${v_SHORT_COUNT}}" 2> /dev/null || echo "error with awk 19" > /dev/stderr )"
+
+	local v_REPORT2="$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME\n  Check Status:                 $v_DESCRIPTOR1\n  Checking for:                 $v_RUN_TIME\n  "
+	if [[ "$v_THIS_STATUS" != "success" ]]; then
+		v_REPORT2="$v_REPORT2""Last successful check:        $v_LAST_SUCCESS_STRING\n  "
+	fi
+	if [[ "$v_THIS_STATUS" != "partial success" ]]; then
+		v_REPORT2="$v_REPORT2""Last partial success:         $v_LAST_PARTIAL_SUCCESS_STRING\n  "
+	fi
+	if [[ "$v_THIS_STATUS" != "failure" ]]; then
+		v_REPORT2="$v_REPORT2""Last failed check:            $v_LAST_FAILURE_STRING\n  "
+	fi
+	v_REPORT2="$v_REPORT2""Number of checks completed:   $v_TOTAL_CHECKS\n  #Success/#Partial/#Failure:   $v_TOTAL_SUCCESSES / $v_TOTAL_PARTIAL_SUCCESSES / $v_TOTAL_FAILURES\n  %Success/%Partial/%Failure:   $v_PERCENT_SUCCESSES% / $v_PERCENT_PARTIAL_SUCCESSES% / $v_PERCENT_FAILURES%\n  This check:                   $v_CHECK_DURATION seconds\n  Average check:                $v_AVERAGE_DURATION seconds\n  Average recent check:         $v_AVERAGE_RECENT_DURATION seconds\n  Average successful check:     $v_AVERAGE_SUCCESS_DURATION seconds"
+
+	### Output to the status file
+	if [[ -f "$d_CHILD"/status || "$v_DUMP_STATUS" == true ]]; then
+		echo -e "$v_REPORT2""\n  Total duration:               $v_TOTAL_DURATIONS seconds\n  Total recent duration:        $v_TOTAL_RECENT_DURATION seconds\n  Total successful duration:    $v_TOTAL_SUCCESS_DURATIONS seconds\n  Last $v_LONG_HOURS hours:\n    Number of checks completed: $v_LONG_COUNT\n    #Success/#Partial/#Failure: $v_LONG_SUCCESS / $v_LONG_PARTIAL / $v_LONG_FAIL\n    %Success/%Partial/%Failure: $v_LONG_PERCENT_SUCCESS% / $v_LONG_PERCENT_PARTIAL% / $v_LONG_PERCENT_FAIL%\n    Average check:              $v_LONG_AVERAGE_DURATION seconds\n    Total duration:             $v_LONG_TOTAL_DURATION seconds\n  Last $v_SHORT_HOURS hours:\n    Number of checks completed: $v_SHORT_COUNT\n    #Success/#Partial/#Failure: $v_SHORT_SUCCESS / $v_SHORT_PARTIAL / $v_SHORT_FAIL\n    %Success/%Partial/%Failure: $v_SHORT_PERCENT_SUCCESS% / $v_SHORT_PERCENT_PARTIAL% / $v_SHORT_PERCENT_FAIL%\n    Average check:              $v_SHORT_AVERAGE_DURATION seconds\n    Total duration:             $v_SHORT_TOTAL_DURATION seconds" > "$d_CHILD"/status
+		mv -f "$d_CHILD"/status "$d_CHILD/#status"
+	fi
+
+	### Output so it can be captured as a variable
+	echo "$v_REPORT2"
+}
+
+function fn_long_short_dur {
+### Do the math for long and short durations
+	local v_THIS_STATUS="$1"
+
+	### add the current values to the long array
+	v_LONG_COUNT=$(( v_LONG_COUNT + 1 ))
+	v_SHORT_COUNT=$(( v_SHORT_COUNT + 1 ))
+	a_LONG_STAMPS[${#a_LONG_STAMPS[@]}]="$v_DATE3"
+	if [[ "$v_THIS_STATUS" == "success" ]]; then
+		a_LONG_STATUSES[${#a_LONG_STATUSES[@]}]="s"
+		v_LONG_SUCCESS=$(( v_LONG_SUCCESS + 1 ))
+		v_SHORT_SUCCESS=$(( v_SHORT_SUCCESS + 1 ))
+	elif [[ "$v_THIS_STATUS" == "partial success" ]]; then
+		a_LONG_STATUSES[${#a_LONG_STATUSES[@]}]="p"
+		v_LONG_PARTIAL=$(( v_LONG_PARTIAL + 1 ))
+		v_SHORT_PARTIAL=$(( v_SHORT_PARTIAL + 1 ))
+	elif [[ "$v_THIS_STATUS" == "failure" ]]; then
+		a_LONG_STATUSES[${#a_LONG_STATUSES[@]}]="f"
+		v_LONG_FAIL=$(( v_LONG_FAIL + 1 ))
+		v_SHORT_FAIL=$(( v_SHORT_FAIL + 1 ))
+	fi
+	a_LONG_DURATIONS[${#a_LONG_DURATIONS[@]}]="$v_CHECK_DURATION"
+
+	### Get rid of entries from the long array, adjust the placement of the for the short hours
+	if [[ -n "${a_LONG_STAMPS[0]}" ]]; then
+		while [[ "${a_LONG_STAMPS[0]}" -le $(( v_DATE3 - $(( 3600 * v_LONG_HOURS )) )) ]]; do
+			if [[ "${a_LONG_STAMPS[0]}" == "s" ]]; then
+				v_LONG_SUCCESS=$(( v_LONG_SUCCESS - 1 ))
+			elif [[ "${a_LONG_STAMPS[0]}" == "p" ]]; then
+				v_LONG_PARTIAL=$(( v_LONG_PARTIAL - 1 ))
+			elif [[ "${a_LONG_STAMPS[0]}" == "f" ]]; then
+				v_LONG_FAIL=$(( v_LONG_FAIL - 1 ))
+			fi
+			v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} - ${a_LONG_DURATIONS[0]}}" 2> /dev/null || echo "error with awk 14" > /dev/stderr )"
+			v_LONG_COUNT=$(( v_LONG_COUNT - 1 ))
+			a_LONG_STAMPS=("${a_LONG_STAMPS[@]:1}")
+			a_LONG_STATUSES=("${a_LONG_STATUSES[@]:1}")
+			a_LONG_DURATIONS=("${a_LONG_DURATIONS[@]:1}")
+			v_SHORT_PLACE=$(( v_SHORT_PLACE - 1 ))
+		done
+	fi
+
+	### adjust placement for the short array
+	if [[ -n "${a_LONG_STAMPS[0]}" ]]; then
+		while [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" -le $(( v_DATE3 - $(( 3600 * v_SHORT_HOURS )) )) ]]; do
+			if [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "s" ]]; then
+				v_SHORT_SUCCESS=$(( v_SHORT_SUCCESS - 1 ))
+			elif [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "p" ]]; then
+				v_SHORT_PARTIAL=$(( v_SHORT_PARTIAL - 1 ))
+			elif [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "f" ]]; then
+				v_SHORT_FAIL=$(( v_SHORT_FAIL - 1 ))
+			fi
+			v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} - ${a_LONG_DURATIONS[$v_SHORT_PLACE]}}" 2> /dev/null || echo "error with awk 15" > /dev/stderr )"
+			v_SHORT_COUNT=$(( v_SHORT_COUNT - 1 ))
+			v_SHORT_PLACE=$(( v_SHORT_PLACE + 1 ))
+		done
+	fi
+
+	v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} + ${v_CHECK_DURATION}}" 2> /dev/null || echo "error with awk 16" > /dev/stderr )"
+	v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} + ${v_CHECK_DURATION}}" 2> /dev/null || echo "error with awk 18" > /dev/stderr )"
+}
+
+#==================================================#
+#== That one Big Function for Outputting Results ==#
+#==================================================#
+
 function fn_report_status {
 ### $1 is the status. $2 is whether or not to try to save the file
 	fn_debug "fn_report_status"
 	v_THIS_STATUS="$1"
 	local v_SAVE="$2"
+
+	#=========================#
+	#== Check Test Statuses ==#
+	#=========================#
 
 	### This is present if, for testing purposes, we need to override the result of a check
 	if [[ -f "$d_CHILD"/force_success ]]; then
@@ -380,7 +601,12 @@ function fn_report_status {
 		rm -f "$d_CHILD"/force_partial
 	fi
 
-	### Gather the specifics for each status
+	#===================================#
+	#== Set Specifics for Each Status ==#
+	#===================================#
+
+	local v_COLOR_START
+	local v_COLOR_END
 	if [[ "$v_THIS_STATUS" == "success" ]]; then
 		v_TOTAL_SUCCESSES=$(( v_TOTAL_SUCCESSES + 1 ))
 		v_LAST_SUCCESS="$v_DATE3"
@@ -428,130 +654,50 @@ function fn_report_status {
 		v_DESCRIPTOR1="$v_LOAD_AVG"
 	fi
 
-	### Statistics and duration information.
+	#=========================================#
+	#== Statistics and Duration Information ==#
+	#=========================================#
 
 	### Figure out how long the script has run and what percent are successes, etc.
-	v_RUN_SECONDS="$(( v_DATE3 - v_START_TIME ))"
-	v_RUN_TIME="$( fn_convert_seconds $v_RUN_SECONDS )"
+	local v_RUN_SECONDS="$(( v_DATE3 - v_START_TIME ))"
+	v_RUN_TIME="$( fn_convert_seconds "$v_RUN_SECONDS" )"
 	v_TOTAL_CHECKS=$(( v_TOTAL_CHECKS + 1 ))
-	v_PERCENT_SUCCESSES="$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_SUCCESSES} * 100 ) / ${v_TOTAL_CHECKS}}" )"
-	v_PERCENT_PARTIAL_SUCCESSES="$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_PARTIAL_SUCCESSES} * 100 ) / ${v_TOTAL_CHECKS}}" )"
-	v_PERCENT_FAILURES="$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_FAILURES} * 100 ) / ${v_TOTAL_CHECKS}}" )"
+	v_PERCENT_SUCCESSES="$( awk "BEGIN {printf \"%.2f\",( ${v_TOTAL_SUCCESSES} * 100 ) / ${v_TOTAL_CHECKS}}" 2> /dev/null || echo "error with awk 20" > /dev/stderr )"
 	### How long did the check itself take?
-	v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_END} - ${v_CHECK_START}}" )"
-	v_TOTAL_DURATIONS="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_DURATION} + ${v_TOTAL_DURATIONS}}" )"
-	v_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_DURATIONS} / ${v_TOTAL_CHECKS}}" )"
+	v_CHECK_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_END} - ${v_CHECK_START}}" 2> /dev/null || echo "error with awk 21" > /dev/stderr )"
+	v_TOTAL_DURATIONS="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_DURATION} + ${v_TOTAL_DURATIONS}}" 2> /dev/null || echo "error with awk 22" > /dev/stderr )"
+	v_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_DURATIONS} / ${v_TOTAL_CHECKS}}" 2> /dev/null || echo "error with awk 23" > /dev/stderr )"
 
 	### Subtract old values from the the total recent duration and add the new value
 	if [[ -z "$v_TOTAL_RECENT_DURATION" ]]; then
 		v_TOTAL_RECENT_DURATION=0
 	fi
-	while [[ "${#a_RECENT_DURATIONS[@]}" -ge "$v_NUM_DURATIONS_RECENT" ]]; do
-		v_TOTAL_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} - ${a_RECENT_DURATIONS[0]}}" )"
+	while [[ "${#a_RECENT_DURATIONS[@]}" -ge "$v_NUM_DURATIONS_RECENT" && "${#a_RECENT_DURATIONS[@]}" -gt 0 ]]; do
+		v_TOTAL_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} - ${a_RECENT_DURATIONS[0]}}" 2> /dev/null || echo "error with awk 24" > /dev/stderr )"
 		a_RECENT_DURATIONS=("${a_RECENT_DURATIONS[@]:1}")
 	done
 	a_RECENT_DURATIONS[${#a_RECENT_DURATIONS[@]}]="$v_CHECK_DURATION"
-	v_TOTAL_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} + ${v_CHECK_DURATION}}" )"
+	v_TOTAL_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} + ${v_CHECK_DURATION}}" 2> /dev/null || echo "error with awk 25" > /dev/stderr )"
 
 	### Calculate the average recent duration
-	v_AVERAGE_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} / ${#a_RECENT_DURATIONS[@]}}" )"
+	v_AVERAGE_RECENT_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_RECENT_DURATION} / ${#a_RECENT_DURATIONS[@]}}" 2> /dev/null || echo "error with awk 26" > /dev/stderr )"
 	if [[ "$v_THIS_STATUS" == "success" ]]; then
-		v_TOTAL_SUCCESS_DURATIONS="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_DURATION} + ${v_TOTAL_SUCCESS_DURATIONS}}" )"
-		v_AVERAGE_SUCCESS_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_TOTAL_SUCCESS_DURATIONS} / ${v_TOTAL_SUCCESSES}}" )"
+		v_TOTAL_SUCCESS_DURATIONS="$( awk "BEGIN {printf \"%.4f\",${v_CHECK_DURATION} + ${v_TOTAL_SUCCESS_DURATIONS}}" 2> /dev/null || echo "error with awk 27" > /dev/stderr )"
 	fi
 
-	### Make sure that the initial variables are there for long and short hours
-	v_LONG_HOURS="8";
-	if [[ -z "$v_LONG_TOTAL_DURATION" ]]; then
-		v_LONG_TOTAL_DURATION=0
-		v_LONG_SUCCESS=0
-		v_LONG_PARTIAL=0
-		v_LONG_FAIL=0
-	fi
-	v_SHORT_HOURS="1";
-	if [[ -z "$v_SHORT_TOTAL_DURATION" ]]; then
-		v_SHORT_TOTAL_DURATION=0
-		v_SHORT_SUCCESS=0
-		v_SHORT_PARTIAL=0
-		v_SHORT_FAIL=0
-		v_SHORT_PLACE=0
-	fi
+	### Do all of the math necessary for long and short duration tracking
+	fn_long_short_dur "$v_THIS_STATUS"
 
-	### add the current values to the long array
-	v_LONG_COUNT=$(( v_LONG_COUNT + 1 ))
-	v_SHORT_COUNT=$(( v_SHORT_COUNT + 1 ))
-	a_LONG_STAMPS[${#a_LONG_STAMPS[@]}]="$v_DATE3"
-	if [[ "$v_THIS_STATUS" == "success" ]]; then
-		a_LONG_STATUSES[${#a_LONG_STATUSES[@]}]="s"
-		v_LONG_SUCCESS=$(( v_LONG_SUCCESS + 1 ))
-		v_SHORT_SUCCESS=$(( v_SHORT_SUCCESS + 1 ))
-	elif [[ "$v_THIS_STATUS" == "partial success" ]]; then
-		a_LONG_STATUSES[${#a_LONG_STATUSES[@]}]="p"
-		v_LONG_PARTIAL=$(( v_LONG_PARTIAL + 1 ))
-		v_SHORT_PARTIAL=$(( v_SHORT_PARTIAL + 1 ))
-	elif [[ "$v_THIS_STATUS" == "failure" ]]; then
-		a_LONG_STATUSES[${#a_LONG_STATUSES[@]}]="f"
-		v_LONG_FAIL=$(( v_LONG_FAIL + 1 ))
-		v_SHORT_FAIL=$(( v_SHORT_FAIL + 1 ))
-	fi
-	a_LONG_DURATIONS[${#a_LONG_DURATIONS[@]}]="$v_CHECK_DURATION"
+	#============================#
+	#== Set the Status Strings ==#
+	#============================#
 
-	### Get rid of entries from the long array, adjust the placement of the for the short hours
-	if [[ -n "${a_LONG_STAMPS[0]}" ]]; then
-		while [[ "${a_LONG_STAMPS[0]}" -le $(( v_DATE3 - $(( 3600 * v_LONG_HOURS )) )) ]]; do
-			if [[ "${a_LONG_STAMPS[0]}" == "s" ]]; then
-				v_LONG_SUCCESS=$(( v_LONG_SUCCESS - 1 ))
-			elif [[ "${a_LONG_STAMPS[0]}" == "p" ]]; then
-				v_LONG_PARTIAL=$(( v_LONG_PARTIAL - 1 ))
-			elif [[ "${a_LONG_STAMPS[0]}" == "f" ]]; then
-				v_LONG_FAIL=$(( v_LONG_FAIL - 1 ))
-			fi
-			v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} - ${a_LONG_DURATIONS[0]}}" )"
-			v_LONG_COUNT=$(( v_LONG_COUNT - 1 ))
-			a_LONG_STAMPS=("${a_LONG_STAMPS[@]:1}")
-			a_LONG_STATUSES=("${a_LONG_STATUSES[@]:1}")
-			a_LONG_DURATIONS=("${a_LONG_DURATIONS[@]:1}")
-			v_SHORT_PLACE=$(( v_SHORT_PLACE - 1 ))
-		done
-	fi
-
-	### adjust placement for the short array
-	if [[ -n "${a_LONG_STAMPS[0]}" ]]; then
-		while [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" -le $(( v_DATE3 - $(( 3600 * v_SHORT_HOURS )) )) ]]; do
-			if [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "s" ]]; then
-				v_SHORT_SUCCESS=$(( v_SHORT_SUCCESS - 1 ))
-			elif [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "p" ]]; then
-				v_SHORT_PARTIAL=$(( v_SHORT_PARTIAL - 1 ))
-			elif [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "f" ]]; then
-				v_SHORT_FAIL=$(( v_SHORT_FAIL - 1 ))
-			fi
-			v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} - ${a_LONG_DURATIONS[$v_SHORT_PLACE]}}" )"
-			v_SHORT_COUNT=$(( v_SHORT_COUNT - 1 ))
-			v_SHORT_PLACE=$(( v_SHORT_PLACE + 1 ))
-		done
-	fi
-
-	### Do the math for long hours
-	v_LONG_PERCENT_SUCCESS="$( awk "BEGIN {printf \"%.2f\",( ${v_LONG_SUCCESS} * 100 ) / ${v_LONG_COUNT}}" )"
-	v_LONG_PERCENT_PARTIAL="$( awk "BEGIN {printf \"%.2f\",( ${v_LONG_PARTIAL} * 100 ) / ${v_LONG_COUNT}}" )"
-	v_LONG_PERCENT_FAIL="$( awk "BEGIN {printf \"%.2f\",( ${v_LONG_FAIL} * 100 ) / ${v_LONG_COUNT}}" )"
-	v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} + ${v_CHECK_DURATION}}" )"
-	v_LONG_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} / ${v_LONG_COUNT}}" )"	
-
-	### Do the math for short hours
-	v_SHORT_PERCENT_SUCCESS="$( awk "BEGIN {printf \"%.2f\",( ${v_SHORT_SUCCESS} * 100 ) / ${v_SHORT_COUNT}}" )"
-	v_SHORT_PERCENT_PARTIAL="$( awk "BEGIN {printf \"%.2f\",( ${v_SHORT_PARTIAL} * 100 ) / ${v_SHORT_COUNT}}" )"
-	v_SHORT_PERCENT_FAIL="$( awk "BEGIN {printf \"%.2f\",( ${v_SHORT_FAIL} * 100 ) / ${v_SHORT_COUNT}}" )"
-	v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} + ${v_CHECK_DURATION}}" )"
-	v_SHORT_AVERAGE_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} / ${v_SHORT_COUNT}}" )"
-
-	### Set the status strings
-
-	### set v_LAST_LAST_STATUS
+	local v_LAST_LAST_STATUS
 	if [[ "$v_LAST_STATUS" != "$v_THIS_STATUS" ]]; then
 		v_LAST_LAST_STATUS="$v_LAST_STATUS"
 	fi
 	### Figure out when the last partial success and last failure were.
+	local v_LAST_SUCCESS_STRING
 	if [[ "$v_THIS_STATUS" != "success" ]]; then
 		if [[ "$v_LAST_SUCCESS" == "never" || -z "$v_LAST_SUCCESS" ]]; then
 			v_LAST_SUCCESS_STRING="never"
@@ -559,6 +705,7 @@ function fn_report_status {
 			v_LAST_SUCCESS_STRING="$( fn_convert_seconds $(( v_DATE3 - v_LAST_SUCCESS )) ) ago"
 		fi
 	fi
+	local v_LAST_PARTIAL_SUCCESS_STRING
 	if [[ "$v_THIS_STATUS" != "partial success" ]]; then
 		if [[ "$v_LAST_PARTIAL_SUCCESS" == "never" || -z $v_LAST_PARTIAL_SUCCESS ]]; then
 			v_LAST_PARTIAL_SUCCESS_STRING="never"
@@ -566,6 +713,7 @@ function fn_report_status {
 			v_LAST_PARTIAL_SUCCESS_STRING="$( fn_convert_seconds $(( v_DATE3 - v_LAST_PARTIAL_SUCCESS )) ) ago"
 		fi
 	fi
+	local v_LAST_FAILURE_STRING
 	if [[ "$v_THIS_STATUS" != "failure" ]]; then
 		if [[ "$v_LAST_FAILURE" == "never" || -z "$v_LAST_FAILURE" ]]; then
 			v_LAST_FAILURE_STRING="never"
@@ -573,48 +721,40 @@ function fn_report_status {
 			v_LAST_FAILURE_STRING="$( fn_convert_seconds $(( v_DATE3 - v_LAST_FAILURE )) ) ago"
 		fi
 	fi
-	v_DUMP_STATUS=false
-	if [[ -z "$v_OUT_STATUS_NEXT" ]]; then
-		v_OUT_STATUS_NEXT=600
-	fi
 
-	if [[ "$v_RUN_SECONDS" -gt "$v_OUT_STATUS_NEXT" ]]; then
+	#====================================================#
+	#== Do we need to Dump the Status or Kill the Job? ==#
+	#====================================================#
+
+	local v_DUMP_STATUS=false
+	if [[ "$v_RUN_SECONDS" -gt "$v_NEXT_STATUS_DUMP" ]]; then
 		v_DUMP_STATUS=true
-		v_OUT_STATUS_NEXT=$(( v_OUT_STATUS_NEXT + 600 ))
+		v_NEXT_STATUS_DUMP="$(( v_NEXT_STATUS_DUMP + v_STATUS_DUMP_INC ))"
 	fi
 
 	### Check to see if the parent is still in place, and die if not.
+	local v_DIE=false
 	if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon.sh[[:blank:]]" ) -eq 0 || -f "$d_CHILD"/die ]]; then
 		v_DUMP_STATUS=true
 		v_DIE=true
 	fi
 
+	### More verbose output is necessary if that's the verbosity, OR if it's time to dump the full status
 	if [[ "$v_VERBOSITY" == "more verbose" || -f "$d_CHILD"/status || "$v_DUMP_STATUS" == true ]]; then
-		### set up the "more verose" output if necessary.
-		v_REPORT2="$v_DATE2 - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME\n  Check Status:                 $v_DESCRIPTOR1\n  Checking for:                 $v_RUN_TIME\n  "
-		if [[ "$v_THIS_STATUS" != "success" ]]; then
-			v_REPORT2="$v_REPORT2""Last successful check:        $v_LAST_SUCCESS_STRING\n  "
-		fi
-		if [[ "$v_THIS_STATUS" != "partial success" ]]; then
-			v_REPORT2="$v_REPORT2""Last partial success:         $v_LAST_PARTIAL_SUCCESS_STRING\n  "
-		fi
-		if [[ "$v_THIS_STATUS" != "failure" ]]; then
-			v_REPORT2="$v_REPORT2""Last failed check:            $v_LAST_FAILURE_STRING\n  "
-		fi
-		v_REPORT2="$v_REPORT2""Number of checks completed:   $v_TOTAL_CHECKS\n  #Success/#Partial/#Failure:   $v_TOTAL_SUCCESSES / $v_TOTAL_PARTIAL_SUCCESSES / $v_TOTAL_FAILURES\n  %Success/%Partial/%Failure:   $v_PERCENT_SUCCESSES% / $v_PERCENT_PARTIAL_SUCCESSES% / $v_PERCENT_FAILURES%\n  This check:                   $v_CHECK_DURATION seconds\n  Average check:                $v_AVERAGE_DURATION seconds\n  Average recent check:         $v_AVERAGE_RECENT_DURATION seconds\n  Average successful check:     $v_AVERAGE_SUCCESS_DURATION seconds"
-		if [[ -f "$d_CHILD"/status || "$v_DUMP_STATUS" == true ]]; then
-			echo -e "$v_REPORT2""\n  Total duration:               $v_TOTAL_DURATIONS seconds\n  Total recent duration:        $v_TOTAL_RECENT_DURATION seconds\n  Total successful duration:    $v_TOTAL_SUCCESS_DURATIONS seconds\n  Last $v_LONG_HOURS hours:\n    Number of checks completed: $v_LONG_COUNT\n    #Success/#Partial/#Failure: $v_LONG_SUCCESS / $v_LONG_PARTIAL / $v_LONG_FAIL\n    %Success/%Partial/%Failure: $v_LONG_PERCENT_SUCCESS% / $v_LONG_PERCENT_PARTIAL% / $v_LONG_PERCENT_FAIL%\n    Average check:              $v_LONG_AVERAGE_DURATION seconds\n    Total duration:             $v_LONG_TOTAL_DURATION seconds\n  Last $v_SHORT_HOURS hours:\n    Number of checks completed: $v_SHORT_COUNT\n    #Success/#Partial/#Failure: $v_SHORT_SUCCESS / $v_SHORT_PARTIAL / $v_SHORT_FAIL\n    %Success/%Partial/%Failure: $v_SHORT_PERCENT_SUCCESS% / $v_SHORT_PERCENT_PARTIAL% / $v_SHORT_PERCENT_FAIL%\n    Average check:              $v_SHORT_AVERAGE_DURATION seconds\n    Total duration:             $v_SHORT_TOTAL_DURATION seconds" > "$d_CHILD"/status
-			mv -f "$d_CHILD"/status "$d_CHILD/#status"
-		fi
+		local v_REPORT2="$( fn_more_verbose "$v_DUMP_STATUS" "$v_THIS_STATUS" )"
 	fi
 
-	### die if we need to die.
+	### If we need to die, do so before the part where we output the status information
 	if [[ "$v_DIE" == true ]]; then
 		fn_child_exit 0
 	fi
 
-	### Set $v_REPORT based on where the verbosity is set
+	#=========================#
+	#== Finalize the Output ==#
+	#=========================#
 
+	### Set $v_REPORT based on where the verbosity is set
+	local v_REPORT
 	if [[ "$v_VERBOSITY" == "verbose" ]]; then
 		### verbose
 		v_REPORT="$v_DATE - [$v_CHILD_PID] - $v_URL_OR_PING $v_JOB_NAME: $v_DESCRIPTOR1 - Checking for $v_RUN_TIME."
@@ -633,9 +773,12 @@ function fn_report_status {
 		### other
 		v_REPORT="$v_DATE - $v_URL_OR_PING $v_JOB_NAME: $v_DESCRIPTOR1"
 	fi
-	v_LOG_MESSAGE="$v_DATE2 - [$v_CHILD_PID] - Status changed for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2"
+	local v_LOG_MESSAGE="$v_DATE2 - [$v_CHILD_PID] - Status changed for $v_URL_OR_PING $v_ORIG_JOB_NAME: $v_DESCRIPTOR2"
+	unset v_REPORT2
 
-	### The part that actually outputs the stuff
+	#===========================#
+	#== Output and Send Email ==#
+	#===========================#
 
 	### If the last status was the same as this status
 	v_SENT=false
@@ -692,7 +835,9 @@ function fn_report_status {
 		echo "$v_DATE2 - [$v_CHILD_PID] - Status: $v_DESCRIPTOR2 - Duration $v_CHECK_DURATION seconds" >> "$d_CHILD"/log
 	fi
 
-	### Preparing for the next loop
+	#===============================#
+	#== Prepare for the Next Loop ==#
+	#===============================#
 
 	### set the v_LAST_STATUS variable to what ever the current status is
 	unset v_REPORT
@@ -710,6 +855,10 @@ function fn_report_status {
 	fi
 	unset v_SENT
 }
+
+#====================================#
+#== Functions for Processing Email ==#
+#====================================#
 
 function fn_start_email {
 	fn_debug "fn_start_email"
@@ -815,6 +964,10 @@ function fn_failure_email {
 	fi
 }
 
+#====================================================#
+#== Actually Sending the Email or Running a Script ==#
+#====================================================#
+
 function fn_send_email {
 ### Attempt to send the actual email and log the result
 ### This function is run with "&" so that the rest of LWmon will continue forward rather than wait for it
@@ -845,6 +998,14 @@ function fn_run_script {
 		fi
 	fi
 }
+
+#===================#
+#== End Functions ==#
+#===================#
+
+fn_locate
+source "$d_PROGRAM"/includes/mutual.shf
+source "$d_PROGRAM"/includes/variables.shf
 
 fn_start_script
 if [[ -n "$1" ]]; then

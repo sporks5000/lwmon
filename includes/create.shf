@@ -1,5 +1,10 @@
 #! /bin/bash
 
+### Variables declared here that need to be able to function globally
+v_ORIG_JOB_NAME=
+v_JOB_TYPE=
+v_SERVER_PORT=
+
 function fn_url_cl {
 	### Verify that the correct information was given at the command line
 	fn_debug "fn_url_cl"
@@ -38,7 +43,7 @@ function fn_ping_cl {
 	fi
 	fn_parse_server "$v_DOMAIN"
 	if [[ "$v_IP_ADDRESSa" == false ]]; then
-		echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
+		echo "Error: Domain '$v_DOMAIN' does not appear to resolve. Exiting."
 		exit 1
 	fi
 	v_ORIG_JOB_NAME="$v_DOMAINa"
@@ -58,7 +63,7 @@ function fn_dns_cl {
 	### Make sure that the domain resolves and is properly formatted
 	fn_parse_server "$v_DOMAIN"
 	if [[ "$v_IP_ADDRESSa" == false ]]; then
-		echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
+		echo "Error: Domain '$v_DOMAIN' does not appear to resolve. Exiting."
 		exit 1
 	fi
 	v_DOMAIN="$v_DOMAINa"
@@ -80,7 +85,7 @@ function fn_load_cl {
 	fi
 	fn_parse_server "$v_DOMAIN"
 	if [[ "$v_IP_ADDRESSa" == false ]]; then
-		echo "Error: Domain $v_DOMAIN does not appear to resolve. Exiting."
+		echo "Error: Domain '$v_DOMAIN' does not appear to resolve. Exiting."
 		exit 1
 	elif [[ "$v_IP_ADDRESSa" != "127.0.0.1" && "$v_IP_ADDRESSa" != "::1" && -z "$v_SSH_USER" ]]; then
 	### If it's not for localhost and there is no user, warn and exit.
@@ -113,8 +118,8 @@ function fn_load_cl {
 
 function fn_mutual_cl {
 	fn_debug "fn_mutual_cl"
-	v_NEW_JOB="$( date +%s )""_$RANDOM.job"
-	f_JOB="$d_WORKING"/"$v_NEW_JOB"
+	local v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+	local f_JOB="$d_WORKING"/"$v_NEW_JOB"
 	fn_read_child_params "$f_JOB"
 
 	mkdir -p "$d_WORKING"/new

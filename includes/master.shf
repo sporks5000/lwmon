@@ -1,6 +1,8 @@
 #! /bin/bash
 
+### Global Variables used throughout
 b_DOWNLOAD_NEW=false
+v_VERSION_CHECK=
 
 function fn_remove_unnecessary_functions {
 ### dump all of the functions that we won't need in order to keep the master process as lightweight as possible
@@ -61,7 +63,7 @@ function fn_master {
 	### try to prevent the master process from exiting unexpectedly.
 	trap fn_master_exit SIGINT SIGTERM SIGKILL
 	fn_remove_unnecessary_functions
-	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
+	local v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
 	### Create some necessary configuration files and directories
 	mkdir -p "$d_WORKING"/"new/"
 	echo -n "$$" > "$d_WORKING"/lwmon.pid
@@ -69,9 +71,9 @@ function fn_master {
 	### Get rid of the save file and no_output file from the previous session.
 	rm -f "$d_WORKING"/save "$d_WORKING"/no_output
 
-	v_TIMESTAMP_FIVE_MINUTES=0
-	v_TIMESTAMP_THIRTY_MINUTES=0
-	v_TIMESTAMP_THIRTY_SECONDS=0
+	local v_TIMESTAMP_FIVE_MINUTES=0
+	local v_TIMESTAMP_THIRTY_MINUTES=0
+	local v_TIMESTAMP_THIRTY_SECONDS=0
 	v_VERSION_CHECK=0
 	if [[ -f "$d_PROGRAM"/version/version_check ]]; then
 		v_VERSION_CHECK="$( cat "$d_PROGRAM"/version/version_check 2> /dev/null )"
@@ -102,6 +104,7 @@ function fn_master {
 			fi
 
 			### Also, let's do getting rid of old processes here - there's no reason to do that every two seconds, and this already runs every half hour, so there's no need to create a separate timer for that.
+			local v_OLD_CHILD
 			for v_OLD_CHILD in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^old_[0-9]+_[0-9]+$" ); do
 				if [[ $( echo "$v_OLD_CHILD" | grep -E -c "^old_[[:digit:]]*_[[:digit:]]*$" ) -eq 1 ]]; then
 					if [[ $(( v_DATE - $( echo "$v_OLD_CHILD" | cut -d "_" -f3 ) )) -gt 604800 ]]; then
@@ -109,27 +112,30 @@ function fn_master {
 						fn_read_child_params_lite "$d_WORKING"/"$v_OLD_CHILD"/params
 						echo "$( date +%F" "%T" "%Z ) - [$( echo "$v_OLD_CHILD" | cut -d "_" -f2)] - $v_JOB_TYPE $v_JOB_NAME - Child process dead for seven days. Deleting backed up data." >> "$v_LOG"
 						rm -rf "$d_WORKING"/"$v_OLD_CHILD"
+						unset v_JOB_TYPE v_JOB_NAME v_ORIG_JOB_NAME
 					fi
 				fi
 			done
 		fi
 
-		### Every five minutes, make surethat the directories for child processes are ACTUALLY associated with running child processes
+		### Every five minutes, make sure that the directories for child processes are ACTUALLY associated with running child processes
 		if [[ $(( v_DATE - 300 )) -gt "$v_TIMESTAMP_FIVE_MINUTES" ]]; then
 			v_TIMESTAMP_FIVE_MINUTES="$v_DATE"
 			### Go through the directories for child processes. Make sure that each one is associated with a running child process. If not....
+			local v_CHILD_PID
 			for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "^[0-9]+$" ); do
 				if [[ $( cat /proc/$v_CHILD_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon_child.sh[[:blank:]]" ) -eq 0 ]]; then
 					### If it hasn't been marked to die, restart it.
 					if [[ ! -f "$d_WORKING"/"$v_CHILD_PID/die" ]]; then
 						fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 						echo "$( date +%F" "%T" "%Z ) - [$v_CHILD_PID] - $v_JOB_TYPE $v_JOB_NAME - Child process was found dead. Restarting with new PID." >> "$v_LOG"
-						v_NEW_JOB="$v_DATE""_$RANDOM.job"
+						local v_NEW_JOB="$v_DATE""_$RANDOM.job"
 						cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"new/$v_NEW_JOB.job"
 						if [[ -f "$d_WORKING"/"$v_CHILD_PID"/log ]]; then
 							### If there's a log file, let's keep that too.
 							cp -a "$d_WORKING"/"$v_CHILD_PID"/log "$d_WORKING"/"new/$v_NEW_JOB".log
 						fi
+						unset v_JOB_TYPE v_JOB_NAME v_ORIG_JOB_NAME
 					fi
 					### Regardless of whether or not it's been marked to die, back it up.
 					v_TIMESTAMP="$v_DATE"
@@ -141,21 +147,18 @@ function fn_master {
 		### Every Two Seconds, check if there are any new files within the new/ directory. Assume that they're params files for new jobs
 		if [[ $( ls -1 "$d_WORKING"/new/*.job 2> /dev/null | wc -l ) -gt 0 ]]; then
 		### If there are any at all, take the first one and start a job from it. The next one can wait for the next loop.
-			v_LWMON_JOB="$( ls -1 "$d_WORKING"/new/*.job 2> /dev/null | head -n1 )"
+			local v_LWMON_JOB="$( ls -1 "$d_WORKING"/new/*.job 2> /dev/null | head -n1 )"
 			fn_read_child_params_lite "$v_LWMON_JOB"
 			if [[ "$v_JOB_TYPE" == "url" ]]; then
-				v_JOB_NAME="URL $v_JOB_NAME"
-				fn_spawn_child_process
+				fn_spawn_child_process "URL $v_JOB_NAME" "$v_LWMON_JOB"
 			elif [[ "$v_JOB_TYPE" == "ping" ]]; then
-				v_JOB_NAME="PING $v_JOB_NAME"
-				fn_spawn_child_process
+				fn_spawn_child_process "PING $v_JOB_NAME" "$v_LWMON_JOB"
 			elif [[ "$v_JOB_TYPE" == "dns" ]]; then
-				v_JOB_NAME="DNS $v_JOB_NAME"
-				fn_spawn_child_process
+				fn_spawn_child_process "DNS $v_JOB_NAME" "$v_LWMON_JOB"
 			elif [[ "$v_JOB_TYPE" == "ssh-load" ]]; then
-				v_JOB_NAME="SSH-LOAD $v_JOB_NAME"
-				fn_spawn_child_process
+				fn_spawn_child_process "SSH-LOAD $v_JOB_NAME" "$v_LWMON_JOB"
 			fi
+			unset v_JOB_TYPE v_JOB_NAME v_ORIG_JOB_NAME
 		else
 			if [[ $( ls -1 "$d_WORKING"/"new/" | wc -l ) -gt 0 ]]; then
 				rm -f "$d_WORKING"/new/*
@@ -206,12 +209,15 @@ function fn_check_updates {
 
 function fn_spawn_child_process {
 	### This function launches the child process and makes sure that it has it's own working directory.
-	### Launch the child process
 	fn_debug "fn_spawn_child_process"
-	"$v_CHILD_SCRIPT" "$v_JOB_NAME" &
+	local v_JOB_NAME="$1"
+	local v_LWMON_JOB="$2"
+
+	### Launch the child process
+	"$d_PROGRAM"/scripts/lwmon_child.sh "$v_JOB_NAME" &
 	### Note - the job name doesn't need to be present, but it makes ps more readable. Each child process starts out as generic. Once the master process creates a working directory for it (based on its PID) and then puts the params file in place for it, only then does it discover its purpose.
 	### create the child's wirectory and move the params file there.
-	v_CHILD_PID=$!
+	local v_CHILD_PID=$!
 	mkdir -p "$d_WORKING"/"$v_CHILD_PID"
 	touch "$d_WORKING"/"$v_CHILD_PID/#die"
 	mv "$v_LWMON_JOB" "$d_WORKING"/"$v_CHILD_PID"/params
@@ -224,11 +230,12 @@ function fn_spawn_child_process {
 function fn_master_exit {
 	### these steps are run after the master process has recieved a signal that it needs to die. "$1" is the exit code that should be passed.
 	fn_debug "fn_master_exit"
-	v_EXIT_CODE="$1"
+	local v_EXIT_CODE="$1"
 	if [[ -z "$v_EXIT_CODE" ]]; then
 		v_EXIT_CODE="0"
 	fi
 	echo "$( date +%F" "%T" "%Z ) - [$$] - Ending the Master Process" >> "$v_LOG"
+	local v_CHILD_PID
 	if [[ ! -f "$d_WORKING"/die && $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -vc "[^0-9]" ) -gt 0 ]]; then
 		### If the "die" file is not present, it was CTRL-C'd from the command line. Check if there are child processes, then prompt if they should be saved.
 		### Create a no_output file
@@ -238,6 +245,7 @@ function fn_master_exit {
 		echo "  1) Kill the master process and all child processes."
 		echo "  2) Back up the data for the child processes so that they'll start again next time LWmon is run, then kill the master process and all child processes."
 		echo
+		local v_OPTION_NUM
 		read -t 15 -ep "How would you like to proceed? " v_OPTION_NUM
 		# If they've opted to kill off all the current running processes, place a "die" file in each of their directories.
 		if [[ "$v_OPTION_NUM" == "1" ]]; then

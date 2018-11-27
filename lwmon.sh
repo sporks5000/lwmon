@@ -1,24 +1,64 @@
 #! /bin/bash
 
-#== Start LWmon ==#
+#===============================#
+#== Declare Initial Variables ==#
+#===============================#
 
+### Debugging variables
 b_DEBUG=false
 b_DEBUG_FUNCTIONS=false
 
-### determine where we're located
+### Command Line Arguments
+a_ARGS=( "$@" )
+a_ARGS2=()
+
+### lobal variables set within this file
+v_RUNNING_STATE=
+v_RUN_TYPE=
+d_PROGRAM=
+
+### Variables related to starting a new job
+v_CURL_URL=
+v_DOMAIN=
+v_CHILD_PID=
+v_USER_AGENT=
+v_LOG_DURATION_DATA=
+v_USE_WGET=
+v_EMAIL=
+v_WAIT_SECONDS=
+v_CHECK_TIME_PARTIAL_SUCCESS=
+v_CHECK_TIMEOUT=
+v_MAIL_DELAY=
+v_MIN_LOAD_PARTIAL_SUCCESS=
+v_MIN_LOAD_FAILURE=
+v_CL_PORT=
+v_NUM_DURATIONS_RECENT=
+v_NUM_STATUSES_RECENT=
+v_NUM_STATUSES_NOT_SUCCESS=
+v_IDENT=
+v_IP_ADDRESS=
+a_CURL_STRING=()
+v_DNS_CHECK_DOMAIN=
+v_DNS_CHECK_RESULT=
+v_DNS_RECORD_TYPE=
+v_SSH_USER=
+v_JOB_NAME=
+v_VERBOSITY=
+v_OUTPUT_FILE=
+
+#=====================#
+#== Begin Functions ==#
+#=====================#
+
 function fn_locate {
+### determine where the script is located
 	if [[ "$b_DEBUG_FUNCTIONS" == true ]]; then echo "$$: fn_locate" > /dev/stderr; fi
-	f_PROGRAM="$( readlink "${BASH_SOURCE[0]}" )"
+	local f_PROGRAM="$( readlink -f "${BASH_SOURCE[0]}" )"
 	if [[ -z "$f_PROGRAM" ]]; then
 		f_PROGRAM="${BASH_SOURCE[0]}"
 	fi
 	d_PROGRAM="$( cd -P "$( dirname "$f_PROGRAM" )" && pwd )"
-	f_PROGRAM="$( basename "$f_PROGRAM" )"
 }
-fn_locate
-source "$d_PROGRAM"/includes/mutual.shf
-
-##### Go through all of the functions in all of the files and determine what variables we can set as local
 
 #========================================#
 #== Functions for Processing Arguments ==#
@@ -195,7 +235,16 @@ function fn_test_flag_with_run {
 
 function fn_parse_cl_and_go {
 	fn_debug "fn_parse_cl_and_go"
+
+	### Separate out any instances where we have multiple single letter arguments, or arguments followed by an "="
+	local c
+	for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
+		fn_process_args "${a_ARGS[$c]}"
+	done
+	unset a_ARGS
+
 	### If any of the arguments are asking for help, output help and exit. Otherwise, find the run type
+	local v_ARG
 	for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
 		v_ARG="${a_ARGS2[$c]}"
 		if [[ "$v_ARG" == "-h" || "$v_ARG" == "--help" ]]; then
@@ -241,8 +290,8 @@ function fn_parse_cl_and_go {
 	done
 
 	### Make sure that ping, and dig are installed
-	### curl, wget, and mail are being checked elsewhere within the script.
-	for i in dig ping stat ssh; do
+	local i
+	for i in 'dig' 'ping' 'stat' 'ssh' 'awk'; do
 		if [[ -z "$( which $i 2> /dev/null )" ]]; then
 			echo "The \"$i\" binary needs to be installed for LWmon to perform some of its functions. Exiting."
 			exit 1
@@ -250,7 +299,7 @@ function fn_parse_cl_and_go {
 	done
 
 	### Determine the running state
-	if [[ -f "$d_WORKING"/lwmon.pid && $( cat /proc/$( cat "$d_WORKING"/lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "$f_PROGRAM[[:blank:]]" ) -gt 0 ]]; then
+	if [[ -f "$d_WORKING"/lwmon.pid && $( cat /proc/$( cat "$d_WORKING"/lwmon.pid )/cmdline 2> /dev/null | tr "\0" " " | grep -c "lwmon.sh[[:blank:]]" ) -gt 0 ]]; then
 	### This tests if the master process exists
 		if [[ "$v_RUN_TYPE" == "--master" ]]; then
 			echo "Master Process is already running"
@@ -272,6 +321,8 @@ function fn_parse_cl_and_go {
 	fi
 
 	### Go through the command line arguments again, this time gathering all the data
+	local v_SAVE_JOBS=false
+	local v_CHILD_PID
 	for (( c=0; c<=$(( ${#a_ARGS2[@]} - 1 )); c++ )); do
 		v_ARG="${a_ARGS2[$c]}"
 
@@ -301,8 +352,6 @@ function fn_parse_cl_and_go {
 			v_RUNNING_STATE="control"
 		elif [[ "$v_ARG" == "--save" ]]; then
 			v_SAVE_JOBS=true
-		elif [[ "$v_ARG" == "--testing" ]]; then
-			v_TESTING=true
 
 		### Flags with boolean arguments
 		elif [[ "$v_ARG" == "--user-agent" ]]; then
@@ -466,12 +515,6 @@ function fn_parse_cl_and_go {
 		fn_list
 		echo
 		exit 0
-	elif [[ -z "$v_RUN_TYPE" ]]; then
-		if [[ "$v_NUM_ARGUMENTS" -ne 0 ]]; then
-			echo "Some of the flags you used didn't make sense in context. Here's a menu instead."
-		fi
-		source "$d_PROGRAM"/includes/modify.shf
-		fn_modify
 	fi
 }
 
@@ -479,20 +522,15 @@ function fn_parse_cl_and_go {
 #== END FUNCTIONS ==#
 #===================#
 
+fn_locate
+source "$d_PROGRAM"/includes/mutual.shf
+
 fn_start_script
-
-### Separate out any instances where we have multiple single letter arguments, or arguments followed by an "="
-a_ARGS=( "$@" )
-a_ARGS2=()
-for (( c=0; c<=$(( ${#a_ARGS[@]} - 1 )); c++ )); do
-	fn_process_args "${a_ARGS[$c]}"
-done
-
-v_RUN_TYPE=
 fn_parse_cl_and_go
 
 ### If it's the master process, run that
 if [[ "$v_RUNNING_STATE" == "master" ]]; then
+	unset a_ARGS2
 	source "$d_PROGRAM"/includes/master.shf
 	fn_master
 fi

@@ -1,5 +1,8 @@
 #! /bin/bash
 
+### Variables that need to be able to function globally
+a_CHILD_PID=()
+
 function fn_list {
 	fn_debug "fn_list"
 	### This just lists the lwmon master process and all child processes.
@@ -10,8 +13,9 @@ function fn_list {
 	echo "List of currently running lwmon processes:"
 	echo
 	echo "  1) [$( cat "$d_WORKING"/lwmon.pid )] - Master Process (and lwmon in general)" #"
-	v_CHILD_NUMBER=2
+	local v_CHILD_NUMBER=2
 	a_CHILD_PID=()
+	local v_CHILD_PID
 	for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "." | grep -E -v "[^0-9]" ); do
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
@@ -32,6 +36,7 @@ function fn_modify_master {
 	echo "  5) Old monotoring jobs."
 	echo "  6) Exit out of this menu."
 	echo
+	local v_OPTION_NUM
 	read -ep "Choose an option from the above list: " v_OPTION_NUM
 	if [[ "$v_OPTION_NUM" == "1" ]]; then
 		touch "$d_WORKING"/die
@@ -68,6 +73,7 @@ function fn_modify_no_master {
 	echo "  6) Old monotoring jobs."
 	echo "  7) Exit out of this menu."
 	echo
+	local v_OPTION_NUM
 	read -ep "Choose an option from the above list: " v_OPTION_NUM
 	if [[ "$v_OPTION_NUM" == "1" ]]; then
 		fn_help
@@ -99,10 +105,11 @@ function fn_modify_old_jobs {
 	fn_debug "fn_modify_old_jobs"
 	echo "List of old lwmon jobs:"
 	echo
-	v_CHILD_NUMBER=1
-	a_CHILD_PID=()
+	local v_CHILD_NUMBER=1
+	local a_CHILD_PID=()
+	local v_CHILD_PID
 	for v_CHILD_PID in $( find "$d_WORKING"/ -maxdepth 1 -type d | rev | cut -d "/" -f1 | rev | grep -E "old_[0-9]*_[0-9]*" | awk -F_ '{print $3"_"$2"_"$1}' | sort -n | awk -F_ '{print $3"_"$2"_"$1}' ); do
-		v_ENDED_DATE="$( echo "$v_CHILD_PID" | cut -d "_" -f3 )"
+		local v_ENDED_DATE="$( echo "$v_CHILD_PID" | cut -d "_" -f3 )"
 		v_ENDED_DATE="$( date --date="@$v_ENDED_DATE" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
@@ -134,31 +141,32 @@ function fn_modify_old_jobs {
 	echo "  7) View associated html files (if any)."
 	echo "  8) Exit out of this menu."
 	echo
+	local v_OPTION_NUM
 	read -ep "Chose an option from the above list: " v_OPTION_NUM
 	if [[ "$v_OPTION_NUM" == "1" && -n "$d_WORKING"/ && -n "$v_CHILD_PID" ]]; then
 		rm -rf "$d_WORKING"/"$v_CHILD_PID"
 		echo "This job has been parmanently removed."
 	elif [[ "$v_OPTION_NUM" == "2" ]]; then
-		echo -en "\ncd $d_WORKING""$v_CHILD_PID/\n\n"
+		echo -en "\ncd $d_WORKING"/"$v_CHILD_PID/\n\n"
 	elif [[ "$v_OPTION_NUM" == "3" ]]; then
-		v_NEW_JOB="$( date +%s )""_$RANDOM.job"
+		local v_NEW_JOB="$( date +%s )""_$RANDOM.job"
 		cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"new/$v_NEW_JOB.job"
 		if [[ -f "$d_WORKING"/"$v_CHILD_PID"/log ]]; then
 			### If there's a log file, let's keep that too.
 			cp -a "$d_WORKING"/"$v_CHILD_PID"/log "$d_WORKING"/"new/$v_NEW_JOB".log
 		fi
 	elif [[ "$v_OPTION_NUM" == "4" ]]; then
-		echo "Viewing the log at $d_WORKING""$v_CHILD_PID/log"
+		echo "Viewing the log at $d_WORKING"/"$v_CHILD_PID/log"
 		less +G "$d_WORKING"/"$v_CHILD_PID/log"
 	elif [[ "$v_OPTION_NUM" == "5" ]]; then
 		echo
 		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
 		echo
 	elif [[ "$v_OPTION_NUM" == "6" && -n "$d_WORKING" && -n "$v_CHILD_PID" ]]; then
-		v_NEW_DIRECTORY="$( basename "$v_CHILD_PID" | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
+		local v_NEW_DIRECTORY="$( basename "$v_CHILD_PID" | awk -F_ '{print $1"_"$2}' )_$( date +%s )"
 		mv -f "$d_WORKING"/"$v_CHILD_PID" "$d_WORKING"/"$v_NEW_DIRECTORY"
 	elif [[ "$v_OPTION_NUM" == "7" ]]; then
-		fn_modify_html
+		fn_modify_html "$v_CHILD_PID"
 	else
 		echo "Exiting."
 	fi
@@ -168,12 +176,14 @@ function fn_modify_old_jobs {
 function fn_modify_html {
 ### Lists html files associated with a process and then gives options for them.
 	fn_debug "fn_modify_html"
+	v_CHILD_PID="$1"
 	echo "List of html files associated with $v_JOB_NAME"
 	echo
-	v_HTML_NUMBER=1
-	a_HTML_LIST=()
+	local v_HTML_NUMBER=1
+	local a_HTML_LIST=()
+	local v_HTML_NAME
 	for v_HTML_NAME in $( find "$d_WORKING"/"$v_CHILD_PID" -maxdepth 1 -type f | rev | cut -d "/" -f1 | rev | grep -E "(success|fail)\.html$" | awk -F_ '{print $2"_"$3"_"$1}' | sort -n | awk -F_ '{print $3"_"$1"_"$2}' ); do
-		v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | grep -E -o "[0-9]+_[psf]" | cut -d "_" -f1 )"
+		local v_HTML_TIMESTAMP="$( echo "$v_HTML_NAME" | grep -E -o "[0-9]+_[psf]" | cut -d "_" -f1 )"
 		v_HTML_TIMESTAMP="$( date --date="@$v_HTML_TIMESTAMP" +%m"/"%d" "%H":"%M":"%S )"
 		### The params files here have to be referenced rather than just the word "child" Otherwise, it will reuse the same set of variables throughout the loop.
 		echo "  $v_HTML_NUMBER) $v_HTML_TIMESTAMP - $v_HTML_NAME"
@@ -197,6 +207,7 @@ function fn_modify_html {
 	echo "  2) Output the full file name."
 	echo "  3) Exit out of this menu."
 	echo
+	local v_OPTION_NUM
 	read -ep "Chose an option from the above list: " v_OPTION_NUM
 	if [[ "$v_OPTION_NUM" == "1" && -n "$d_WORKING"/ && -n "$v_CHILD_PID" && "$v_HTML_NAME" ]]; then
 		rm -f "$d_WORKING"/"$v_CHILD_PID"/"$v_HTML_NAME"
@@ -219,6 +230,7 @@ function fn_modify {
 	fi
 	fn_list
 	echo
+	local v_CHILD_NUMBER
 	read -ep "Which process do you want to modify? " v_CHILD_NUMBER
 	if [[ "$v_CHILD_NUMBER" == "0" || $( echo "$v_CHILD_NUMBER" | grep -E -vc "[^0-9]" ) -eq 0 || "$v_CHILD_NUMBER" -ge $(( ${#a_CHILD_PID[@]} + 2 )) ]]; then
 		echo "Invalid Option. Exiting."
@@ -227,7 +239,7 @@ function fn_modify {
 	if [[ "$v_CHILD_NUMBER" -lt 2 ]]; then
 		fn_modify_master
 	fi
-	v_CHILD_PID="${a_CHILD_PID[$v_CHILD_NUMBER - 2]}"
+	local v_CHILD_PID="${a_CHILD_PID[$v_CHILD_NUMBER - 2]}"
 	fn_read_child_params_lite "$d_WORKING"/"$v_CHILD_PID"/params
 	echo "$v_JOB_NAME:"
 	echo
@@ -236,17 +248,17 @@ function fn_modify {
 	echo "  3) Directly edit the parameters file (with your EDITOR - \"$EDITOR\")."
 	echo "  4) View the log file associated with this process."
 	echo "  5) Output the commands to reproduce this job."
-	echo "  6) Change the title of the job as it's reported by the child process. (Currently \"$v_JOB_NAME\")."
-	echo "  7) Show the most recent full status output for the job."
-	echo "  8) View associated html files (if any)."
-	echo "  9) Exit out of this menu."
+	echo "  6) Show the most recent full status output for the job."
+	echo "  7) View associated html files (if any)."
+	echo "  8) Exit out of this menu."
 	echo
+	local v_OPTION_NUM
 	read -ep "Chose an option from the above list: " v_OPTION_NUM
 	if [[ "$v_OPTION_NUM" == "1" ]]; then
 		touch "$d_WORKING"/"$v_CHILD_PID/die"
 		echo "Process will exit out shortly."
 	elif [[ "$v_OPTION_NUM" == "2" ]]; then
-		echo -en "\ncd $d_WORKING""$v_CHILD_PID/\n\n"
+		echo -en "\ncd $d_WORKING"/"$v_CHILD_PID/\n\n"
 	elif [[ "$v_OPTION_NUM" == "3" ]]; then
 		cp -a "$d_WORKING"/"$v_CHILD_PID"/params "$d_WORKING"/"$v_CHILD_PID"/params.temp
 		if [[ -n "$EDITOR" ]]; then
@@ -257,17 +269,13 @@ function fn_modify {
 		fi
 		rm -f "$d_WORKING"/"$v_CHILD_PID/params.temp"
 	elif [[ "$v_OPTION_NUM" == "4" ]]; then
-		echo "Viewing the log at $d_WORKING""$v_CHILD_PID/log"
+		echo "Viewing the log at $d_WORKING"/"$v_CHILD_PID/log"
 		less +G "$d_WORKING"/"$v_CHILD_PID/log"
 	elif [[ "$v_OPTION_NUM" == "5" ]]; then
 		echo
 		echo "./lwmon.sh $( cat "$d_WORKING"/"$v_CHILD_PID/cl" )"
 		echo
 	elif [[ "$v_OPTION_NUM" == "6" ]]; then
-		read -ep "Enter a new identifying string to associate with this check: " v_JOB_NAME
-		fn_update_conf JOB_NAME "$v_JOB_NAME" "$d_WORKING"/"$v_CHILD_PID"/params
-		echo "The job name has been updated."
-	elif [[ "$v_OPTION_NUM" == "7" ]]; then
 		if [[ ! -f "$d_WORKING"/"$v_CHILD_PID"/'#status' ]]; then
 			echo -e "\nData not yet available. Prompting for output."
 			touch "$d_WORKING"/"$v_CHILD_PID"/status
@@ -278,34 +286,11 @@ function fn_modify {
 		echo
 		cat "$d_WORKING"/"$v_CHILD_PID"/'#status'
 		echo
-	elif [[ "$v_OPTION_NUM" == "8" ]]; then
-		fn_modify_html
+	elif [[ "$v_OPTION_NUM" == "7" ]]; then
+		fn_modify_html "$v_CHILD_PID"
 	else
 		echo "Exiting."
 	fi
 	exit 0
 }
 
-function fn_update_conf {
-### This function updates a value in the conf file. It expects $1 to be the name of the directive, $2 to be the new value for that directive, and $3 to be the name of the conf file.
-	fn_debug "fn_update_conf"
-	if [[ "$3" == "child" && -f "$d_WORKING"/"$v_CHILD_PID"/params ]]; then
-		v_CONF_FILE="$d_WORKING"/"$v_CHILD_PID"/params
-	elif [[ "$3" == "master" && -f "$f_CONF" ]]; then
-		v_CONF_FILE="$f_CONF"
-	else
-		v_CONF_FILE="$3"
-	fi
-	if [[ -f "$v_CONF_FILE" ]]; then
-		### We're about to run $2 through sed, so it needs to have all of its slashes escaped.
-		v_MODIFIED_2="$( echo "$2" | sed -e 's/[\/&]/\\&/g' )"
-		if [[ $( grep -E -c "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
-			sed -i "$( grep -E -n "^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/\(^[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
-		elif [[ $( grep -E -c "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*$" "$v_CONF_FILE" 2> /dev/null ) -gt 0 ]]; then
-		### If there's a commended-out line, but it doesn't have a value afterward...
-			sed -i "$( grep -E -n "^[[:blank:]]*##*[[:blank:]]*$1[[:blank:]]*=[[:blank:]]*" "$v_CONF_FILE" | tail -n1 | cut -d ":" -f1 )""s/^[[:blank:]]*##*\([[:blank:]]*$1[[:blank:]]*=[[:blank:]]*\).*$/\1""$v_MODIFIED_2/" "$v_CONF_FILE"
-		else
-			echo "$1 = $v_MODIFIED_2" >> "$v_CONF_FILE"
-		fi
-	fi
-}
