@@ -54,7 +54,7 @@ function fn_master {
 	### try to prevent the master process from exiting unexpectedly.
 	trap fn_master_exit SIGINT SIGTERM SIGKILL
 	fn_remove_unnecessary_functions
-	local v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
+	local v_RELOAD_MASTER="$( stat --format=%Y "$f_CONF" )"
 	### Create some necessary configuration files and directories
 	mkdir -p "$d_WORKING"/"new/"
 	echo -n "$$" > "$d_WORKING"/lwmon.pid
@@ -74,11 +74,11 @@ function fn_master {
 		local v_DATE="$( date +%s )"
 
 		### Every thirty seconds, check if we need to re-read the master conf
-		if [[ $(( v_DATE - 30 )) -gt "$v_TIMESTAMP_THIRTY_SECONDS" ]]; then
+		if [[ $(( v_DATE - 30 )) -gt "$v_TIMESTAMP_THIRTY_SECONDS" && -f "$f_CONF" ]]; then
 			v_TIMESTAMP_THIRTY_SECONDS="$v_DATE"
-			local v_MASTER_CUR="$( stat --format=%Y "$f_CONF" )"
-			if [[ "$v_MASTER_CUR" -gt "$v_MASTER_RELOAD" ]]; then
-				v_MASTER_RELOAD="$v_MASTER_CUR"
+			local v_CURRENT_MASTER="$( stat --format=%Y "$f_CONF" )"
+			if [[ "$v_CURRENT_MASTER" -gt "$v_RELOAD_MASTER" ]]; then
+				v_RELOAD_MASTER="$v_CURRENT_MASTER"
 				fn_read_master_conf master
 			fi
 		fi
@@ -168,7 +168,7 @@ function fn_check_updates {
 	fn_debug "fn_check_updates"
 
 	local v_DATE="$1"
-	if [[ "$v_DATE" -gt $(( v_VERSION_CHECK + ( 3600 * 24 ) )) ]]; then
+	if [[ "$v_CHECK_UPDATES" == true && "$v_DATE" -gt $(( v_VERSION_CHECK + ( 3600 * 24 ) )) ]]; then
 	### If it's been 24 hours or more since the last version check
 		local v_HASH="$( cat "$d_PROGRAM"/version/version 2> /dev/null )"
 		if [[ "$v_HASH" == "new" ]]; then
@@ -209,7 +209,8 @@ function fn_check_updates {
 		else
 		### Compare the current hash to the new hash
 			local v_HASH_NEW="$( cat "$d_PROGRAM"/version/version_ 2> /dev/null )"
-			if [[ "$v_HASH" != "$v_NEW_HASH" ]]; then
+			if [[ "$v_HASH" != "$v_HASH_NEW" ]]; then
+echo "|$v_HASH| |$v_HASH_NEW|"
 				b_DOWNLOAD_NEW=true
 			fi
 			rm -f "$d_PROGRAM"/version/version_

@@ -7,50 +7,63 @@
 ### These functions are here at least in part in order to help keep track of the variables that we're using
 
 function fn_set_defaults {
+### If there are master values present, these will e set to the master values; this allows us to create new config files
 	fn_debug "fn_set_defaults"
 	### Variables that can be set in the main config
-	v_DEFAULT_VERBOSITY="standard"
-	v_DEFAULT_EMAIL_ADDRESS=""
-	v_DEFAULT_MAIL_DELAY="2"
-	v_DEFAULT_WAIT_SECONDS="30"
-	v_DEFAULT_CHECK_TIMEOUT="10"
-	v_DEFAULT_OUTPUT_FILE="/dev/stdout"
-	v_DEFAULT_USER_AGENT="false"
-	v_DEFAULT_HTML_FILES_KEPT="40"
-	v_DEFAULT_NUM_DURATIONS_RECENT="10"
-	v_DEFAULT_NUM_STATUSES_RECENT="12"
-	v_DEFAULT_NUM_STATUSES_NOT_SUCCESS="3"
-	v_DEFAULT_CHECK_TIME_PARTIAL_SUCCESS="7"
-	v_DEFAULT_LOG_DURATION_DATA="true"
-	v_DEFAULT_CURL_VERBOSE="true"
-	v_DEFAULT_LOG_HTTP_CODE="true"
-	v_DEFAULT_USE_WGET="false"
-	v_DEFAULT_LOG="$d_PROGRAM"/"lwmon.log"
-	v_DEFAULT_MAIL_COMMAND='echo -e "$v_MESSAGE" | mail -s "$v_SUBJECT" $v_EMAIL_ADDRESS'
-	v_DEFAULT_SSH_CONTROL_PATH="~/.ssh/control:%h:%p:%r"
-	v_DEFAULT_CUSTOM_MESSAGE=""
-	v_DEFAULT_COLOR_SUCCESS=""
-	v_DEFAULT_COLOR_FIRST_SUCCESS="\e[1;32m"
-	v_DEFAULT_COLOR_FAILURE="\e[1;33m"
-	v_DEFAULT_COLOR_FIRST_FAILURE="\e[1;31m"
-	v_DEFAULT_COLOR_PARTIAL_SUCCESS="\e[1;34m"
-	v_DEFAULT_COLOR_FIRST_PARTIAL_SUCCESS="\e[1;34m"
-	v_DEFAULT_RETURN_SUCCESS=""
-	v_DEFAULT_RETURN_FIRST_SUCCESS="\e[00m"
-	v_DEFAULT_RETURN_FAILURE="\e[00m"
-	v_DEFAULT_RETURN_FIRST_FAILURE="\e[00m"
-	v_DEFAULT_RETURN_PARTIAL_SUCCESS="\e[00m"
-	v_DEFAULT_RETURN_FIRST_PARTIAL_SUCCESS="\e[00m"
+	v_DEFAULT_VERBOSITY="${v_MASTER_VERBOSITY:-standard}"
+	v_DEFAULT_EMAIL_ADDRESS="$v_MASTER_EMAIL_ADDRESS"
+	v_DEFAULT_MAIL_DELAY="${v_MASTER_MAIL_DELAY:-2}"
+	v_DEFAULT_WAIT_SECONDS="${v_MASTER_WAIT_SECONDS:-30}"
+	v_DEFAULT_CHECK_TIMEOUT="${v_MASTER_CHECK_TIMEOUT:-10}"
+	v_DEFAULT_OUTPUT_FILE="${v_MASTER_OUTPUT_FILE:-/dev/stdout}"
+	v_DEFAULT_USER_AGENT="${v_MASTER_USER_AGENT:-false}"
+	v_DEFAULT_HTML_FILES_KEPT="${v_MASTER_HTML_FILES_KEPT:-40}"
+	v_DEFAULT_NUM_DURATIONS_RECENT="${v_MASTER_NUM_DURATIONS_RECENT:-10}"
+	v_DEFAULT_NUM_STATUSES_RECENT="${v_MASTER_NUM_STATUSES_RECENT:-12}"
+	v_DEFAULT_NUM_STATUSES_NOT_SUCCESS="${v_MASTER_NUM_STATUSES_NOT_SUCCESS:-3}"
+	v_DEFAULT_CHECK_TIME_PARTIAL_SUCCESS="${v_MASTER_CHECK_TIME_PARTIAL_SUCCESS:-7}"
+	v_DEFAULT_LOG_DURATION_DATA="${v_MASTER_LOG_DURATION_DATA:-true}"
+	v_DEFAULT_CURL_VERBOSE="${v_MASTER_CURL_VERBOSE:-true}"
+	v_DEFAULT_LOG_HTTP_CODE="${v_MASTER_LOG_HTTP_CODE:-true}"
+	v_DEFAULT_USE_WGET="${v_MASTER_USE_WGET:-false}"
+	v_DEFAULT_CUSTOM_MESSAGE="$v_MASTER_CUSTOM_MESSAGE"
+
+	### Variables that only apply to the master
+	v_DEFAULT_LOG="$v_LOG"
+	if [[ -z "$v_DEFAULT_LOG" ]]; then
+		v_DEFAULT_LOG="$d_PROGRAM"/"lwmon.log"
+	fi
+	v_DEFAULT_MAIL_COMMAND="$v_MAIL_COMMAND"
+	if [[ -z "$v_DEFAULT_MAIL_COMMAND" ]]; then
+		v_DEFAULT_MAIL_COMMAND='echo -e "$v_MESSAGE" | mail -s "$v_SUBJECT" $v_EMAIL_ADDRESS'
+	fi
+	v_DEFAULT_SSH_CONTROL_PATH="$v_SSH_CONTROL_PATH"
+	if [[ -z "$v_DEFAULT_SSH_CONTROL_PATH" ]]; then
+		v_DEFAULT_SSH_CONTROL_PATH="~/.ssh/control:%h:%p:%r"
+	fi
+	v_DEFAULT_CHECK_UPDATES="${v_CHECK_UPDATES:-true}"
+	v_DEFAULT_COLOR_SUCCESS="$v_COLOR_SUCCESS"
+	v_DEFAULT_COLOR_FIRST_SUCCESS="${v_COLOR_FIRST_SUCCESS:-\e[1;32m}"
+	v_DEFAULT_COLOR_FAILURE="${v_COLOR_FAILURE:-\e[1;33m}"
+	v_DEFAULT_COLOR_FIRST_FAILURE="${v_COLOR_FIRST_FAILURE:-\e[1;31m}"
+	v_DEFAULT_COLOR_PARTIAL_SUCCESS="${v_COLOR_PARTIAL_SUCCESS:-\e[1;34m}"
+	v_DEFAULT_COLOR_FIRST_PARTIAL_SUCCESS="${v_COLOR_FIRST_PARTIAL_SUCCESS:-\e[1;34m}"
+	v_DEFAULT_RETURN_SUCCESS="$v_RETURN_SUCCESS"
+	v_DEFAULT_RETURN_FIRST_SUCCESS="${v_RETURN_FIRST_SUCCESS:-\e[00m}"
+	v_DEFAULT_RETURN_FAILURE="${v_RETURN_FAILURE:-\e[00m}"
+	v_DEFAULT_RETURN_FIRST_FAILURE="${v_RETURN_FIRST_FAILURE:-\e[00m}"
+	v_DEFAULT_RETURN_PARTIAL_SUCCESS="${v_RETURN_PARTIAL_SUCCESS:-\e[00m}"
+	v_DEFAULT_RETURN_FIRST_PARTIAL_SUCCESS="${v_RETURN_FIRST_PARTIAL_SUCCESS:-\e[00m}"
 
 	### Debug variables
-	v_DEFAULT_DEBUG=false
-	v_DEFAULT_DEBUG_FUNCTIONS=false
+	v_DEFAULT_DEBUG="${v_MASTER_DEBUG:-false}"
+	v_DEFAULT_DEBUG_FUNCTIONS="${v_MASTER_DEBUG_FUNCTIONS:-false}"
 
 	### Variables that cannot be set in the main config
-	v_DEFAULT_DNS_RECORD_TYPE="A"
-	v_DEFAULT_SERVER_PORT="22"
-	v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS="4"
-	v_DEFAULT_MIN_LOAD_FAILURE="8"
+	v_DEFAULT_DNS_RECORD_TYPE="${v_MASTER_DNS_RECORD_TYPE:-A}"
+	v_DEFAULT_SERVER_PORT="${v_MASTER_SERVER_PORT:-22}"
+	v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS="${v_MASTER_MIN_LOAD_PARTIAL_SUCCESS:-4}"
+	v_DEFAULT_MIN_LOAD_FAILURE="${v_MASTER_MIN_LOAD_FAILURE:-8}"
 }
 
 function fn_clear_master_vars1 {
@@ -85,6 +98,7 @@ function fn_clear_master_vars2 {
 	v_MASTER_LOG=
 	v_MASTER_MAIL_COMMAND=
 	v_MASTER_SSH_CONTROL_PATH=
+	v_MASTER_CHECK_UPDATES=
 	v_MASTER_COLOR_SUCCESS=
 	v_MASTER_COLOR_FIRST_SUCCESS=
 	v_MASTER_COLOR_FAILURE=
@@ -166,9 +180,8 @@ function fn_is_float {
 function fn_is_boolean {
 ### If a value should be only true or false, return only true or false
 	fn_debug "fn_is_boolean"
-	local v_VAL="$( echo "$1" | tr '[:upper:]' '[:lower:]' )"
-	if [[ "$v_VAL" == "true" || "$v_VAL" == "false" ]]; then
-		echo "$v_VAL"
+	if [[ "${1,,}" == "true" || "${1,,}" == "false" ]]; then
+		echo "${1,,}"
 	else
 		echo "$2"
 	fi
@@ -231,20 +244,29 @@ function fn_is_ip {
 function fn_read_master_conf {
 ### Read all of the variables in the master config
 ### If it's the master process reading these, $1 should be "master"
+### If we're replacing an old config with a new config, $1 should be the path to the old config
 	fn_debug "fn_read_master_conf"
-	fn_set_defaults
-
-	### If we're asked to read the master conf, and there IS NO master conf present, create one
-	if [[ ! -f "$f_CONF" ]]; then
-		source "$d_PROGRAM"/includes/create_config.shf
-		fn_create_config
-	fi
-
 	### Clear the master variables
 	fn_clear_master_vars1
 	fn_clear_master_vars2
+	### Make sure we have the default variables
+	fn_set_defaults
+
+	local f_CONF="$f_CONF"
+	local b_NEW_CONF=false
+	if [[ -f "$1" && "${1:0:1}" == "/" ]]; then
+		f_CONF="$1"
+		b_NEW_CONF=true
+		fn_clear_params_vars
+	elif [[ ! -f "$f_CONF" ]]; then
+	### If we're asked to read the master conf, and there IS NO master conf present, create one
+		source "$d_PROGRAM"/includes/create_config.shf
+		fn_create_config
+		echo "$( date +%F" "%T" "%Z ) - [$$] - Created a configuration file" >> "$v_DEFAULT_LOG"
+	fi
+
 	### Read the configuration
-	source <( cat "$f_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_MASTER_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_MASTER_(VERBOSITY|EMAIL_ADDRESS|MAIL_(DELAY|COMMAND)|WAIT_SECONDS|OUTPUT_FILE|USE(R_AGENT|_WGET)|HTML_FILES_KEPT|NUM_((STATUSES|DURATIONS)_RECENT|STATUSES_NOT_SUCCESS)|CHECK_TIME(OUT|_PARTIAL_SUCCESS)|LOG(_DURATION_DATA|_HTTP_CODE)?|(COLOR|RETURN)_(FIRST_)?(PARTIAL_)?(SUCCESS|FAILURE)|CURL_VERBOSE|SSH_CONTROL_PATH|DEBUG(_FUNCTIONS)?)='.*'$" ) 2> /dev/null
+	source <( cat "$f_CONF" | grep -Ev "^\s*#|^\s*$" | sed -E "s/^\s*/v_MASTER_/;s/'/'\\\''/g;s/\s*=\s*/='/;s/\s*$/'/" | grep -E "^v_MASTER_(VERBOSITY|EMAIL_ADDRESS|MAIL_(DELAY|COMMAND)|WAIT_SECONDS|OUTPUT_FILE|USE(R_AGENT|_WGET)|HTML_FILES_KEPT|NUM_((STATUSES|DURATIONS)_RECENT|STATUSES_NOT_SUCCESS)|CHECK_TIME(OUT|_PARTIAL_SUCCESS)|LOG(_DURATION_DATA|_HTTP_CODE)?|(COLOR|RETURN)_(FIRST_)?(PARTIAL_)?(SUCCESS|FAILURE)|CURL_VERBOSE|SSH_CONTROL_PATH|CHECK_UPDATES|DEBUG(_FUNCTIONS)?)='.*'$" ) 2> /dev/null
 
 	### Replace values with defaults if necessary
 	v_MASTER_VERBOSITY="$( fn_is_verbosity "$v_MASTER_VERBOSITY" "$v_DEFAULT_VERBOSITY" )"
@@ -277,6 +299,7 @@ function fn_read_master_conf {
 		v_MAIL_COMMAND="$v_DEFAULT_MAIL_COMMAND"
 	fi
 	v_SSH_CONTROL_PATH="$( fn_is_file_path "$v_MASTER_SSH_CONTROL_PATH" "$v_DEFAULT_SSH_CONTROL_PATH" )"
+	v_CHECK_UPDATES="$( fn_is_boolean "$v_MASTER_CHECK_UPDATES" "$v_DEFAULT_CHECK_UPDATES" )"
 	v_COLOR_SUCCESS="$( fn_is_string "$v_MASTER_COLOR_SUCCESS" "$v_DEFAULT_COLOR_SUCCESS" )"
 	v_COLOR_FIRST_SUCCESS="$( fn_is_string "$v_MASTER_COLOR_FIRST_SUCCESS" "$v_DEFAULT_COLOR_FIRST_SUCCESS" )"
 	v_COLOR_FAILURE="$( fn_is_string "$v_MASTER_COLOR_FAILURE" "$v_DEFAULT_COLOR_FAILURE" )"
@@ -295,6 +318,13 @@ function fn_read_master_conf {
 	v_MASTER_SERVER_PORT="$( fn_is_integer "$v_MASTER_SERVER_PORT" "$v_DEFAULT_SERVER_PORT" )"
 	v_MASTER_MIN_LOAD_PARTIAL_SUCCESS="$( fn_is_float "$v_MASTER_MIN_LOAD_PARTIAL_SUCCESS" "$v_DEFAULT_MIN_LOAD_PARTIAL_SUCCESS" )"
 	v_MASTER_MIN_LOAD_FAILURE="$( fn_is_float "$v_MASTER_MIN_LOAD_FAILURE" "$v_DEFAULT_MIN_LOAD_FAILURE" )"
+
+	if [[ "$b_NEW_CONF" == true ]]; then
+		fn_set_defaults
+		fn_create_config
+		echo "$( date +%F" "%T" "%Z ) - [$$] - Updated the configuration file" >> "$v_DEFAULT_LOG"
+		return
+	fi
 
 	### unset unneeded master variables
 	fn_clear_master_vars2
@@ -604,6 +634,7 @@ function fn_read_child_params {
 	b_DEBUG="$( fn_is_string "$v_DEBUG" "$v_MASTER_DEBUG" )"
 	b_DEBUG_FUNCTIONS="$( fn_is_string "$v_DEBUG_FUNCTIONS" "$v_MASTER_DEBUG_FUNCTIONS" )"
 	unset v_DEBUG v_DEBUG_FUNCTIONS
+	fn_clear_master_vars1
 }
 
 function fn_make_params {

@@ -60,10 +60,10 @@ v_DATE2=
 v_DATE3=
 
 ### Other global variables that are used throughout
-v_MASTER_PID=
+v_PID_MASTER=
 d_CHILD=
-v_PARAMS_RELOAD=
-v_MASTER_RELOAD=
+v_RELOAD_PARAMS=
+v_RELOAD_MASTER=
 v_VERSION=
 v_URL_OR_PING=
 v_CHECK_START=
@@ -115,10 +115,10 @@ function fn_child {
 		echo "$( date +%F":"%T" "%Z ) - [$v_CHILD_PID] - No Master Process present. Exiting." >> "$v_LOG"
 		exit 1
 	fi
-	v_MASTER_PID="$( cat "$d_WORKING"/lwmon.pid )"
+	v_PID_MASTER="$( cat "$d_WORKING"/lwmon.pid )"
 	d_CHILD="$d_WORKING"/"$v_CHILD_PID"
-	v_PARAMS_RELOAD="$( stat --format=%Y "$d_CHILD"/params )"
-	v_MASTER_RELOAD="$( stat --format=%Y "$f_CONF" )"
+	v_RELOAD_PARAMS="$( stat --format=%Y "$d_CHILD"/params )"
+	v_RELOAD_MASTER="$( stat --format=%Y "$f_CONF" )"
 	if [[ $( grep -E -c "^[[:blank:]]*JOB_TYPE[[:blank:]]*=" "$d_CHILD"/params ) -eq 1 ]]; then
 		fn_read_child_params "$d_CHILD"/params
 		if [[ "$v_JOB_TYPE" == "url" ]]; then
@@ -368,19 +368,19 @@ function fn_dns_child {
 function fn_child_start_loop {
 ### Check if the conf or params file have been updated, then get all of the necessary timestamps
 	fn_debug "fn_child_start_loop"
-	local v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
-	local v_MASTER_CUR="$( stat --format=%Y "$f_CONF" )"
-	if [[ "$v_MASTER_CUR" -gt "$v_MASTER_RELOAD" ]]; then
+	local v_CURRENT_PARAMS="$( stat --format=%Y "$d_CHILD"/params 2> /dev/null )"
+	local v_CURRENT_MASTER="$( stat --format=%Y "$f_CONF" 2> /dev/null )"
+	if [[ -n "$v_CURRENT_MASTER" && "$v_CURRENT_MASTER" -gt "$v_RELOAD_MASTER" ]]; then
 		fn_read_master_conf
-		v_MASTER_RELOAD="$v_MASTER_CUR"
+		v_RELOAD_MASTER="$v_CURRENT_MASTER"
 		fn_read_child_params "$d_CHILD"/params
-		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
-	elif [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
+		v_CURRENT_PARAMS="$( stat --format=%Y "$d_CHILD"/params )"
+	elif [[ -n "$v_CURRENT_PARAMS" && "$v_CURRENT_PARAMS" -gt "$v_RELOAD_PARAMS" ]]; then
 		fn_read_child_params "$d_CHILD"/params
-		v_PARAMS_CUR="$( stat --format=%Y "$d_CHILD"/params )"
+		v_CURRENT_PARAMS="$( stat --format=%Y "$d_CHILD"/params )"
 	fi
-	if [[ "$v_PARAMS_CUR" -gt "$v_PARAMS_RELOAD" ]]; then
-		v_PARAMS_RELOAD="$v_PARAMS_CUR"
+	if [[ "$v_CURRENT_PARAMS" -gt "$v_RELOAD_PARAMS" ]]; then
+		v_RELOAD_PARAMS="$v_CURRENT_PARAMS"
 		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$v_LOG"
 		echo "$v_DATE2 - [$v_CHILD_PID] - Reloaded parameters for $v_URL_OR_PING $v_ORIG_JOB_NAME." >> "$d_CHILD"/log
 		if [[ ! -f "$d_WORKING"/no_output ]]; then
@@ -744,7 +744,7 @@ function fn_report_status {
 
 	### Check to see if the parent is still in place, and die if not.
 	local v_DIE=false
-	if [[ $( cat /proc/$v_MASTER_PID/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon.sh[[:blank:]]" ) -eq 0 || -f "$d_CHILD"/die ]]; then
+	if [[ $( cat /proc/$v_PID_MASTER/cmdline 2> /dev/null | tr "\0" " " | grep -E -c "lwmon.sh[[:blank:]]" ) -eq 0 || -f "$d_CHILD"/die ]]; then
 		v_DUMP_STATUS=true
 		v_DIE=true
 	fi

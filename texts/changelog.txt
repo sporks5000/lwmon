@@ -4,15 +4,24 @@ Future Versions -
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
 
+3.0.1 (2018-11-29) -
+    - Fixed a bad variable name that was causing LWmon to incorrectly report the presence of a newer version
+    - Added a readme file
+    - Added the "CHECK_UPDATES" directive to the configuration file
+    - Installation file is now re-generated when LWmon is installed with a newer version of the configuration file
+    - Configuration version changed from "1" to "2"
+    - All variables that aren't from the configuration that began with "v_MASTER" had their names changed to prevent potential future collisions
+    - Spelling fixes
+
 3.0.0 (2018-11-27) -
-    - Split lwmon up into multiple files
+    - Split LWmon up into multiple files
         - Better change tracking
         - Allows processes to be more light weight
     - Master process unsets all of the functions that it will not use
     - Moved the configuration file out of the working directory
     - Added the ability to specify a log file
     - Updated the standards I was following for variable quotation
-    - Seperated out help and version information into their own files
+    - Separated out help and version information into their own files
     - Revised how command line arguments are parsed
     - Revised how variables are pulled from the configuration and the params files
     - Fixed a bug where resetting the end time on an old child directory would not function as expected
@@ -51,7 +60,7 @@ Future Versions -
     - Fixed a bug where intermittent failure emails did not have the correct text
     - Added more definitive rules to when the intermittent failure emails would be sent
     - Added help output for the various files and directories that LWmon uses
-    - Added the "SCRIPT" parameter. The user can define a script to run every time an eamil would be sent
+    - Added the "SCRIPT" parameter. The user can define a script to run every time an email would be sent
 
 2.3.7 (2018-06-21) -
     - "More verbose" output now includes the number of successes, partial successes, and failures
@@ -107,10 +116,10 @@ Future Versions -
     - Added a menu item for currently running jobs to output the "more verbose" information once.
     - Added menu options for html files.
     - Allowed command line options "--user-agent" and "--wget" to optionally be followed by "true" or "false" (as there was no way to unset either of these if it was already set in the conf).
-    - Added the following flags "--ldd", "--ndr", "--nsns", "--nds". These mostly exist for the purposes of putputting the command to reproduce the job.
+    - Added the following flags "--ldd", "--ndr", "--nsns", "--nds". These mostly exist for the purposes of outputting the command to reproduce the job.
 
 2.1.0 (2015-12-23) -
-    - The master process now checks for a newer version of lwmon and lets the user know if one is available.
+    - The master process now checks for a newer version of LWmon and lets the user know if one is available.
     - ssh-load jobs can now be started with just the "--load" flag, in addition to the "--ssh-load" flag
     - Added menu options for old jobs.
 
@@ -118,7 +127,7 @@ Future Versions -
     - The script now has the ability to use wget instead of curl. Added the "--wget" flag to force this.
 
 2.0.1 (2015-12-18) -
-    - Re-added a menu item for changing the job name, as it's not as intuative as I would like just from editing the conf.
+    - Re-added a menu item for changing the job name, as it's not as intuitive as I would like just from editing the conf.
     - Added the "--ident" flag, so that you can pre-include a ticket number or account number as part of a job's name.
     - When determining a domain's IP address, the script first checks /etc/hosts before determining if it needs to do a dig.
     - ssh-load jobs can now be run against localhost. A user is not required.
@@ -135,7 +144,7 @@ Future Versions -
     - Removed the majority of the menus; restructured the remaining ones.
     - Menu items to view log files.
     - In the child directory, there is a file named "cl" that has the command line flags for the job. You can output this from the menus.
-    - Implimented ssh-load job types. Made sure that there was an explanation for how to start them.
+    - Implemented ssh-load job types. Made sure that there was an explanation for how to start them.
 
 1.4.1 (2015-12-10) -
     - Improved checking for the output file
@@ -159,22 +168,22 @@ Future Versions -
     - Checks how long it takes for the busy-work portion of checks and subtracts that from WAIT_SECONDS.
     - Added "more verbose" mode.
     - email messages now include data on how long the checks took.
-    - Implimented partial successes for URL based checks.
-    - The master process now creates a mini script with just the functions that the child proces needs (reduces memory footprint).
+    - Implemented partial successes for URL based checks.
+    - The master process now creates a mini script with just the functions that the child process needs (reduces memory footprint).
     - Set the minimum wait seconds to 5 for URLs and 2 for ping and DNS.
     - All potential parameters are output to the params file; the unpopulated ones are commented out.
     - Added an option for the script to send an email if X out of the last Y checks were not successes.
     - Condensed the email functions by reworking them to combine common verbiage.
 
 1.3.1 (2015-12-02) -
-    - Changed the project's name from "xmonitor" to "lwmon".
+    - Changed the project's name from "xmonitor" to "LWmon".
 
 1.3.0 (2015-12-01) -
     - A custom message can now be added to email messages using the "CUSTOM_MESSAGE" directive in the params file.
-    - When the master process recieves a "ctrl -c", the prompt now times out after 15 seconds.
+    - When the master process receives a "ctrl -c", the prompt now times out after 15 seconds.
     - Replaced the old control files with a conf file.
     - Re-designed the params file as a conf-style file.
-    - The job type no longer has to be on the first line - it just has to be preceeded with "JOB_TYPE = ".
+    - The job type no longer has to be on the first line - it just has to be preceded with "JOB_TYPE = ".
     - Created functions to read from and write to conf files.
     - More robust checks to make sure that the values pulled from the params files make sense.
     - No more "none2" verbosity during the period where xmonitor is shutting down; handling this by touching a file instead.
@@ -190,7 +199,7 @@ Future Versions -
     - The remote die list can also include the $IP_ADDRESS or $DOMAIN associated with the job. In these cases, it will kill the individual jobs rather than the master process.
     - The remote die list can also contain in-line comments.
     - When a process kill is triggered by the remote die list, the full line, including comments, is logged.
-    - "Xmonitor" is now included in the user agent, whether or not the chrome user agent is being used. Tested to verify that this works on my one test case (http://www.celebdirtylaundry.com/).
+    - "Xmonitor" is now included in the user agent, whether or not the chrome user agent is being used. Tested to verify that this works on my one test case.
     - If the user agent field is set to something that is neither "true" nor "false", what ever is in the field will be used.
     - All instances of "$v_LOG" are now in quotes, just in case the designated log file contains spaces.
     - re-worked the sections of the master process that find dead children, and remove disabled children.
@@ -208,7 +217,7 @@ Future Versions -
     - The variables in the params file are no longer recognized by the line number they're on.
     - "--modify" includes an option to directly edit a child process's params file.
     - Child processes have their own verbosity file. This can be changed in the "--modify" menu.
-    - Now has the option for child processes to output in places other than /dec/stdout. This is accessable through the "--modify" menu.
+    - Now has the option for child processes to output in places other than /dev/stdout. This is accessible through the "--modify" menu.
 
 1.2.0 (2015-11-16) -
     - Script does its best to check if there are newer versions of curl installed elsewhere.
@@ -259,12 +268,12 @@ Future Versions -
     - E-mail messages are sent as a background process so that the script won't hang if mail isn't configured.
 
 1.0.0 (2013-07-09) -
-    - Implimented master, child, and control functionality
+    - Implemented master, child, and control functionality
     - URL, ping, and DNS monitoring
     - Basic functionality for "--modify"
     - "--help" text is concise and informative
     - E-mail messages can be sent after a certain number of hits or a certain number of misses.
-    - When running without any arguents, prompt intelligently for what needs to be done.
+    - When running without any arguments, prompt intelligently for what needs to be done.
     - "--modify" allows you to kill the master process
     - Option to backup current child processes so that they will run next time xmonitor is started, then kill the master process.
 

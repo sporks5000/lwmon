@@ -18,7 +18,7 @@ VERBOSITY = $v_DEFAULT_VERBOSITY
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
 EMAIL_ADDRESS = $v_DEFAULT_EMAIL_ADDRESS
 
-# The "MAIL_DELAY" directive sets a default for how many passes or failures have to occur in a row before an email is sent. This is useful in that it's typical for a single failure after a string of several succeses to be a false positive, rather than an actual indicator of an issue.
+# The "MAIL_DELAY" directive sets a default for how many passes or failures have to occur in a row before an email is sent. This is useful in that it's typical for a single failure after a string of several successes to be a false positive, rather than an actual indicator of an issue.
 # Note: This can also be set on a per-child basis
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
 MAIL_DELAY = $v_DEFAULT_MAIL_DELAY
@@ -38,7 +38,7 @@ CHECK_TIMEOUT = $v_DEFAULT_CHECK_TIMEOUT
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
 OUTPUT_FILE = $v_DEFAULT_OUTPUT_FILE
 
-# The "USER_AGENT" directive can be set to "true" or "false". For "true" the user agent string emulates chrome's user agent. For "false", the user agent string simply outputs the lwmon and curl versions.
+# The "USER_AGENT" directive can be set to "true" or "false". For "true" the user agent string emulates chrome's user agent. For "false", the user agent string simply outputs the LWmon and curl versions.
 # If this is set to something other than "true" or "false", what ever it's set to will be used as the user agent instead
 # Note: This can also be set on a per-child basis
 # Note: Changes to this directive will only impact jobs that are created after the change is made.
@@ -83,11 +83,14 @@ LOG = $v_DEFAULT_LOG
 # LWmon will only log that a mail message was sent if the exit code for the command given is "0", otherwise it will log that the message failed to send
 # Note: If the permissions of the config file ever change from 600, instead of running the command given for this directive, LWmon will attempt to send mail via the default command
 #     - This is to prevent a potential security compromise resulting from having this file edited by another user
-# Note: If you are using the default vaules for this and mail is not sending, try adding the "-v" flag after "mail" to see the error output
+# Note: If you are using the default values for this and mail is not sending, try adding the "-v" flag after "mail" to see the error output
 MAIL_COMMAND = $v_DEFAULT_MAIL_COMMAND
 
 # The "SSH_CONTROL_PATH" directive allows the user to specify where the control path socket file for an ssh-load job is located.
 SSH_CONTROL_PATH = $v_DEFAULT_SSH_CONTROL_PATH
+
+# The "CHECK_UPDATES" directive will determine whether or not LWmon should regularly check to see if there is a new version available. Setting this to "false" will prevent these checks from occurring
+CHECK_UPDATES = $v_DEFAULT_CHECK_UPDATES
 
 # The "COLOR_" and "RETURN_" directives allow the user to set specific strings that will be output before and after checks, depending on whether they're the first successful check, iterative successful checks, the first failed check, or iterative failed checks. This is designed to be used with bash color codes, but really anything that could be interpreted by "echo -e" can be used here.
 COLOR_SUCCESS = $v_DEFAULT_COLOR_SUCCESS

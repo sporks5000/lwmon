@@ -4,6 +4,9 @@ LWMON FILES AND DIRECTORIES
 ./lwmon.conf
     - This is the main configuration file for LWmon
 
+./lwmon.conf.old
+    - If the installation process has updated a previous configuration file to match the new version, the old configuration file will be stored here
+
 ./lwmon.log
     - The log file for the master process. Child processes also log some details to this file
 
@@ -48,6 +51,9 @@ LWMON FILES AND DIRECTORIES
 
 ./version
     - A directory for verifying that the version present is up to date
+
+./version/conf
+    - Contains the version of the configuration file.
 
 ./version/version
     - Contains the md5hash of the download of the current verson of the file

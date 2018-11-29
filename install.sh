@@ -65,11 +65,19 @@ function fn_copy {
 	done
 }
 
+### If the directory the script is in is already the installation directory, we don't need to do this
 if [[ "$d_PROGRAM" != "$d_INST" ]]; then
+	### Update the configuration
+	if [[ -f "$d_PROGRAM"/version/conf && -f "$d_INST"/version/conf && -f "$d_INST"/lwmon.conf && "$( cat "$d_PROGRAM"/version/conf 2> /dev/null )" -gt "$( cat "$d_INST"/version/conf 2> /dev/null )" ]]; then
+		mv -f "$d_INST"/lwmon.conf "$d_INST"/lwmon.conf.old
+		source "$d_PROGRAM"/includes/mutual.shf
+		source "$d_PROGRAM"/includes/variables.shf
+		source "$d_PROGRAM"/includes/create_config.shf
+		fn_read_master_conf "$d_INST"/lwmon.conf.old
+	fi
+	### Copy over all of the relevant files
 	fn_copy
 fi
-
-##### At some point in the future, I'll have to write a bit that updates the conf to a newer version.
 
 ### Give the correct permissions
 chmod 744 "$d_INST"/lwmon.sh
