@@ -171,16 +171,15 @@ function fn_check_updates {
 	if [[ "$v_CHECK_UPDATES" == true && "$v_DATE" -gt $(( v_VERSION_CHECK + ( 3600 * 24 ) )) ]]; then
 	### If it's been 24 hours or more since the last version check
 		local v_HASH="$( cat "$d_PROGRAM"/version/version 2> /dev/null )"
-		if [[ "$v_HASH" == "new" ]]; then
+		if [[ "$v_HASH" == "new" || ! -f "$d_PROGRAM"/version/version ]]; then
 		### If we do not already have a hash file, get it
 			local v_VERSION="$( fn_version )"
 
 			### Download the most recent hash
-			##### I should store historical versions at lwmon.com eventually
 			if [[ "$v_WGET_BIN" == "false" ]]; then
-				"$v_CURL_BIN" -Ls 'https://sporks5000.com/scripts/lwmon.tar.gz.'"$v_VERSION"'.md5sum' -o "$d_PROGRAM"/version/version_ 2> /dev/null
+				"$v_CURL_BIN" -Ls 'https://lwmon.com/lwmon.tar.gz.'"$v_VERSION"'.md5sum' -o "$d_PROGRAM"/version/version_ 2> /dev/null
 			else
-				"$v_WGET_BIN" -q 'https://sporks5000.com/scripts/lwmon.tar.gz.'"$v_VERSION"'.md5sum' -O "$d_PROGRAM"/version/version_ 2> /dev/null
+				"$v_WGET_BIN" -q 'https://lwmon.com/lwmon.tar.gz.'"$v_VERSION"'.md5sum' -O "$d_PROGRAM"/version/version_ 2> /dev/null
 			fi
 
 			### Check that the download worked
@@ -194,6 +193,10 @@ function fn_check_updates {
 			### Move the hash file into place
 			mv -f "$d_PROGRAM"/version/version_ "$d_PROGRAM"/version/version
 			v_HASH="$( cat "$d_PROGRAM"/version/version 2> /dev/null )"
+			### If we didn't get anything for the hash, let's ignore it for a bit
+			if [[ -z "$v_HASH" ]]; then
+				return
+			fi
 		fi
 
 		### Download the most recent hash

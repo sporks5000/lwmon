@@ -79,6 +79,8 @@ if [[ "$d_PROGRAM" != "$d_INST" ]]; then
 	fn_copy
 fi
 
+echo -e "\e[32mThe LWmon executable has been installed at '$d_INST/lwmon.sh'\e[00m"
+
 ### Give the correct permissions
 chmod 744 "$d_INST"/lwmon.sh
 chmod 744 "$d_INST"/scripts/fold_out.pl

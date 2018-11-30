@@ -1,5 +1,11 @@
 # Purpose
-LWmon is a monitoring tool designed to help automate the process of monitoring websites or load on a remote server with minimal effort. It outputs colored text showing data for multiple monitoring jobs to a single terminal window, allowing the user to be constantly aware of the status of each monitoring job without having to put forth specific effort.
+LWmon is a command-line tool for monitoring up-time of servers and websites with minimal effort. It outputs colored text showing data for multiple monitoring jobs to a single terminal window, allowing the user to be constantly aware of the status of each monitoring job without having to put forth too much effort or look for details in multiple places.
+
+Its output is based on the notion that the human eye is drawn to change. For each check it performs, it outputs a line of text with details on success or failure, and when that status changes from one check to the next, the color of the output changes to make it quickly visible that something is different. As a result, a single terminal window taking up minimal screen real estate can be used to monitor multiple items at once, and alert an end user when something has changed.
+
+# Limitations and Requirements
+
+This script has been tested on Debian, Mint, and CentOS 6, and 7 without issues. It's author can make no guarantees for other operating systems. It's functionality requires the presence of Bash, Perl, and various standard Linux command line utilities.
 
 # Installation
 Run the following to install LWmon:
@@ -8,6 +14,15 @@ Run the following to install LWmon:
 git clone https://github.com/sporks5000/lwmon.git
 ./lwmon/install.sh
 ```
+
+LWmon can do the following:
+* Monitor various services on a remote server
+  * Check a website to verify that it's loading as expecting by making a request for its content, and then checking to ensure that the response includes specified strings of text
+  * Check whether or not a server is pinging
+  * Keep track of the load average on a remote server (via SSH control sockets)
+  * Check DNS on a server by regularly performing dig requests against it
+* Send email notifications when the status of a monitoring job has changed
+* Keep track of the timestamps of when the status of a monitoring job has changed, as well as the percentage of successes vs. failures
 
 # Master / Child Model
 LWmon uses a master process and child processes in order to output data; this allows it to output information from multiple jobs in a single terminal window. If you need to start additional monitoring jobs, run the command to start them in a separate terminal window, and the output from the new jobs you've created will output in the original terminal window alongside any previously existing jobs.
@@ -123,10 +138,6 @@ For details on all the parameters present within this file and what they do, you
 # Configuration File
 
 LWmon includes a configuration file that can be used to modify its default behavior. When LWmon is run for the first time it will generate a configuration file named lwmon.conf in the same directory as lwmon.sh. This file should include all of the necessary details on what the directives therein accomplish.
-
-# Limitations and Requirements
-
-This script has been tested on Debian, Mint, and CentOS 6, and 7 without issues. I can make no guarantees for other operating systems. It's functionality requires the present of Bash, Perl, and various standard Linux command line utilities.
 
 # Reporting Bugs, Feature Requests
 

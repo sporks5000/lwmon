@@ -4,13 +4,16 @@ Future Versions -
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
 
-3.0.1 (2018-11-29) -
+3.0.1 (2018-11-30) -
     - Fixed a bad variable name that was causing LWmon to incorrectly report the presence of a newer version
     - Added a readme file
     - Added the "CHECK_UPDATES" directive to the configuration file
     - Installation file is now re-generated when LWmon is installed with a newer version of the configuration file
     - Configuration version changed from "1" to "2"
     - All variables that aren't from the configuration that began with "v_MASTER" had their names changed to prevent potential future collisions
+    - Installation process now outputs the path to lwmon.sh
+    - Remote version information is now pulled from lwmon.com rather than elsewhere
+    - If the version file doesn't have a version in it and we aren't able to get a remote version, wait 24 hours before checking again
     - Spelling fixes
 
 3.0.0 (2018-11-27) -
