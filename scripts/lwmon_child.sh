@@ -536,37 +536,43 @@ function fn_long_short_dur {
 
 	### Get rid of entries from the long array, adjust the placement of the for the short hours
 	if [[ -n "${a_LONG_STAMPS[0]}" ]]; then
+		local v_SHIFTED=0
 		while [[ "${a_LONG_STAMPS[0]}" -le $(( v_DATE3 - $(( 3600 * v_LONG_HOURS )) )) ]]; do
-			if [[ "${a_LONG_STAMPS[0]}" == "s" ]]; then
+			if [[ "${a_LONG_STATUSES[0]}" == "s" ]]; then
 				v_LONG_SUCCESS=$(( v_LONG_SUCCESS - 1 ))
-			elif [[ "${a_LONG_STAMPS[0]}" == "p" ]]; then
+			elif [[ "${a_LONG_STATUSES[0]}" == "p" ]]; then
 				v_LONG_PARTIAL=$(( v_LONG_PARTIAL - 1 ))
-			elif [[ "${a_LONG_STAMPS[0]}" == "f" ]]; then
+			elif [[ "${a_LONG_STATUSES[0]}" == "f" ]]; then
 				v_LONG_FAIL=$(( v_LONG_FAIL - 1 ))
 			fi
-			v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} - ${a_LONG_DURATIONS[0]}}" 2> /dev/null || echo "error with awk 14" > /dev/stderr )"
 			v_LONG_COUNT=$(( v_LONG_COUNT - 1 ))
 			a_LONG_STAMPS=("${a_LONG_STAMPS[@]:1}")
 			a_LONG_STATUSES=("${a_LONG_STATUSES[@]:1}")
 			a_LONG_DURATIONS=("${a_LONG_DURATIONS[@]:1}")
 			v_SHORT_PLACE=$(( v_SHORT_PLACE - 1 ))
+			v_SHIFTED=1
 		done
-	fi
+		if [[ $v_SHIFTED == 1 ]]; then
+			v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} - ${a_LONG_DURATIONS[0]}}" 2> /dev/null || echo "error with awk 14" > /dev/stderr )"
+		fi
 
-	### adjust placement for the short array
-	if [[ -n "${a_LONG_STAMPS[0]}" ]]; then
+		### adjust placement for the short array
+		v_SHIFTED=0
 		while [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" -le $(( v_DATE3 - $(( 3600 * v_SHORT_HOURS )) )) ]]; do
-			if [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "s" ]]; then
+			if [[ "${a_LONG_STATUSES[$v_SHORT_PLACE]}" == "s" ]]; then
 				v_SHORT_SUCCESS=$(( v_SHORT_SUCCESS - 1 ))
-			elif [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "p" ]]; then
+			elif [[ "${a_LONG_STATUSES[$v_SHORT_PLACE]}" == "p" ]]; then
 				v_SHORT_PARTIAL=$(( v_SHORT_PARTIAL - 1 ))
-			elif [[ "${a_LONG_STAMPS[$v_SHORT_PLACE]}" == "f" ]]; then
+			elif [[ "${a_LONG_STATUSES[$v_SHORT_PLACE]}" == "f" ]]; then
 				v_SHORT_FAIL=$(( v_SHORT_FAIL - 1 ))
 			fi
-			v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} - ${a_LONG_DURATIONS[$v_SHORT_PLACE]}}" 2> /dev/null || echo "error with awk 15" > /dev/stderr )"
 			v_SHORT_COUNT=$(( v_SHORT_COUNT - 1 ))
 			v_SHORT_PLACE=$(( v_SHORT_PLACE + 1 ))
+			v_SHIFTED=1
 		done
+		if [[ $v_SHIFTED == 1 ]]; then
+			v_SHORT_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_SHORT_TOTAL_DURATION} - ${a_LONG_DURATIONS[$v_SHORT_PLACE]}}" 2> /dev/null || echo "error with awk 15" > /dev/stderr )"
+		fi
 	fi
 
 	v_LONG_TOTAL_DURATION="$( awk "BEGIN {printf \"%.4f\",${v_LONG_TOTAL_DURATION} + ${v_CHECK_DURATION}}" 2> /dev/null || echo "error with awk 16" > /dev/stderr )"

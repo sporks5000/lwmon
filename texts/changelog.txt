@@ -8,6 +8,7 @@ Future Versions -
 3.0.2 (2020-07-07) -
     - Regex for email addresses updated to allow for multiple space separated addresses
     - Ping now fails when it returns the message 'destination net unreachable'
+    - Fixed a bug where counts of successes/fails/partials were being math'd wrong
 
 3.0.1 (2018-11-30) -
     - Fixed a bad variable name that was causing LWmon to incorrectly report the presence of a newer version
