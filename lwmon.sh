@@ -149,7 +149,7 @@ function fn_test_child_pid {
 
 function fn_test_email {
 	fn_debug "fn_fn_test_email"
-	if [[ $( echo "$1" | grep -E -c "^[^@ ]+@[^.@ ]+\.[^@ ]+$" ) -lt 1 ]]; then
+	if [[ $( echo "$1" | grep -E -c "^([^@ ]+@[^.@ ]+\.[^@ ]+ ?)+$" ) -lt 1 ]]; then
 		echo "Argument \"$2\" must be followed by an email address"
 		exit 1
 	fi

@@ -315,7 +315,7 @@ function fn_ping_child {
 		v_CHECK_START="$( date +%s"."%N | head -c -6 )"
 		v_PING_RESULT="$( ping -W2 -c1 "$v_DOMAIN" 2> /dev/null | grep -E "icmp_[rs]eq" )"
 		v_CHECK_END="$( date +%s"."%N | head -c -6 )"
-		local v_WATCH="$( echo "$v_PING_RESULT" | grep -E -c "icmp_[rs]eq" )"
+		local v_WATCH="$( echo "$v_PING_RESULT" | grep -E "icmp_[rs]eq" | grep -v -c -i 'destination net unreachable' )"
 		if [[ "$v_WATCH" -ne 0 ]]; then
 			fn_report_status success
 		else
@@ -581,7 +581,12 @@ function fn_output {
 	elif [[ "$v_OUTPUT_FILE" == "/dev/stderr" ]]; then
 		( >&2 echo -e "$v_MESSAGE" )
 	else
-		echo -e "$v_MESSAGE" >> "$v_OUTPUT_FILE"
+		local v_FAIL=false
+		echo -e "$v_MESSAGE" >> "$v_OUTPUT_FILE" 2> /dev/null || v_FAIL=true
+		if [[ "$v_FAIL" == true ]]; then
+			### If we can't write to the output file for some reason, write to standard out
+			echo -e "$v_MESSAGE"
+		fi
 	fi
 }
 

@@ -3,6 +3,11 @@ Future Versions -
     - In URL jobs, should I compare the current pull to the previous pull? Compare file size?
     - Rather than have a job run indefinitely, have the user be able to set a duration or a time for it to stop.
     - Because "--string" uses fgrep, does it make sense to make a "--reg-string" flag that uses egrep?
+    - Redo everything in perl
+
+3.0.2 (2020-07-07) -
+    - Regex for email addresses updated to allow for multiple space separated addresses
+    - Ping now fails when it returns the message 'destination net unreachable'
 
 3.0.1 (2018-11-30) -
     - Fixed a bad variable name that was causing LWmon to incorrectly report the presence of a newer version

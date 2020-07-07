@@ -207,7 +207,7 @@ function fn_is_file_path {
 
 function fn_is_email {
 	fn_debug "fn_is_email"
-	if [[ $( echo "$1" | grep -E -c "^[^@ ]+@[^.@ ]+\.[^@ ]+$" ) -gt 0 ]]; then
+	if [[ $( echo "$1" | grep -E -c "^([^@ ]+@[^.@ ]+\.[^@ ]+ ?)+$" ) -gt 0 ]]; then
 		echo "$1"
 	else
 		echo "$2"
